@@ -210,12 +210,15 @@ import {
 
 /** tGLM the sharer sends a new editor or manager's stealth address, so it can write file entries. */
 const MEMBER_TGLM = parseEther("0.005");
-/** Sepolia ETH the sharer sends a new manager's stealth address, so it can grant and revoke. */
-const MANAGER_ETH = parseEther("0.003");
+/**
+ * Sepolia ETH the sharer sends a new manager's stealth address, so it can grant and revoke. Sized for Sepolia's real
+ * fees (a base fee of a few wei): a manager's grant or revoke is ~150k gas, so this covers hundreds of them.
+ */
+const MANAGER_ETH = parseEther("0.0003");
 /** Below this, an editor or manager shows "needs gas", and maintain() tops them up. */
 const LOW_TGLM = parseEther("0.001");
 /** The least a key needs before the client sends a transaction with it. */
-const MIN_ETH = parseEther("0.0003");
+const MIN_ETH = parseEther("0.0001");
 const MIN_TGLM = parseEther("0.0003");
 /** How many weeks of welcome notes "Shared with me" scans on a first look. */
 const WELCOME_WEEKS = 8;
@@ -473,13 +476,15 @@ class Client implements HavenClient {
    * Makes sure K or K_room can pay for the next transactions: asks the API for a drip (sent in batches) and waits
    * for it. Stealth members are never dripped; their sharer funded them.
    */
-  private async ensureGas(h: Holding, need: { sepolia?: boolean; arkiv?: boolean }, step: StepSink) {
+  private async ensureGas(h: Holding, need: { sepolia?: boolean; arkiv?: boolean; minEth?: bigint }, step: StepSink) {
+    // `minEth`: when this key is about to send ETH on (a new manager's gas), it needs that much as well as its own fees.
+    const wantEth = need.minEth ?? MIN_ETH;
     const enough = async () => {
       const [eth, glm] = await Promise.all([
-        need.sepolia ? this.sepolia(undefined, h.address).getBalance({ address: h.address }) : Promise.resolve(MIN_ETH),
+        need.sepolia ? this.sepolia(undefined, h.address).getBalance({ address: h.address }) : Promise.resolve(wantEth),
         need.arkiv ? this.arkiv(undefined, h.address).getBalance({ address: h.address }) : Promise.resolve(MIN_TGLM),
       ]);
-      return eth >= MIN_ETH && glm >= MIN_TGLM;
+      return eth >= wantEth && glm >= MIN_TGLM;
     };
     if (await enough()) return;
     if (h.source === "share") {
@@ -1554,7 +1559,8 @@ class Client implements HavenClient {
     const head = chainHead(fsCopy.key);
     const ops: CreateOp[] = [];
     const added: RosterMember[] = [];
-    if (people.length) await this.ensureGas(h, { sepolia: true, arkiv: true }, step);
+    const newManagers = opts.role === "manager" ? BigInt(people.length) : 0n;
+    if (people.length) await this.ensureGas(h, { sepolia: true, arkiv: true, minEth: MIN_ETH + newManagers * MANAGER_ETH }, step);
     for (const p of people) {
       const welcome = await createWelcome({ recipientSpendingPublicKey: p.key, folder: f });
       const S = welcome.stealthAddress;

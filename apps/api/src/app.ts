@@ -177,6 +177,8 @@ const LIMITS = {
   // Every drip costs the relayer DRIP_SEPOLIA_WEI and DRIP_ARKIV_WEI. Without a total, a script making fresh keys could
   // empty the relayer in a day and stop sign-ups for everyone; with it, the most a day can cost is known in advance.
   dripsPerDay: 60,
+  // Drips are small (DRIP_SEPOLIA_WEI), so a busy key, one sharing with several managers, may ask a few times a day.
+  dripsPerKeyPerDay: 5,
   roomsPerDay: 150,
   uploadBytesPerKeyPerDay: 512 * 1024 * 1024,
   arkivCallsPerMinute: 600,
@@ -502,7 +504,7 @@ export function createApi(env: ApiEnv) {
       if (!isAddressEqual(owner, address) || access.via !== "owner") throw new DriveError("NOT_AUTHORIZED", "only a registry's owner key gets gas");
       if (!pending.has(address)) {
         // The per-key check comes first, so a key asking again can't use up everyone's daily total.
-        if (!counters.hit(`drip:${address}`, 1, 1, DAY)) throw new DriveError("RATE_LIMITED", "one drip per key per day");
+        if (!counters.hit(`drip:${address}`, 1, LIMITS.dripsPerKeyPerDay, DAY)) throw new DriveError("RATE_LIMITED", "this key has had its free gas for today");
         if (!counters.hit("drips", 1, LIMITS.dripsPerDay, DAY)) throw new DriveError("RATE_LIMITED", "today's free test gas is used up; try again tomorrow");
       }
       pending.set(address, address);
