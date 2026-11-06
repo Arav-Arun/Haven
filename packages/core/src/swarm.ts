@@ -127,6 +127,28 @@ function httpsRoute(config: SwarmConfig, label: string, isolationKey?: string) {
   };
 }
 
+/**
+ * One Swarm/API call: through the private network when it can carry it, else direct. A large body (a 1 MB padded
+ * upload) can be more than a mixnet carries in time; then the call is sent again direct, and the receipt says so.
+ */
+async function routedCall(
+  config: SwarmConfig,
+  label: string,
+  isolationKey: string | undefined,
+  step: StepSink,
+  call: (f: typeof fetch) => Promise<Response>,
+): Promise<Response> {
+  const route = httpsRoute(config, label, isolationKey);
+  step(route.step);
+  try {
+    return await call(route.fetch);
+  } catch (error) {
+    if (route.step.route !== "anon") throw error;
+    step({ kind: "route", label: `${label}: too large for the private network, sent direct`, route: "direct", network: route.step.network });
+    return await call(config.directFetch ?? globalThis.fetch.bind(globalThis));
+  }
+}
+
 function trimSlash(url: string): string {
   return url.replace(/\/+$/, "");
 }
@@ -161,15 +183,15 @@ export async function uploadEncrypted(
     throw new DriveError("UNKNOWN", "only padded ciphertext may be uploaded");
   }
   const auth = await signUpload(writer, folder, padded);
-  const route = httpsRoute(config, "Upload to Swarm (via API)", isolationKey);
-  step(route.step);
   let response: Response;
   try {
-    response = await route.fetch(`${trimSlash(config.apiUrl)}/upload`, {
-      method: "POST",
-      headers: { "content-type": "application/octet-stream", ...uploadHeaders(auth) },
-      body: new Uint8Array(padded),
-    });
+    response = await routedCall(config, "Upload to Swarm (via API)", isolationKey, step, (f) =>
+      f(`${trimSlash(config.apiUrl)}/upload`, {
+        method: "POST",
+        headers: { "content-type": "application/octet-stream", ...uploadHeaders(auth) },
+        body: new Uint8Array(padded),
+      }),
+    );
   } catch (error) {
     throw new DriveError("NETWORK", `upload: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -187,11 +209,9 @@ export async function downloadEncrypted(
   step: StepSink = ignoreSteps,
   isolationKey?: string,
 ): Promise<Uint8Array> {
-  const route = httpsRoute(config, "Download from Swarm", isolationKey);
-  step(route.step);
   let response: Response;
   try {
-    response = await route.fetch(`${trimSlash(config.beeUrl)}/bytes/${normalizeRef(ref).slice(2)}`);
+    response = await routedCall(config, "Download from Swarm", isolationKey, step, (f) => f(`${trimSlash(config.beeUrl)}/bytes/${normalizeRef(ref).slice(2)}`));
   } catch (error) {
     throw new DriveError("NETWORK", `download: ${error instanceof Error ? error.message : String(error)}`);
   }
