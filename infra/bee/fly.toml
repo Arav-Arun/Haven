@@ -9,8 +9,10 @@
 # 2^depth × amount PLUR (1 xBZZ = 1e16 PLUR), and amount = live price × 17280 blocks/day × days. Read the live price
 # first (GET /chainstate → currentPrice); the contract refuses less than 1 day (minimumValidityBlocks = 17280). At
 # 201172 PLUR/chunk/block (2026-11-06), 7 days at depth 19 is amount 24333765120, about 1.28 xBZZ:
-#   fly ssh console --config infra/bee/fly.toml -C "wget -qO- http://localhost:1633/chainstate"
-#   fly ssh console --config infra/bee/fly.toml -C "wget -qO- --post-data= http://localhost:1633/stamps/<amount>/19"
+# The image has no wget or curl, so talk to the node through a private tunnel from your own machine:
+#   fly proxy 1633:1633 --config infra/bee/fly.toml        (leave running; then, in another terminal)
+#   curl http://localhost:1633/chainstate
+#   curl -X POST http://localhost:1633/stamps/<amount>/19
 # Extend it later instead of buying another: POST /stamps/topup/<batchID>/<amount>.
 # The node's key (in the bee_data volume, encrypted with BEE_PASSWORD) owns the batch: keep the password safe, and
 # don't delete the volume while the batch is in use.
