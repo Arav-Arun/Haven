@@ -314,6 +314,30 @@ export async function listChildren(
   registry: Address,
   options: ListChildrenOptions,
 ): Promise<ChildName[]> {
+  const { labels } = await registeredLabels(client, registry, options);
+  const children: ChildName[] = labels.map((l) => ({ ...l, registry: null }));
+  for (const child of children) child.registry = await getSubregistry(client, registry, child.label);
+  return children;
+}
+
+export interface RegisteredLabel {
+  label: string;
+  /** The token owner at registration. */
+  owner: Address;
+  expiry: bigint;
+  blockNumber: bigint;
+}
+
+/**
+ * Every label registered in any PermissionedRegistry (a folder, or someone's subregistry such as acme.eth's), from
+ * its LabelRegistered events (eth_getLogs, which carry the label itself). The latest registration of a label wins.
+ * Returns the last block scanned, so a caller can continue from there next time.
+ */
+export async function registeredLabels(
+  client: SepoliaReader,
+  registry: Address,
+  options: ListChildrenOptions,
+): Promise<{ labels: RegisteredLabel[]; scannedTo: bigint }> {
   const event = driveRegistryAbi.find((e) => e.type === "event" && e.name === "LabelRegistered");
   if (!event || event.type !== "event") throw new Error("LabelRegistered missing from the ABI");
   const latest = options.toBlock ?? (await client.getBlockNumber());
@@ -331,19 +355,59 @@ export async function listChildren(
     }
   }
   const parsed = parseEventLogs({ abi: driveRegistryAbi, eventName: "LabelRegistered", logs });
-  const byLabel = new Map<string, ChildName>();
+  const byLabel = new Map<string, RegisteredLabel>();
   for (const log of parsed) {
     byLabel.set(log.args.label, {
       label: log.args.label,
-      registry: null,
       owner: getAddress(log.args.owner),
       expiry: log.args.expiry,
       blockNumber: log.blockNumber,
     });
   }
-  const children = [...byLabel.values()];
-  for (const child of children) child.registry = await getSubregistry(client, registry, child.label);
-  return children;
+  return { labels: [...byLabel.values()], scannedTo: latest };
+}
+
+/** A label's live owner and expiry. owner is null when the label is unregistered, reserved or expired. */
+export async function labelState(
+  client: SepoliaReader,
+  registry: Address,
+  label: string,
+  now = Math.floor(Date.now() / 1000),
+): Promise<{ owner: Address | null; expiry: number }> {
+  try {
+    const state = await client.readContract({
+      address: registry,
+      abi: driveRegistryAbi,
+      functionName: "getState",
+      args: [labelId(label)],
+    });
+    const expiry = Number(state.expiry);
+    const live = !isAddressEqual(state.latestOwner, zeroAddress) && expiry > now;
+    return { owner: live ? getAddress(state.latestOwner) : null, expiry };
+  } catch (error) {
+    throw toDriveError(error, `state of ${label}`);
+  }
+}
+
+/**
+ * The block a contract was deployed in, by binary search on eth_getCode (needs an RPC that serves past state, as
+ * Sepolia's common providers do). A registry's logs can't be older, so a first scan starts here.
+ */
+export async function creationBlock(client: SepoliaReader, address: Address): Promise<bigint> {
+  try {
+    let high = await client.getBlockNumber();
+    if (!(await client.getCode({ address, blockNumber: high }))) throw new DriveError("NOT_FOUND", "no contract there");
+    let low = 0n;
+    while (low < high) {
+      const mid = (low + high) / 2n;
+      const code = await client.getCode({ address, blockNumber: mid });
+      if (code && code !== "0x") high = mid;
+      else low = mid + 1n;
+    }
+    return low;
+  } catch (error) {
+    throw toDriveError(error, "finding when a registry was created");
+  }
 }
 
 // ---------------------------------------------------------------- writes

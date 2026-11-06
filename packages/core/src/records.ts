@@ -104,9 +104,43 @@ export interface RosterMember {
   via: "direct" | "group";
 }
 
+/** One person a team rule (add-on F2) shared with: which subname, through which stealth address, to whom and to which key. */
+export interface SubtreeMember {
+  ensName: string;
+  /** The stealth address S the share went to. */
+  address: Address;
+  /** The subname's owner when it was shared; a transfer means a different person. */
+  owner: Address;
+  /** Their compressed spending key when it was shared; a change means a re-share. */
+  key: Hex;
+  since: number;
+}
+
+/**
+ * "Share with everyone under acme.eth" (add-on F2). Lives ONLY in the sealed manager roster: the chain never learns
+ * the folder is shared with that team, it only sees one random address per member.
+ */
+export interface SubtreeRuleState {
+  parent: string;
+  /** The parent's subregistry, where its subnames live. */
+  registry: Address;
+  role: Role;
+  until: number | null;
+  hideFromMembers: boolean;
+  excluded: string[];
+  members: SubtreeMember[];
+  /** Labels seen in the parent's registry so far, and the last block scanned, so each sync only reads new logs. */
+  labels: string[];
+  scannedTo: number;
+  createdAt: number;
+  lastSyncedAt: number;
+}
+
 export interface Roster {
   managers: RosterMember[];
   members: RosterMember[];
+  /** Team rules (add-on F2). Absent in rosters written before F2. */
+  subtrees?: SubtreeRuleState[];
 }
 
 const rosterAad = (part: "managers" | "members", folder: Address, version: number) =>
@@ -144,9 +178,81 @@ function decodeMembers(value: unknown): RosterMember[] {
   });
 }
 
+function encodeSubtrees(rules: SubtreeRuleState[]) {
+  return rules.map((r) => ({
+    p: r.parent,
+    g: getAddress(r.registry),
+    r: r.role,
+    u: r.until,
+    h: r.hideFromMembers,
+    x: r.excluded,
+    m: r.members.map((m) => ({ n: m.ensName, a: getAddress(m.address), o: getAddress(m.owner), k: m.key, s: m.since })),
+    l: r.labels,
+    b: r.scannedTo,
+    c: r.createdAt,
+    y: r.lastSyncedAt,
+  }));
+}
+
+const isInt = (v: unknown): v is number => typeof v === "number" && Number.isSafeInteger(v) && v >= 0;
+const isTextList = (v: unknown, max = 1024): v is string[] => Array.isArray(v) && v.every((s) => isText(s, 255)) && v.length <= max;
+
+function decodeSubtrees(value: unknown): SubtreeRuleState[] {
+  if (!Array.isArray(value)) throw new Error("malformed roster");
+  return value.map((r: Record<string, unknown>) => {
+    const ok =
+      isText(r.p, 255) &&
+      typeof r.g === "string" &&
+      ["viewer", "editor", "manager"].includes(r.r as string) &&
+      (r.u === null || isInt(r.u)) &&
+      isTextList(r.x) &&
+      Array.isArray(r.m) &&
+      isTextList(r.l, 100_000) &&
+      isInt(r.b) &&
+      isInt(r.c) &&
+      isInt(r.y);
+    if (!ok) throw new Error("malformed roster");
+    return {
+      parent: r.p as string,
+      registry: getAddress(r.g as string),
+      role: r.r as Role,
+      until: r.u as number | null,
+      hideFromMembers: r.h === true,
+      excluded: r.x as string[],
+      members: (r.m as Record<string, unknown>[]).map((m) => {
+        if (!isText(m.n, 255) || typeof m.a !== "string" || typeof m.o !== "string" || !isInt(m.s)) {
+          throw new Error("malformed roster");
+        }
+        if (typeof m.k !== "string" || !isHex(m.k)) throw new Error("malformed roster");
+        return { ensName: m.n, address: getAddress(m.a), owner: getAddress(m.o), key: m.k, since: m.s };
+      }),
+      labels: r.l as string[],
+      scannedTo: r.b as number,
+      createdAt: r.c as number,
+      lastSyncedAt: r.y as number,
+    };
+  });
+}
+
+/**
+ * The managers part holds the manager list and, since F2, the team rules: `{ m: managers, s: rules }`. Rosters written
+ * before F2 hold a bare array, which still opens (with no rules).
+ */
+function encodeManagersPart(roster: Roster) {
+  const managers = encodeMembers(roster.managers);
+  return roster.subtrees?.length ? { m: managers, s: encodeSubtrees(roster.subtrees) } : managers;
+}
+
+function decodeManagersPart(value: unknown): Pick<Roster, "managers" | "subtrees"> {
+  if (Array.isArray(value)) return { managers: decodeMembers(value) };
+  const v = value as Record<string, unknown> | null;
+  if (!v || typeof v !== "object") throw new Error("malformed roster");
+  return { managers: decodeMembers(v.m), subtrees: decodeSubtrees(v.s) };
+}
+
 export async function sealRoster(rosterKey: Uint8Array, folder: Address, version: number, roster: Roster) {
   return {
-    managers: await sealJson(rosterKey, encodeMembers(roster.managers), rosterAad("managers", folder, version)),
+    managers: await sealJson(rosterKey, encodeManagersPart(roster), rosterAad("managers", folder, version)),
     members: await sealJson(rosterKey, encodeMembers(roster.members), rosterAad("members", folder, version)),
   };
 }
@@ -157,9 +263,13 @@ export async function openRoster(
   version: number,
   sealed: { managers: Uint8Array; members: Uint8Array },
 ): Promise<Roster> {
+  const { managers, subtrees } = decodeManagersPart(
+    await openJson(rosterKey, sealed.managers, rosterAad("managers", folder, version)),
+  );
   return {
-    managers: decodeMembers(await openJson(rosterKey, sealed.managers, rosterAad("managers", folder, version))),
+    managers,
     members: decodeMembers(await openJson(rosterKey, sealed.members, rosterAad("members", folder, version))),
+    ...(subtrees ? { subtrees } : {}),
   };
 }
 

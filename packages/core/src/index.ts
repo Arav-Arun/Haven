@@ -15,6 +15,7 @@ export * from "./padding";
 export * from "./receipts";
 export * from "./records";
 export * from "./stealth";
+export * from "./subtree";
 export * from "./swarm";
 export * from "./transport";
 export * from "./validator";
