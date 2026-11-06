@@ -24,4 +24,5 @@ export * from "./stealth";
 export * from "./swarm";
 export * from "./transport";
 export * from "./validator";
+export * from "./zk";
 export { driveRegistryAbi, sepoliaDeployment, verifiableFactoryAbi } from "./generated";
