@@ -4,6 +4,7 @@
 export * from "./addresses";
 export * from "./arkiv";
 export * from "./crypto";
+export * from "./doorbell";
 export * from "./ens";
 export * from "./epochs";
 export * from "./errors";

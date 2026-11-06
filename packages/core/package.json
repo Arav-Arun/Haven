@@ -11,6 +11,7 @@
     "a4": "tsx scripts/a4-live.ts",
     "f1": "tsx scripts/f1-live.ts",
     "release": "tsx scripts/release.ts",
+    "f4": "tsx scripts/f4-live.ts",
     "test": "vitest run"
   },
   "dependencies": {
