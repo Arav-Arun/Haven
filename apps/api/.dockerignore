@@ -1,3 +1,0 @@
-# Admit only the bundle. Everything else (including .env files) stays out of the build context.
-*
-!dist/server.mjs

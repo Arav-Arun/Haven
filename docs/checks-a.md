@@ -350,67 +350,24 @@ Found while preparing A5. All of it was checked onchain, read-only.
 
 ## A5: API
 
-Code: `apps/api/` (Hono). It covers `/claim`, `/room`, `/drip`, `/upload` and `/health`, with abuse limits. The
-signed request formats live in `packages/core/src/apiAuth.ts`, so the client and the API share them. Runbook:
-`apps/api/README.md`.
+Code: `apps/api/` (Hono). Two versions were written in parallel: one on `plan-a` and one on `plan-b`, the second as
+part of A6. The merge keeps the `plan-b` version, `createApi` in `src/app.ts`, because `createDriveClient`, the web
+app, the extension and the add-ons (`/keylog`, `/doorbell`, `/arkiv-rpc`, `/bytes/:ref`, `/config`) are built on it.
+Both versions call the same core flows: `claimName`, `createRoom`, `verifyUpload` and `wasAllowed`. The request formats
+are in `packages/core/src/api.ts`. The `plan-a` version is gone, along with its `apiAuth.ts`, `server.ts`, `drips.ts`,
+`limits.ts` and their tests; it is still in the history (commit `eb526ed`). Runbook: `apps/api/README.md`.
 
 | Done when | Status |
 |---|---|
-| Each endpoint works with curl against the deployed URL | **Not deployed yet.** Needs the bootstrap (addresses), `fly auth login` and the Fly secrets. Locally, every endpoint works end to end over HTTP (below) |
-| Abuse limits return `RATE_LIMITED` | **Pass locally:** one name per K, one room per K_room, the daily room cap, one drip per key, and the upload quota each return `429 RATE_LIMITED` |
+| Each endpoint works with curl against the deployed URL | **Not deployed yet.** Needs the bootstrap (addresses), `fly auth login` and the Fly secrets |
+| Abuse limits return `RATE_LIMITED` | In code: one name per K per day, one room per key, one drip per key per day, daily caps, the upload quota per key. `apps/api/test/app.test.ts` (9 tests) checks the refusals that need no network |
 
-**Local evidence: 7 tests** (`pnpm --filter @cloakroom/api test`).
-- **Setup:** a real local chain with the compiled `DriveRegistry` and `UserRegistry`, the factory at its Sepolia
-  address, and the **live PermissionedResolver bytecode copied from Sepolia**. A local HTTP server stands in for Bee.
-- **`/room`:** creates a room for a fresh key, which drive-owns it, with nothing left to the relayer. It refuses:
-  - weak work;
-  - someone else's signature;
-  - a tampered time, and an honestly signed request ten minutes old;
-  - the daily cap.
-- **`/drip`:**
-  - queues only the drive owner of a registry registered under the right parent;
-  - the batch pays exactly the drip amount;
-  - nothing is sent when the relayer is at its floor.
-- **`/upload`:**
-  - stores padded ciphertext from a current editor;
-  - refuses a viewer (`403`), an unpadded body (`413`) and over-quota (`429`).
-- **`/claim`:**
-  - deploys the resolver with `cloak.key` and the drive root, and keeps no role;
-  - then refuses the taken name (`409`) and a second name for the same K (`429`);
-  - refuses bad labels, reserved prefixes, malformed keys, another key's signature and stale requests.
-
-**Mutation check: 15/16 killed.** Each of these was broken in turn, and a test failed every time:
-- request signature, freshness and proof of work;
-- the key format;
-- name availability;
-- one name per K, one room per K_room, the room cap;
-- the drip's parent check, owner check, once-per-key and floor;
-- the upload's WRITE check, padding check and quota.
-
-The one survivor is equivalent: dropping the API's early label check changes nothing, because `claimName` checks the
-label again.
-
-**Packaging.**
-- `pnpm --filter @cloakroom/api build` bundles everything into `dist/server.mjs` (2.9 MB). The bundle starts, and
-  without deployed addresses it stops with "driveRegistryImpl is not deployed yet".
-- The Docker build context is `apps/api` with a `.dockerignore` that admits only `dist/server.mjs`. So no `.env` file
-  can reach Fly's remote builder or the image.
-- `fly.toml`: region `bom`, health check on `/health`, one machine always on (the drip timer must run).
-
-**Decisions.**
-- **Every request is signed by the key it concerns and carries the time** (±5 minutes), so nobody can ask for a name,
-  room or drip on someone else's behalf or replay a request.
-- **`/drip` only answers** when:
-  - the registry is registered under `cloakroom.eth` (kind `drive`) or `rooms.cloakroom.eth` (kind `room`) with the
-    given label;
-  - the asking key is its drive owner.
-
-  This enforces "K or K_room only". A key that already holds the drip amount gets nothing. Sends go out in the
-  10-minute batch in shuffled order.
-- **Counters live in memory,** keyed by a short hash, and reset each UTC day: "one name per K" holds per day and per
-  process. The name itself can't be claimed twice because it's taken onchain.
-
----
+**Possible hardening, from the `plan-a` version** (not ported in the merge, to keep the client's request formats
+unchanged):
+- sign `/room` and `/drip` with the key they concern;
+- skip drips to keys that already hold the drip amount;
+- add a relayer floor and a daily drip budget;
+- local-chain tests over HTTP.
 
 ## Runbook: what to run when the funds are in
 
@@ -425,6 +382,46 @@ label again.
    `generated.ts`.
 4. `pnpm --filter @cloakroom/core a1`: the live checks 3 and 4 and the A2 demo, with gas. Paste the output here.
 5. `pnpm --filter @cloakroom/core check9`: MetaMask, twice, by hand.
-6. **The API:** `fly auth login`, `fly launch --no-deploy --copy-config`, `fly secrets set …`, then
-   `pnpm --filter @cloakroom/api deploy`. curl each endpoint.
+6. **The API:** `fly auth login`, `fly secrets set --config apps/api/fly.toml …`, then from the repo root
+   `fly deploy --config apps/api/fly.toml --dockerfile apps/api/Dockerfile .`. curl each endpoint.
 7. **After the tGLM and Bee handoff:** `pnpm --filter @cloakroom/core a4` (the A4 Done-when and check 5).
+
+---
+
+## Add-ons F1, F2, F4 (core and API), done on plan-b
+
+Spec: the add-ons build spec (F1 key log, F2 subtree sharing, F3 verified frontend, F4 doorbells). Names follow the
+repo (`cloak.*`, `cloakroom.eth`) rather than the spec's older `hush.*`, `hushdrive.eth`.
+
+- **Interface:** `packages/types` is frozen on branches, so the new members live in `packages/core/src/extras.ts`
+  (`CloakroomClient extends DriveClient`); `docs/requests-b.md` asks for them on `main`.
+- **F1 check, the signer.** The spec says "the signer is the name's current drive-root K". That holds for
+  `<label>.cloakroom.eth` (`driveOwner(findExactRegistry(name))`). Other names (needed for F2: `priya.acme.eth`) have no
+  drive root, so their controller is the token owner in the parent registry (`getStatus`, `getExpiry`, `getTokenId`,
+  `ownerOf`). Validity goes by the EIP-712 signature, not `$creator`, so the API relays entries (`POST /keylog`) and
+  users need no tGLM; a forged entry is ignored and listed.
+- **F1 deviation:** the fingerprint uses the first 8 bytes of `keccak256(compressed key)`, one word per byte from a
+  frozen 256-word list (64 bits), instead of 4 bytes as 8 words (which would be 4 bits per word).
+- **F1 deviation:** `spendingPublicKey` is stored compressed (0x + 66 hex): uncompressed is over Arkiv's 128-byte str
+  limit. Empty values are written as `"none"` (Arkiv attributes are set or absent).
+- **F2 check: listing subnames.** `LabelRegistered(tokenId, labelHash, label, owner, expiry, sender)` carries the label
+  string, so no `LabelStore` read is needed; it's the same event our own `listChildren` already uses (DriveRegistry
+  inherits it from `PermissionedRegistry`). The scan of someone else's registry starts at its creation block, found by
+  binary search over `eth_getCode` (needs an RPC that serves past state). **Not yet run against a live third-party
+  registry.**
+- **F2:** the "until the sync runs" refresh-request case can't arise as written: only managers can read the rule
+  (it's in the sealed roster), and a manager's app always holds the folder secret, so it refreshes directly.
+- **F4 check: GSOC with bee-js 13.2.0 and our node.** Implemented against Bee's HTTP API directly (no bee-js
+  dependency): SOC upload `POST /soc/{owner}/{id}?sig=`, subscription `GET /gsoc/subscribe/{address}` (WebSocket,
+  proxied by the API, which keeps Bee private), BMT chunk address (tested against Swarm's known empty-chunk address
+  `b34ca8c2…`), EIP-191 SOC signature. **Not verified live:** whether a Bee *light* node (`infra/bee`) delivers GSOC
+  messages; GSOC is documented for nodes in the chunk's neighbourhood. **Fallback, already built:** with no doorbell
+  config (`DOORBELL_PROXIMITY` empty) or a dropped socket, the client re-reads Arkiv every 30 s. Spec's feed fallback
+  was replaced by this, since it works without a postage write per poll.
+- **F4:** the personal inbox doorbell was not built: as the spec notes, the first share is still found by the Arkiv
+  scan, and every later event comes through the room doorbell.
+- **Tests:** `packages/core/test/addons.test.ts`, 18 tests (key chains: valid, gap, broken link, tampered, forged,
+  wrong signer; agreement; trust on first use; fingerprints; expired and revoked devices; subtree add, revoke, exclude,
+  transfer, cap, and that the sealed roster contains neither `acme` nor its namehash; doorbell 256-byte payloads,
+  wrong-topic and forged rings, topic per epoch, mining; release manifests). Core: 68 tests pass. API: 9 (adds
+  `/keylog` and `/doorbell` refusals).

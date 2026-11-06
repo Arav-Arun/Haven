@@ -1,11 +1,10 @@
-# The API image: one bundled file on Node 22, run as the unprivileged `node` user.
-# Build the bundle first (`pnpm --filter @cloakroom/api build`); `pnpm --filter @cloakroom/api deploy` does both.
-# The build context is apps/api only, and .dockerignore admits nothing but dist/, so no .env file can reach the
-# builder or the image. Configuration comes from Fly secrets at runtime.
+# Cloakroom API. Build from the repo root:
+#   fly deploy --config apps/api/fly.toml --dockerfile apps/api/Dockerfile .
 FROM node:22-slim
+RUN corepack enable
 WORKDIR /app
+COPY . .
+RUN pnpm install --frozen-lockfile --filter "@cloakroom/api..."
 ENV NODE_ENV=production PORT=8787
-COPY dist/server.mjs ./server.mjs
-USER node
 EXPOSE 8787
-CMD ["node", "server.mjs"]
+CMD ["pnpm", "--filter", "@cloakroom/api", "start"]

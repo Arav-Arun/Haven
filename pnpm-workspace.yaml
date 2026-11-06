@@ -5,3 +5,5 @@ packages:
 # pnpm 11 blocks install scripts unless allowed here.
 allowBuilds:
   esbuild: true
+  # Only a version check that phones home; not needed to build or run.
+  "@reown/appkit": false

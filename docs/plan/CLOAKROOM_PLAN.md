@@ -381,8 +381,10 @@ Keep these only in `packages/core/src/addresses.ts`. Re-check before deploying.
 - **Expiry users can see:** guests' key copies vanish at their end; links stop; welcome notes expire, which keeps the
   scan small on phones.
 - **Runnable README query:** `select().from(Files).where(eq("folder", "0x…")).fetch()`.
-- **Access key:** ask the Arkiv team on day 1 whether a public app key is fine. If not, use a thin pass-through on our
-  API, reached through Anon-RPC.
+- **Access key:** Arkiv's guidance is to keep it on a backend, never in a browser bundle. So it lives only on our API,
+  which exposes `POST /arkiv-rpc`, a JSON-RPC pass-through that adds the key server-side. Browsers, phones and the
+  extension point their Arkiv client at that URL, through Anon-RPC like any other RPC. The pass-through forwards only
+  the read methods the app uses plus `eth_sendRawTransaction` (writes are signed in the browser), and logs nothing.
 
 ---
 
@@ -490,6 +492,7 @@ They get real names and rooms on testnet; the judge uploads their own files. Not
 | `POST /claim` | Deploys resolver and drive root, registers the name | Signed by K; 1 name per K; daily cap |
 | `POST /room` | Registers a room label and deploys its registry with root `K_room` | Proof-of-work + daily cap (Must); blind token (Should) |
 | `POST /drip` | Sepolia ETH and tGLM to **K or `K_room` only**, sent in a batch every 10 minutes | Once per key per day; global budget; balance floor |
+| `POST /arkiv-rpc` | JSON-RPC pass-through to Arkiv that adds our access key server-side | Allowlisted methods only; rate limits; no logs |
 | `POST /upload` | Streams ciphertext to Bee | Signed by a key with WRITE (`wasAllowed` now); 25 MB per file; quota per key; stamp budget guard |
 
 - Relayer keys hold `ROLE_REGISTRAR` on `cloakroom.eth` and `rooms.cloakroom.eth`, and nothing else.

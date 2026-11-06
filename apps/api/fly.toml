@@ -1,29 +1,26 @@
-# Fly.io app for the Cloakroom API. Deploy from apps/api: `pnpm --filter @cloakroom/api deploy`.
-# Secrets (never in this file): fly secrets set RELAYER_PRIVATE_KEY=… SEPOLIA_RPC_URL=… ARKIV_ACCESS_KEY=… \
-#   BEE_URL=… POSTAGE_BATCH_ID=…   (optional: DRIP_SEPOLIA_WEI, DRIP_ARKIV_WEI, ROOM_POW_DIFFICULTY, caps)
+# Cloakroom API on Fly.io. Secrets (never in this file):
+#   fly secrets set --config apps/api/fly.toml SEPOLIA_RPC_URL=… RELAYER_PRIVATE_KEY=… ARKIV_ACCESS_KEY=… \
+#     POSTAGE_BATCH_ID=… BEE_URL=http://cloakroom-bee.internal:1633
 app = "cloakroom-api"
 primary_region = "bom"
 
-[build]
-  dockerfile = "Dockerfile"
-
 [env]
   PORT = "8787"
+  ARKIV_RPC_URL = "https://rpc.rabdi.db-chain.testnet.arkiv.network"
+  ROOM_POW_DIFFICULTY = "20"
+  DRIP_SEPOLIA_WEI = "3000000000000000"
+  DRIP_ARKIV_WEI = "20000000000000000"
+  # The plan says 600. 60 keeps "Try it" usable for judges; drips are still sent together, never one by one.
+  DRIP_BATCH_SECONDS = "60"
 
 [http_service]
   internal_port = 8787
   force_https = true
   auto_stop_machines = "off"
-  auto_start_machines = true
   min_machines_running = 1
 
-  [[http_service.checks]]
-    grace_period = "10s"
-    interval = "30s"
-    method = "GET"
-    path = "/health"
-    timeout = "5s"
-
-[[vm]]
-  memory = "512mb"
-  cpus = 1
+[[http_service.checks]]
+  method = "GET"
+  path = "/health"
+  interval = "30s"
+  timeout = "5s"

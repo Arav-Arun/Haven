@@ -31,7 +31,7 @@ Results and evidence are in `docs/checks-a.md`.
      `0x24e1d8e068620b647ca097f961a61055f4f42d72`, as the plan already says.
 6. **The API (A5),** deployed on Fly once funded:
    - Its URL comes with the H12 handoff.
-   - The client never calls it directly: `DriveClient` does (A6), with signed requests (`packages/core/src/apiAuth.ts`).
+   - The client never calls it directly: `DriveClient` does (A6), with the request formats in `packages/core/src/api.ts`.
    - Allow-list its origin and the Bee URL in the web app's CSP `connect-src`.
 7. **Arkiv:**
    - The access key is public by design: it ships with the app as `NEXT_PUBLIC_ARKIV_ACCESS_KEY`. Restrict it to our

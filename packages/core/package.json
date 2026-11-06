@@ -13,6 +13,8 @@
     "bootstrap": "tsx scripts/bootstrap-sepolia.ts",
     "a1": "tsx scripts/a1-checks.ts",
     "rehearse": "tsx scripts/rehearse.ts",
+    "e2e": "tsx scripts/e2e.ts",
+    "release": "tsx scripts/release.ts",
     "test": "vitest run"
   },
   "dependencies": {
