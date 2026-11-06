@@ -110,7 +110,10 @@ export type ArkivWriter = WalletArkivClient<Transport, Chain, Account>;
 export interface ArkivConnection {
   /** DriveConfig.arkivRpcUrl, e.g. https://rpc.rabdi.db-chain.testnet.arkiv.network */
   rpcUrl: string;
-  /** DriveConfig.arkivAccessKey: not a secret (it ships with the app), sent as the last path segment. */
+  /**
+   * The Arkiv access key, sent as the last path segment. Empty in browsers: there `rpcUrl` is our API's /arkiv-rpc
+   * pass-through, which adds the key server-side (Arkiv's guidance: never ship it in a client bundle).
+   */
   accessKey: string;
   anon: AnonFetch;
   isolationKey?: string;
@@ -124,7 +127,7 @@ export function arkivEndpoint(rpcUrl: string, accessKey: string): string {
 }
 
 function chainAndTransport(connection: ArkivConnection) {
-  if (connection.accessKey === "") throw new DriveError("UNKNOWN", "an Arkiv access key is required");
+  if (!connection.rpcUrl) throw new DriveError("UNKNOWN", "no Arkiv RPC URL configured");
   return {
     chain: rabdi({ accessKey: connection.accessKey }),
     transport: anonTransport({
@@ -547,6 +550,28 @@ export function listKeyCopies(reader: ArkivReader, folder: Address, recipient: A
     recipient: address(r.recipient!),
     version: num(r.version!),
     sealed: blob(r.sealed!),
+  }));
+}
+
+/** Every key copy in a folder, whoever it's for (the Public view counts them; their contents stay sealed). */
+export function listFolderKeyCopies(reader: ArkivReader, folder: Address): Promise<Page<KeyCopyRecord>> {
+  return fetchAll(reader, KeyCopySchema, eq("folder", addr(folder)), (r) => ({
+    ...info(r),
+    folder: address(r.folder!),
+    recipient: address(r.recipient!),
+    version: num(r.version!),
+    sealed: blob(r.sealed!),
+  }));
+}
+
+/** Every welcome note for a folder (the Public view counts them). */
+export function listFolderWelcomes(reader: ArkivReader, folder: Address): Promise<Page<WelcomeRecord>> {
+  return fetchAll(reader, WelcomeSchema, eq("folder", addr(folder)), (r) => ({
+    ...info(r),
+    folder: address(r.folder!),
+    bucket: num(r.bucket!),
+    ephemeralPub: hex(r.ephemeralPub!),
+    sealedMemberKey: blob(r.sealedMemberKey!),
   }));
 }
 

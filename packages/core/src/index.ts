@@ -1,7 +1,8 @@
 // @cloakroom/core: the protocol library behind DriveClient.
-// createDriveClient arrives in step A6; these are the building blocks from steps A2–A4.
 
 export * from "./addresses";
+export * from "./api";
+export { createDriveClient } from "./client";
 export * from "./arkiv";
 export * from "./crypto";
 export * from "./ens";

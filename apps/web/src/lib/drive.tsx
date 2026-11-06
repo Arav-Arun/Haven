@@ -1,18 +1,13 @@
 "use client";
 
+import { createDriveClient } from "@cloakroom/core";
 import { createWebStorage } from "@cloakroom/platform";
-import type { CreateDriveClient, DriveClient, Identity, Receipt } from "@cloakroom/types";
+import type { DriveClient, Identity, Receipt } from "@cloakroom/types";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { getAnon } from "./anon";
 import { CLIENT_NEEDS, config, missingConfig } from "./config";
 
-/**
- * The one place the app gets a DriveClient: `createDriveClient` from @cloakroom/core (Person A, step A6).
- * There is no mock. Until A6 is merged to main this is null and every screen says so instead of showing data.
- * When it lands, replace the line below with:
- *   import { createDriveClient } from "@cloakroom/core";
- */
-const createDriveClient = null as CreateDriveClient | null;
+/** The one place the app gets a DriveClient: @cloakroom/core's createDriveClient. There is no mock. */
 
 /** Whose keys this tab is using: your own, or one of the two "Try it" personas, each with its own storage. */
 export type Profile = "me" | "founder" | "investor";
@@ -25,14 +20,12 @@ function storageName(p: Profile) {
 function unavailableReason(): string | null {
   const missing = missingConfig(CLIENT_NEEDS);
   if (missing.length) return `This deployment is missing settings: ${missing.join(", ")}.`;
-  if (!createDriveClient)
-    return "The Cloakroom client (@cloakroom/core's createDriveClient, Person A's step A6) isn't in this build yet.";
   return null;
 }
 
 /** A client for one profile. Exported for "Try it", which keeps both personas signed in at once. */
 export function makeClient(profile: Profile): DriveClient | null {
-  if (unavailableReason() || !createDriveClient) return null;
+  if (unavailableReason()) return null;
   return createDriveClient({
     anon: getAnon(),
     storage: createWebStorage({ dbName: storageName(profile) }),

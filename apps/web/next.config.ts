@@ -6,7 +6,7 @@ const config: NextConfig = {
   // Each page is written as route/index.html, which Swarm serves without any rewrite rules.
   trailingSlash: true,
   images: { unoptimized: true },
-  transpilePackages: ["@cloakroom/platform", "@cloakroom/types", "@cloakroom/ui"],
+  transpilePackages: ["@cloakroom/core", "@cloakroom/platform", "@cloakroom/types", "@cloakroom/ui"],
   reactStrictMode: true,
 };
 export default config;

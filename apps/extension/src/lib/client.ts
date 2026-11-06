@@ -1,14 +1,10 @@
 import { AnonRpcWorker } from "@anon-rpc/browser-extension-harness";
+import { createDriveClient } from "@cloakroom/core";
 import { createAnonFetch, createExtensionStorage, type HarnessWorker } from "@cloakroom/platform";
-import type { AnonFetch, CreateDriveClient, DriveClient } from "@cloakroom/types";
+import type { AnonFetch, DriveClient } from "@cloakroom/types";
 import { config, missingConfig } from "./config";
 
-/**
- * The extension's DriveClient, from @cloakroom/core (Person A, step A6). There is no mock: until A6 is on main this is
- * null and the popup says so. When it lands, replace the line below with:
- *   import { createDriveClient } from "@cloakroom/core";
- */
-const createDriveClient = null as CreateDriveClient | null;
+
 
 /** Where the keys live: session storage (cleared when the browser closes) unless the user chose to stay signed in. */
 const AREA_KEY = "cloak:persist";
@@ -24,7 +20,6 @@ export async function setPersist(persist: boolean): Promise<void> {
 export function unavailableReason(): string | null {
   const missing = missingConfig();
   if (missing.length) return `This build is missing settings: ${missing.join(", ")}.`;
-  if (!createDriveClient) return "The Cloakroom client (@cloakroom/core's createDriveClient, Person A's step A6) isn't in this build yet.";
   return null;
 }
 
@@ -43,7 +38,7 @@ export function getAnon(): AnonFetch {
 }
 
 export async function makeClient(): Promise<DriveClient | null> {
-  if (unavailableReason() || !createDriveClient) return null;
+  if (unavailableReason()) return null;
   return createDriveClient({
     anon: getAnon(),
     storage: createExtensionStorage({ persist: await getPersist() }),
