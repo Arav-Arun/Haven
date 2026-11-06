@@ -9,8 +9,6 @@ import Link from "next/link";
 import { useState } from "react";
 import { useInView } from "./hooks";
 import { FxLabel } from "@haven/ui";
-import { HavenLogo } from "./Logo";
-import { NAV } from "./Nav";
 import { FrontClouds } from "./Sky";
 
 export const NETWORKS = [
@@ -262,24 +260,6 @@ export function Closing({ href, label }: { href: string; label: string }) {
           </Link>
         </div>
       </div>
-      <footer className="mx-auto mt-6 flex max-w-5xl flex-col gap-6 px-4 py-8 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-col gap-2">
-          <HavenLogo size={30} />
-          <p className="text-[15px] text-[#0d1b33]/60">
-            Built at ETHGlobal Mumbai 2026 by Team <strong className="font-semibold text-[#0d1b33]">Deploy For Good</strong>
-          </p>
-        </div>
-        <nav aria-label="Footer" className="flex flex-wrap gap-x-6 gap-y-2 text-[15px] text-[#0d1b33]/65">
-          {NAV.map(([l, h]) => (
-            <a key={h} href={h} className="hover:text-[#0d1b33]">
-              {l}
-            </a>
-          ))}
-          <a href="https://github.com/Arav-Arun/ETHGlobalMumbai" rel="noreferrer" className="hover:text-[#0d1b33]">
-            Source code
-          </a>
-        </nav>
-      </footer>
     </section>
   );
 }

@@ -30,7 +30,8 @@
 
 @layer base {
   html,
-  body {
+  body,
+  .page-surface {
     /* The landing's sky, faded down to the page colour near the top. */
     background: linear-gradient(180deg, #a9c6f5 0, #c9dcf8 160px, #e4edfb 320px, var(--color-paper) 520px) no-repeat, var(--color-paper);
     color: var(--color-ink);

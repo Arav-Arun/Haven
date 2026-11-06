@@ -1,0 +1,51 @@
+/* The footer under every page (SiteFooter.tsx): the night sky the day page lifts off. */
+.haven-footer {
+  /* Starts at exactly the colour round the lifted page (PullUpFooter's backdrop), so the two meet without a line. */
+  background: linear-gradient(180deg, #0d1b33 0%, #12274d 55%, #183a78 100%);
+}
+.haven-footer-glow {
+  background: radial-gradient(circle at 50% 50%, rgb(63 120 227 / 0.35) 0%, rgb(143 181 242 / 0.12) 40%, transparent 70%);
+  animation: footer-breathe 8s ease-in-out infinite alternate;
+}
+@keyframes footer-breathe {
+  from {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.6;
+  }
+  to {
+    transform: translate(-50%, -50%) scale(1.1);
+    opacity: 1;
+  }
+}
+.haven-footer-grid {
+  background-size: 60px 60px;
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.04) 1px, transparent 1px);
+  mask-image: linear-gradient(to bottom, transparent, #000 30%, #000 70%, transparent);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 30%, #000 70%, transparent);
+}
+/*
+ * The giant lockup behind the footer's content: as wide as the screen allows, sunk into the floor and fading out
+ * toward it. The word is trimmed to its cap height so it centres exactly against the mark. A plain fill: an outline
+ * would trace the variable font's overlapping contours (the stray lines inside A and N).
+ */
+.haven-footer-giant {
+  font-size: 22vw;
+  font-weight: 800;
+  line-height: 1;
+  transform-origin: 50% 100%;
+}
+.haven-footer-word {
+  letter-spacing: -0.045em;
+  text-box: trim-both cap alphabetic;
+  color: transparent;
+  background: linear-gradient(180deg, rgb(190 212 250 / 0.42) 0%, rgb(143 181 242 / 0) 90%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+@media (prefers-reduced-motion: reduce) {
+  .haven-footer-glow {
+    animation: none;
+  }
+}
