@@ -14,8 +14,6 @@ importers:
 
   packages/core: {}
 
-  packages/mock: {}
-
   packages/platform: {}
 
   packages/types: {}

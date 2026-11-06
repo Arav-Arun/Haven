@@ -5,21 +5,33 @@
 
 ## Starter prompt (paste into your Claude agent)
 
-> You are building Plan A of Hushdrive in this repo. Read `CLAUDE.md`, `docs/plan/HUSHDRIVE_PLAN.md`,
+> You are building Plan A of Cloakroom in this repo. Read `CLAUDE.md`, `docs/plan/CLOAKROOM_PLAN.md`,
 > `docs/plan/PLAN_SHARED.md` and `docs/plan/PLAN_A.md`, in that order.
 > - Edit only the folders Plan A owns.
 > - Implement the frozen interface in `packages/types/src/index.ts` exactly; never edit that file.
 > - Work through the steps of `PLAN_A.md` in order. After each step, run its "Done when" check, write the result in
 >   `docs/checks-a.md`, commit and push.
 > - Before writing Solidity, load the ethskills `security` and `testing` skills.
-> - Never guess an address: use only the table in `HUSHDRIVE_PLAN.md` section 6.
+> - Never guess an address: use only the table in `CLOAKROOM_PLAN.md` section 6.
 > - Ask me before any step that needs a human: faucets, accounts, funding.
+> - No faking or hardcoding: no mock data, placeholder values or fake hashes. Every value comes from Sepolia, Arkiv
+>   or Swarm; only configuration (addresses, endpoints) is fixed.
 
 **Human-only tasks for Person A** (an agent can't do these):
 - Sepolia faucet drips.
 - Arkiv Hub sign-in for the access key and tGLM.
 - Etherscan API key.
 - Approving the deployer key's first transactions.
+
+**Delivery order for B** (there is no mock client, so B wires screens as these land). Merge `plan-a` into `main`
+after each group, about every 3 hours:
+1. Session: `signInMessage`, `needsSecondSignature`, `signIn`, `restore`, `signOut`, `exportSeed`,
+   `isNameAvailable`, `claimName`.
+2. Rooms and folders: `createRoom`, `createFolder`, `listFolders`, `getFolder`.
+3. Files: `upload`, `listFiles`, `download`, `downloadFolder`.
+4. Sharing: `lookupRecipient`, `share`, `listMembers`, `removeMember`, `sharedWithMe`.
+5. Transparency: `publicView`, `onReceipt`, `maintain`.
+6. The rest: groups, links, mount, versions, delete.
 
 ---
 
@@ -28,10 +40,10 @@ Follow `PLAN_SHARED.md` section 2 exactly, then `git checkout -b plan-a`.
 **Done when:** `main` has the skeleton and the frozen interface, and B has cloned it.
 
 ## A1 · First-hour checks (H0.5–H3)
-Run checks 1, 2, 3, 4, 5, 8 and 9 from `HUSHDRIVE_PLAN.md` section 17, using throwaway scripts in
+Run checks 1, 2, 3, 4, 5, 8 and 9 from `CLOAKROOM_PLAN.md` section 17, using throwaway scripts in
 `contracts/script/` and `packages/core/scripts/`.
 - Generate the deployer and relayer keys locally (`.env` only). The human funds them from faucets.
-- Register `hushdrive.eth` (`ETHRegistrar` commit–reveal; another name if taken) and `rooms.hushdrive.eth`. Give the
+- Register `cloakroom.eth` (`ETHRegistrar` commit–reveal; another name if taken) and `rooms.cloakroom.eth`. Give the
   relayer key only `ROLE_REGISTRAR` on both registries.
 - Measure gas for:
   - a `DriveRegistry` proxy deploy plus `register`;
@@ -49,7 +61,7 @@ fallback chosen. B has the Arkiv access key and the app names (handoff H4).
   - add `ensdomains/contracts-v2` as a submodule pinned at `48b3e2d` (with its own submodules);
   - set remappings;
   - load ethskills `security` and `testing`.
-- **Implement**, per `HUSHDRIVE_PLAN.md` section 6:
+- **Implement**, per `CLOAKROOM_PLAN.md` section 6:
   - `contract DriveRegistry is UserRegistry`;
   - our initializer (root roles to K; dangerous roles to W when given; no upgrade roles);
   - `_getRoles`: strip `ROLE_UPGRADE` and its admin bit from everyone, and drop expired drive bits;
@@ -57,10 +69,10 @@ fallback chosen. B has the Arkiv access key and the app names (handoff H4).
   - the history in `_onRolesGranted` / `_onRolesRevoked` (at most 8 intervals per account);
   - `wasAllowed`, `accessOf` and `sweep`;
   - events `AccessGranted` / `AccessEnded`.
-- **Tests:** unit, fuzz and invariant, as listed in `HUSHDRIVE_PLAN.md` sections 6 and 20, plus a fork test through
+- **Tests:** unit, fuzz and invariant, as listed in `CLOAKROOM_PLAN.md` sections 6 and 20, plus a fork test through
   the Sepolia `VerifiableFactory`.
 - **Deploy:** deploy the implementation to Sepolia and verify it on Etherscan. Write
-  `contracts/deployments/sepolia.json`. Add `pnpm --filter @hush/core gen` to export the ABI and addresses into
+  `contracts/deployments/sepolia.json`. Add `pnpm --filter @cloakroom/core gen` to export the ABI and addresses into
   `packages/core/src/generated.ts`.
 
 **Done when:**
@@ -78,7 +90,7 @@ In `packages/core` (TypeScript, vitest, fast-check):
   - the two-signature comparison;
   - smart-wallet detection (`getCode`);
   - key derivation from a signature (Fluidkey kit), a passkey PRF, a random seed or an exported seed;
-  - K, `K_room[n]`, and the `hush.key` comparison.
+  - K, `K_room[n]`, and the `cloak.key` comparison.
 - **`epochs.ts`:**
   - key regression (`E[N] = HKDF(FS, "chain")`, `E[i-1] = SHA-256(E[i])`, N = 8,760);
   - epoch maths from `t0` and L (1 minute when `demoMode`);
@@ -96,9 +108,9 @@ In `packages/core` (TypeScript, vitest, fast-check):
 
 ## A4 · ENS, Arkiv, validator, Swarm client (H9–H11)
 - **`ens.ts`:**
-  - **Reads**, through `UniversalResolverV2` (passed explicitly): `hush.key`, the registry walk, `accessOf`,
+  - **Reads**, through `UniversalResolverV2` (passed explicitly): `cloak.key`, the registry walk, `accessOf`,
     `wasAllowed`, and listing child folders from the registry's registration events (`eth_getLogs`) **(check;
-    fallback: a sealed `hush.index` entity per owner)**.
+    fallback: a sealed `cloak.index` entity per owner)**.
   - **Writes from K or `K_room`:** create a folder (`VerifiableFactory` proxy + `register`), `grantRolesUntil`,
     `revokeRoles`, `sweep`, link subnames, mount.
   - Every write adds receipt steps.
@@ -119,15 +131,15 @@ In `packages/core` (TypeScript, vitest, fast-check):
 - shows the validator hiding a planted write from an address without WRITE.
 
 ## A5 · API (H11–H13)
-`apps/api`, Hono, per `HUSHDRIVE_PLAN.md` section 15:
-- **`POST /claim`:** deploy the PermissionedResolver with `hush.key` through `initialize(grants, calls)`, deploy the
+`apps/api`, Hono, per `CLOAKROOM_PLAN.md` section 15:
+- **`POST /claim`:** deploy the PermissionedResolver with `cloak.key` through `initialize(grants, calls)`, deploy the
   drive root (K everyday, W dangerous), register the name. Return what it did so the client can verify the API holds
   no role.
-- **`POST /room`:** check the proof-of-work and the daily cap; register `r-<random>.rooms.hushdrive.eth`; deploy the
+- **`POST /room`:** check the proof-of-work and the daily cap; register `r-<random>.rooms.cloakroom.eth`; deploy the
   registry with root `K_room`.
 - **`POST /drip`:**
-  - only for a K or `K_room` that holds root on a registry whose parent chain ends at `hushdrive.eth` or
-    `rooms.hushdrive.eth`;
+  - only for a K or `K_room` that holds root on a registry whose parent chain ends at `cloakroom.eth` or
+    `rooms.cloakroom.eth`;
   - queued and sent **in a batch every 10 minutes**;
   - once per key per day; global budget; balance floor.
 - **`POST /upload`:** the signature must be from a key with WRITE now (`wasAllowed` at the current time); 25 MB cap;
@@ -147,7 +159,7 @@ In `packages/core` (TypeScript, vitest, fast-check):
   - sharing: `lookupRecipient`, `share` (grant + funding S in the same action + welcome + key copy + roster),
     `listMembers`, `removeMember` (revoke + refresh), `sharedWithMe`;
   - transparency: `publicView` (with the summary sentence and direct calls), `onReceipt`.
-- **e2e script** (`pnpm --filter @hush/core e2e`, Node, passthrough Anon-RPC, demo epochs):
+- **e2e script** (`pnpm --filter @cloakroom/core e2e`, Node, passthrough Anon-RPC, demo epochs):
   1. Founder signs in and creates a room.
   2. Founder uploads two files.
   3. Founder shares with Investor (viewer, end in 2 minutes) and Editor (editor).
@@ -196,10 +208,10 @@ In order:
    - `addGroup` in the contract;
    - `createGroup`;
    - share to a group (the group manager re-seals bounded epoch keys);
-   - early removal from a group opens `hush.refresh`, which blocks editors until a folder manager's `maintain()`
+   - early removal from a group opens `cloak.refresh`, which blocks editors until a folder manager's `maintain()`
      refreshes;
    - property test extended to groups.
-2. **Links:** `createLink` / `openLink` (expiring subname + `hush.link` + fragment secret).
+2. **Links:** `createLink` / `openLink` (expiring subname + `cloak.link` + fragment secret).
 3. **Mount:** `mount`, refused for rooms.
 4. **Versions:** `listVersions`, `deleteFile` (tomb).
 5. **Blind room tokens** (feature 27), if time.
@@ -217,7 +229,7 @@ In order:
   - writer wallets;
   - one runnable Arkiv query.
 - **`docs/evidence.md`:** every deploy, setup and e2e transaction.
-- **Contenthash:** set `hushdrive.eth`'s contenthash to the Swarm reference B sends (H28).
+- **Contenthash:** set `cloakroom.eth`'s contenthash to the Swarm reference B sends (H28).
 
 **Done when:** every file exists with real links and hashes. No placeholders.
 
