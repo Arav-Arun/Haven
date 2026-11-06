@@ -58,3 +58,10 @@ describe("api", () => {
     expect(res.headers.get("access-control-allow-origin")).toBe("*");
   });
 });
+
+describe("swarm gateway", () => {
+  it("refuses anything that isn't a Swarm reference", async () => {
+    expect((await api.app.request("/bytes/not-a-ref")).status).toBe(404);
+    expect((await api.app.request("/bytes/../../stamps")).status).toBe(404);
+  });
+});

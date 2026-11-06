@@ -4,6 +4,7 @@
 //   POST /drip        Sepolia ETH + tGLM to K or K_room only, sent in batches
 //   POST /arkiv-rpc   JSON-RPC pass-through to Arkiv that adds the access key server-side
 //   POST /upload      signed by a key with WRITE now; streams padded ciphertext to Bee
+//   GET  /bytes/:ref  read-only Swarm gateway (the Bee node itself stays private)
 //   GET  /config, /health
 // It logs nothing about users: only in-memory rate-limit counters, reset daily.
 
@@ -190,7 +191,7 @@ export function createApi(env: ApiEnv) {
 
   const app = new Hono();
   // No cookies or credentials anywhere, so any origin may call (the website, the extension, the Swarm copy).
-  app.use("*", cors({ origin: "*", allowHeaders: ["content-type", "x-cloak-folder", "x-cloak-signer", "x-cloak-time", "x-cloak-signature"] }));
+  app.use("*", cors({ origin: "*", exposeHeaders: ["content-length"], allowHeaders: ["content-type", "x-cloak-folder", "x-cloak-signer", "x-cloak-time", "x-cloak-signature"] }));
 
   app.get("/health", (c) => c.json({ ok: true }));
 
@@ -283,6 +284,20 @@ export function createApi(env: ApiEnv) {
       return fail(c, e);
     }
   });
+
+  // Read-only Swarm gateway: the Bee node itself stays private (anyone who could reach its API could spend our
+  // postage batch). Only padded ciphertext lives there; nothing is logged.
+  const bytes = async (c: Context, method: "GET" | "HEAD") => {
+    const ref = c.req.param("ref") ?? "";
+    if (!/^[0-9a-f]{64}([0-9a-f]{64})?$/i.test(ref)) return c.json({ error: { code: "NOT_FOUND", message: "not a Swarm reference" } }, 404);
+    const upstream = await fetch(`${env.BEE_URL.replace(/\/+$/, "")}/bytes/${ref}`, { method });
+    const headers = new Headers({ "content-type": "application/octet-stream", "cache-control": "public, max-age=31536000, immutable" });
+    const length = upstream.headers.get("content-length");
+    if (length) headers.set("content-length", length);
+    return new Response(method === "HEAD" ? null : upstream.body, { status: upstream.status, headers });
+  };
+  app.get("/bytes/:ref", (c) => bytes(c, "GET"));
+  app.on("HEAD", "/bytes/:ref", (c) => bytes(c, "HEAD"));
 
   app.post("/upload", async (c) => {
     try {

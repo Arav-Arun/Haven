@@ -1,0 +1,25 @@
+# Cloakroom API on Fly.io. Secrets (never in this file):
+#   fly secrets set --config apps/api/fly.toml SEPOLIA_RPC_URL=… RELAYER_PRIVATE_KEY=… ARKIV_ACCESS_KEY=… \
+#     POSTAGE_BATCH_ID=… BEE_URL=http://cloakroom-bee.internal:1633
+app = "cloakroom-api"
+primary_region = "bom"
+
+[env]
+  PORT = "8787"
+  ARKIV_RPC_URL = "https://rpc.rabdi.db-chain.testnet.arkiv.network"
+  ROOM_POW_DIFFICULTY = "20"
+  DRIP_SEPOLIA_WEI = "3000000000000000"
+  DRIP_ARKIV_WEI = "20000000000000000"
+  DRIP_BATCH_SECONDS = "600"
+
+[http_service]
+  internal_port = 8787
+  force_https = true
+  auto_stop_machines = "off"
+  min_machines_running = 1
+
+[[http_service.checks]]
+  method = "GET"
+  path = "/health"
+  interval = "30s"
+  timeout = "5s"
