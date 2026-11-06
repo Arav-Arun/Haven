@@ -2,7 +2,7 @@
 #   fly secrets set --config apps/api/fly.toml SEPOLIA_RPC_URL=… RELAYER_PRIVATE_KEY=… ARKIV_ACCESS_KEY=… \
 #     POSTAGE_BATCH_ID=… BEE_URL=http://haven-bee.internal:1633
 app = "haven-api"
-primary_region = "bom"
+primary_region = "sin"
 
 [env]
   PORT = "8787"
@@ -12,6 +12,8 @@ primary_region = "bom"
   DRIP_ARKIV_WEI = "20000000000000000"
   # The plan says 600. 60 keeps "Try it" usable for judges; drips are still sent together, never one by one.
   DRIP_BATCH_SECONDS = "60"
+  # Add-on F4: leading bits a doorbell chunk address shares with our Bee node (bee-js default for GSOC mining).
+  DOORBELL_PROXIMITY = "12"
 
 [http_service]
   internal_port = 8787

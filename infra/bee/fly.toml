@@ -1,8 +1,8 @@
 # Our own Bee light node (only if the Swarm team doesn't give us an upload node). Private: no public service, so only
 # the API reaches it, at http://haven-bee.internal:1633. Anyone who could reach a Bee API could spend our batch.
 #   fly apps create haven-bee
-#   fly volumes create bee_data --config infra/bee/fly.toml --region bom --size 10
-#   fly secrets set --config infra/bee/fly.toml BEE_PASSWORD=… BEE_BLOCKCHAIN_RPC_ENDPOINT=https://<gnosis rpc>
+#   fly volumes create bee_data --config infra/bee/fly.toml --region sin --size 10
+#   fly secrets set --config infra/bee/fly.toml BEE_PASSWORD=… BEE_BLOCKCHAIN_RPC_ENDPOINT=https://rpc.gnosischain.com
 #   fly deploy --config infra/bee/fly.toml
 # Then fund the node's Gnosis address (GET /addresses → ethereum) with a little xDAI (gas for its chequebook and the
 # batch) and xBZZ, and buy ONE batch. Depth 19 = 112 MB usable (enough for the site copy and demo files); cost is
@@ -15,7 +15,7 @@
 # The node's key (in the bee_data volume, encrypted with BEE_PASSWORD) owns the batch: keep the password safe, and
 # don't delete the volume while the batch is in use.
 app = "haven-bee"
-primary_region = "bom"
+primary_region = "sin"
 
 [build]
   image = "ethersphere/bee:2.8.3"
