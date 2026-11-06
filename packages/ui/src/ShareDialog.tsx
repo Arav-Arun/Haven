@@ -2,7 +2,7 @@
 
 import type { Folder, Member, Role, ShareOptions, Timestamp } from "@haven/types";
 import { Check, Fingerprint, LoaderCircle, ShieldAlert, TriangleAlert, Users } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { describeError } from "./errors";
 import { cx, formatDate, nowSeconds, ROLE_ABOUT, ROLE_LABEL } from "./format";
 import { Button, Dialog, ErrorNote, inputClass } from "./primitives";
@@ -117,6 +117,14 @@ export function ShareDialog({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [done, setDone] = useState<Member | null>(null);
+  // Callers often pass a fresh function each render (client.lookupRecipient.bind(client)). Kept in refs, so a
+  // re-render (a clock tick, an upload finishing) doesn't cancel a lookup that's under way and start it again.
+  const recipientFn = useRef(lookupRecipient);
+  recipientFn.current = lookupRecipient;
+  const keyFn = useRef(lookupKey);
+  keyFn.current = lookupKey;
+  const teamFn = useRef(previewTeam);
+  teamFn.current = previewTeam;
 
   useEffect(() => {
     const n = name.trim().toLowerCase();
@@ -124,7 +132,7 @@ export function ShareDialog({
     setLookup({ state: "checking" });
     let live = true;
     const t = setTimeout(() => {
-      lookupRecipient(n).then(
+      recipientFn.current(n).then(
         (r) =>
           live &&
           setLookup(
@@ -139,26 +147,29 @@ export function ShareDialog({
       live = false;
       clearTimeout(t);
     };
-  }, [name, to, lookupRecipient]);
+  }, [name, to]);
 
+  const okName = lookup.state === "ok" ? lookup.ensName : null;
   useEffect(() => {
     setKey(null);
-    if (lookup.state !== "ok" || !lookupKey) return;
+    const fn = keyFn.current;
+    if (!okName || !fn) return;
     let live = true;
-    lookupKey(lookup.ensName).then((k) => live && setKey(k), () => undefined);
+    fn(okName).then((k) => live && setKey(k), () => undefined);
     return () => {
       live = false;
     };
-  }, [lookup, lookupKey]);
+  }, [okName]);
 
   useEffect(() => {
     const p = team.trim().toLowerCase();
     setPreviewError(null);
-    if (to !== "team" || !previewTeam || !p.includes(".")) return setPreview(null);
+    const preview = teamFn.current;
+    if (to !== "team" || !preview || !p.includes(".")) return setPreview(null);
     setPreview("checking");
     let live = true;
     const t = setTimeout(() => {
-      previewTeam(p).then(
+      preview(p).then(
         (r) => live && setPreview(r),
         (e) => {
           if (!live) return;
@@ -171,7 +182,7 @@ export function ShareDialog({
       live = false;
       clearTimeout(t);
     };
-  }, [team, to, previewTeam]);
+  }, [team, to]);
 
   const until = untilFor(preset, custom, nowSeconds());
   const keyBlocked = !!key && (key.changedSinceLastShare || !key.matchesEns || !!key.problem);
