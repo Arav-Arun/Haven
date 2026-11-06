@@ -374,32 +374,53 @@ export function createApi(env: ApiEnv) {
     }
   });
 
+  // Claims and rooms wait for a Sepolia receipt (often 15-30 s). A private network may drop a reply that slow (Nox waits
+  // 20 s), so the same signed request can arrive again: it gets the job already running or done, never a second one.
+  const claimJobs = new Map<string, Promise<ClaimResponse>>();
+  const roomJobs = new Map<string, Promise<RoomResponse>>();
+  const remember = <T>(jobs: Map<string, Promise<T>>, key: string, job: Promise<T>) => {
+    jobs.set(key, job);
+    job.catch(() => jobs.delete(key));
+    if (jobs.size > 1000) jobs.delete(jobs.keys().next().value!);
+    return job;
+  };
+
   app.post("/claim", async (c) => {
     try {
       const r = await verifyClaimRequest(await c.req.json());
       const label = checkUserLabel(r.label);
+      const driveKey = getAddress(r.driveKey);
+      const running = claimJobs.get(driveKey);
+      if (running) return c.json<ClaimResponse>(await running);
       if (!counters.hit(`claim:${r.driveKey}`, 1, 1, DAY)) throw new DriveError("RATE_LIMITED", "one name per key per day");
       if (!counters.hit("claims", 1, LIMITS.claimsPerDay, DAY)) throw new DriveError("RATE_LIMITED", "daily cap reached");
       const appRegistry = requireDeployed("appRegistry");
       if (!(await isLabelAvailable(sepoliaClient, appRegistry, label))) throw new DriveError("NAME_TAKEN");
-      const result = await queue.run(async () =>
-        claimName(writer, {
-          appRegistry,
-          implementation: requireDeployed("driveRegistryImpl"),
-          label,
-          driveKey: getAddress(r.driveKey),
-          mainWallet: r.mainWallet ? getAddress(r.mainWallet) : null,
-          spendingPublicKey: r.spendingPublicKey,
-          expiry: await ethNameExpiry(sepoliaClient, "haven"),
-        }),
+      const job = remember(
+        claimJobs,
+        driveKey,
+        (async (): Promise<ClaimResponse> => {
+          const result = await queue.run(async () =>
+            claimName(writer, {
+              appRegistry,
+              implementation: requireDeployed("driveRegistryImpl"),
+              label,
+              driveKey,
+              mainWallet: r.mainWallet ? getAddress(r.mainWallet) : null,
+              spendingPublicKey: r.spendingPublicKey,
+              expiry: await ethNameExpiry(sepoliaClient, "haven"),
+            }),
+          );
+          return {
+            ensName: result.ensName,
+            resolver: result.resolver,
+            driveRoot: result.driveRoot,
+            driveRootBlock: result.driveRootBlock.toString(),
+            api: relayer.address,
+          };
+        })(),
       );
-      return c.json<ClaimResponse>({
-        ensName: result.ensName,
-        resolver: result.resolver,
-        driveRoot: result.driveRoot,
-        driveRootBlock: result.driveRootBlock.toString(),
-        api: relayer.address,
-      });
+      return c.json<ClaimResponse>(await job);
     } catch (e) {
       return fail(c, e);
     }
@@ -411,17 +432,27 @@ export function createApi(env: ApiEnv) {
       if (!isAddress(r?.roomKey ?? "") || !checkRoomPow(r, env.ROOM_POW_DIFFICULTY)) {
         throw new DriveError("NOT_AUTHORIZED", "missing or wrong proof of work");
       }
+      const roomKey = getAddress(r.roomKey);
+      const running = roomJobs.get(roomKey);
+      if (running) return c.json<RoomResponse>(await running);
       if (!counters.hit(`room:${r.roomKey}`, 1, 1, DAY)) throw new DriveError("RATE_LIMITED", "one room per key");
       if (!counters.hit("rooms", 1, LIMITS.roomsPerDay, DAY)) throw new DriveError("RATE_LIMITED", "daily cap reached");
-      const room = await queue.run(async () =>
-        createRoom(writer, {
-          roomsRegistry: requireDeployed("roomsRegistry"),
-          implementation: requireDeployed("driveRegistryImpl"),
-          roomKey: getAddress(r.roomKey),
-          expiry: await ethNameExpiry(sepoliaClient, "haven"),
-        }),
+      const job = remember(
+        roomJobs,
+        roomKey,
+        (async (): Promise<RoomResponse> => {
+          const room = await queue.run(async () =>
+            createRoom(writer, {
+              roomsRegistry: requireDeployed("roomsRegistry"),
+              implementation: requireDeployed("driveRegistryImpl"),
+              roomKey,
+              expiry: await ethNameExpiry(sepoliaClient, "haven"),
+            }),
+          );
+          return { ensName: room.ensName, registry: room.registry, blockNumber: room.blockNumber.toString() };
+        })(),
       );
-      return c.json<RoomResponse>({ ensName: room.ensName, registry: room.registry, blockNumber: room.blockNumber.toString() });
+      return c.json<RoomResponse>(await job);
     } catch (e) {
       return fail(c, e);
     }

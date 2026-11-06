@@ -448,6 +448,21 @@ class Client implements HavenClient {
     return payload;
   }
 
+  /**
+   * For API calls that wait on a Sepolia receipt (/claim, /room). A private network can drop a reply that slow, so the
+   * same request is sent again: the API answers a repeat with the job it already ran, so nothing happens twice.
+   */
+  private async apiPatient<T>(path: string, body: unknown, step?: StepSink): Promise<T> {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await this.api<T>(path, body, step);
+      } catch (e) {
+        if (attempt >= 4 || toDriveError(e).code !== "NETWORK") throw e;
+        await new Promise((ok) => setTimeout(ok, 5000));
+      }
+    }
+  }
+
   private async info(): Promise<ApiInfo> {
     return (this.apiInfo ??= await this.api<ApiInfo>("/config", undefined, undefined, "GET"));
   }
@@ -606,7 +621,7 @@ class Client implements HavenClient {
         spendingPublicKey: keys.spendingPublicKey,
         time: now(),
       });
-      const claimed = await this.api<ClaimResponse>("/claim", request, step);
+      const claimed = await this.apiPatient<ClaimResponse>("/claim", request, step);
       await verifyClaim(this.sepolia(step), {
         ensName: claimed.ensName,
         resolver: claimed.resolver,
@@ -953,7 +968,7 @@ class Client implements HavenClient {
       const { roomPowDifficulty } = await this.info();
       const nonce = await solveRoomPow(address, roomPowDifficulty);
       step({ kind: "check", label: "Proof of work for a new room", detail: `${roomPowDifficulty} bits`, ok: true });
-      const room = await this.api<RoomResponse>("/room", { roomKey: address, nonce }, step);
+      const room = await this.apiPatient<RoomResponse>("/room", { roomKey: address, nonce }, step);
       await this.cfg.storage.set(STORE.rooms, json(n + 1));
       const h = this.roomHolding(getAddress(room.registry), n, room.ensName);
       await this.ensureGas(h, { arkiv: true }, step);
