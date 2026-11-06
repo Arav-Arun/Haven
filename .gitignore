@@ -1,15 +1,76 @@
-node_modules
+# --- Secrets: never commit keys, seeds or env files ---
 .env
 .env.*
 !.env.example
-dist
-out
-.next
-.output
-.wxt
-coverage
-contracts/out
-contracts/cache
-contracts/broadcast/*/31337
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+keystore/
+keystores/
+*.mnemonic
+*.seed
+secrets/
+.secrets/
+
+# --- Dependencies ---
+node_modules/
+.pnpm-store/
+.pnpm-debug.log*
+
+# --- Build output ---
+dist/
+out/
+build/
+.next/
+.output/
+.wxt/
+.vercel/
+*.tsbuildinfo
+next-env.d.ts
+
+# --- Caches and test output ---
+.cache/
+.turbo/
+.eslintcache
+.parcel-cache/
+coverage/
+lcov.info
+.fast-check/
+
+# --- Foundry ---
+contracts/out/
+contracts/cache/
+contracts/broadcast/*/31337/
+contracts/broadcast/**/dry-run/
+
+# --- Extension packaging ---
+apps/extension/.output/
+*.crx
+*.xpi
+
+# --- Local infra state (Bee node data, Fly.io) ---
+infra/bee/data/
+infra/bee/.bee/
+.fly/
+
+# --- Logs ---
 *.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- Editors and OS ---
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*~
 .DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Local agent settings ---
+.claude/settings.local.json
