@@ -60,7 +60,7 @@ function UploadScene({ run }: { run: boolean }) {
             {s >= 1 ? <Lock size={18} /> : <FileText size={18} />}
           </span>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[14px] font-semibold text-[#0d1b33]">Medical records.pdf</p>
+            <p className="truncate text-[14px] font-semibold text-[#0d1b33]">Series A deck.pdf</p>
             <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[#0d1b33]/10">
               <span className="block h-full rounded-full bg-[#1f4fd1] transition-[width] duration-700" style={{ width: `${(s / 4) * 100}%` }} />
             </div>
@@ -86,14 +86,14 @@ function ShareScene({ run }: { run: boolean }) {
           <div className="pop glass claim mx-auto flex w-[78%] items-center gap-3 rounded-2xl px-4 py-3">
             <Ticket size={18} className="shrink-0 text-[#1f4fd1]" />
             <div className="text-[12px] leading-tight text-[#0d1b33]">
-              <p className="font-semibold">A ticket for sam.eth</p>
+              <p className="font-semibold">A ticket for investor.eth</p>
               <p className="text-[#0d1b33]/60">A new random address, not their name</p>
             </div>
           </div>
         )}
         <div className="scene-panel rounded-2xl p-4">
           <div className="flex items-center rounded-xl border border-[#0d1b33]/10 bg-white px-3 py-2.5 text-[14px]">
-            <span className="font-medium text-[#0d1b33]">{s >= 1 ? "sam.eth" : ""}</span>
+            <span className="font-medium text-[#0d1b33]">{s >= 1 ? "investor.eth" : ""}</span>
             {s < 1 && <span className="caret h-4 w-px bg-[#1f4fd1]" />}
             {s >= 1 && <Check size={15} className="pop ml-auto text-[#1d6b4b]" />}
           </div>

@@ -18,12 +18,11 @@ function connectors() {
     [
       {
         groupName: "Popular",
-        // Without a WalletConnect project id only wallets in this browser can connect (no QR codes).
-        wallets: config.walletConnectProjectId
-          ? [metaMaskWallet, phantomWallet, rainbowWallet, rabbyWallet]
-          : [metaMaskWallet, phantomWallet, rabbyWallet],
+        // Without a WalletConnect project id only the wallet in this browser can connect (no QR codes): RainbowKit's
+        // named wallets all need a project id, and throw at startup without one.
+        wallets: config.walletConnectProjectId ? [metaMaskWallet, phantomWallet, rainbowWallet, rabbyWallet] : [injectedWallet],
       },
-      { groupName: "More", wallets: config.walletConnectProjectId ? [injectedWallet, walletConnectWallet] : [injectedWallet] },
+      ...(config.walletConnectProjectId ? [{ groupName: "More", wallets: [injectedWallet, walletConnectWallet] }] : []),
     ],
     {
       projectId: config.walletConnectProjectId,

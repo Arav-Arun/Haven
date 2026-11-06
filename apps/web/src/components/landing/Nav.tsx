@@ -11,7 +11,6 @@ export const NAV = [
   ["Tracks", "#tracks"],
   ["Privacy", "#privacy"],
   ["FAQ", "#faq"],
-  ["Extension", "/extension/"],
 ] as const;
 
 /** On the sky at the top of the page; a floating white pill once you scroll past the hero's first screen. */
@@ -30,7 +29,7 @@ export function Nav({ cta }: { cta: { href: string; label: string } }) {
         className={`nav-bar pointer-events-auto mx-auto flex items-center justify-between gap-4 rounded-full px-4 py-2.5 sm:px-5 ${floating ? "max-w-5xl" : "max-w-[calc(100%-1rem)]"}`}
       >
         <Link href="/" aria-label="Haven home">
-          <HavenLogo tone={floating ? "dark" : "light"} size={32} />
+          <HavenLogo tone={floating ? "dark" : "light"} size={32} line />
         </Link>
         <nav aria-label="Sections" className="hidden lg:block">
           <ul className="flex items-center gap-1">
