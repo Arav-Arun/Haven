@@ -149,13 +149,29 @@ export function Story() {
   // Paint the textures once.
   useEffect(() => {
     let live = true;
+    // One texture at a time, each when the browser is idle: painting them all at once on load blocked the first
+    // screen and made the first scroll stutter.
+    const idle = () =>
+      new Promise<void>((ok) =>
+        "requestIdleCallback" in window ? (window as Window & typeof globalThis).requestIdleCallback(() => ok(), { timeout: 400 }) : setTimeout(ok, 30),
+      );
+    const paint = async <T,>(f: () => Promise<T>) => {
+      await idle();
+      return f();
+    };
     void (async () => {
-      const [b, fb, ma, mb, sunWisp] = await Promise.all([bank(), farBank(), mass(31), mass(47), wisps("sunwisp", 41, "#ffd2b4", "#9a6f9e")]);
-      const [dayFar, dayMid, dayNear, duskFar, duskMid, nightFar, nightMid] = await Promise.all([
-        skyline("day", "far"), skyline("day", "mid"), skyline("day", "near"),
-        skyline("dusk", "far"), skyline("dusk", "mid"),
-        skyline("night", "far"), skyline("night", "mid"),
-      ]);
+      const b = await paint(bank);
+      const fb = await paint(farBank);
+      const ma = await paint(() => mass(31));
+      const mb = await paint(() => mass(47));
+      const sunWisp = await paint(() => wisps("sunwisp", 41, "#ffd2b4", "#9a6f9e"));
+      const dayFar = await paint(() => skyline("day", "far"));
+      const dayMid = await paint(() => skyline("day", "mid"));
+      const dayNear = await paint(() => skyline("day", "near"));
+      const duskFar = await paint(() => skyline("dusk", "far"));
+      const duskMid = await paint(() => skyline("dusk", "mid"));
+      const nightFar = await paint(() => skyline("night", "far"));
+      const nightMid = await paint(() => skyline("night", "mid"));
       if (live) setTex({ bank: b, farBank: fb, massA: ma, massB: mb, dayFar, dayMid, dayNear, duskFar, duskMid, nightFar, nightMid, sunWisp });
     })();
     return () => {
@@ -312,7 +328,7 @@ export function Story() {
       FILES.forEach(([, bytes], i) => {
         const ts = 11.65 + i * 0.35;
         const k = eo(seg(t, ts - 0.1, ts + 0.25));
-        set(`sealName${i}`, { opacity: (1 - k).toFixed(3), transform: `translateY(${(-10 * k).toFixed(1)}px)`, filter: `blur(${(3 * k).toFixed(1)}px)` });
+        set(`sealName${i}`, { opacity: (1 - k).toFixed(3), transform: `translateY(${(-10 * k).toFixed(1)}px)` });
         set(`sealCipher${i}`, { opacity: k.toFixed(3), transform: `translateY(${(10 * (1 - k)).toFixed(1)}px)` });
         op(`sealLock${i}`, k);
         set(`sealPad${i}`, { transform: `scaleX(${k.toFixed(3)})` });
@@ -390,7 +406,7 @@ export function Story() {
         const k = eo(seg(t, 20.9 + i * 0.08, 21.35 + i * 0.08));
         set(`pRow${i}`, { opacity: k.toFixed(3), transform: `translateY(${lerp(16, 0, k).toFixed(1)}px)` });
         const fz = eio(seg(t, 22.0 + i * 0.04, 22.35 + i * 0.04));
-        set(`pName${i}`, { opacity: (1 - 0.9 * fz).toFixed(3), filter: `blur(${(6 * fz).toFixed(1)}px)` });
+        set(`pName${i}`, { opacity: (1 - 0.9 * fz).toFixed(3) });
         set(`pFrost${i}`, { opacity: fz.toFixed(3), transform: `scaleX(${lerp(0.55, 1, fz).toFixed(3)})` });
         op(`pDot${i}`, eo(seg(t, 22.3, 22.5)));
       });
@@ -462,7 +478,7 @@ export function Story() {
 
     // Wheel and trackpad scrolling is smoothed by Lenis. Touch keeps the phone's own scrolling, so the loop below
     // eases toward it instead.
-    const lenis = reduce ? null : new Lenis({ autoRaf: false, lerp: 0.09 });
+    const lenis = reduce ? null : new Lenis({ autoRaf: false, lerp: 0.12 });
     let touch = false;
     const onTouch = () => (touch = true);
     const onWheel = () => (touch = false);
@@ -638,8 +654,11 @@ export function Story() {
               {/* inside the frosted room */}
               <div ref={reg("room")} className="story-room" style={{ opacity: 0 }}>
                 <div ref={reg("roomOut")} className="story-room-out">
-                  {img(tex?.dayFar, { left: -340, top: 120, width: 2600, height: 780 })}
-                  {img(tex?.dayMid, { left: -240, top: 180, width: 2400, height: 980 })}
+                  {/* Blurred once on its own layer; only the outer layer moves, so the blur isn't redrawn per frame. */}
+                  <div className="story-room-out-blur">
+                    {img(tex?.dayFar, { left: -340, top: 120, width: 2600, height: 780 })}
+                    {img(tex?.dayMid, { left: -240, top: 180, width: 2400, height: 980 })}
+                  </div>
                 </div>
                 <span className="story-room-frost" />
                 <span className="story-room-light" />

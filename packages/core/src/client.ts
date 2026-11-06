@@ -2271,34 +2271,65 @@ class Client implements HavenClient {
     }
     await this.cfg.storage.set(STORE.shares, json(stored));
     const since = opts?.since ?? 0;
-    const shares = await Promise.all(
-      stored
-        .filter((s) => s.seen >= since)
-        .map(async (s): Promise<IncomingShare | null> => {
-          try {
-            const h = this.shareHolding(s);
-            const folder = await this.toFolder(h.folder, h, await this.readFolder(h.folder, h));
-            const access = await accessOf(this.sepolia(undefined, h.address), h.folder, h.address);
-            const history = access.roles ? null : await this.sepolia(undefined, h.address).readContract({
-              address: h.folder,
-              abi: driveRegistryAbi,
-              functionName: "historyOf",
-              args: [h.address],
-            });
-            const last = history?.[history.length - 1];
-            const role: Role = roleOf(access.roles) ?? (last ? roleOf(last.roles) : null) ?? "viewer";
-            const until = access.roles ? access.until : last ? (last.endedAt ? Number(last.endedAt) : Number(last.until)) : null;
+    const wanted = stored.filter((s) => s.seen >= since);
+    // Three at a time, each tried again on a slow moment; a share that still can't be read stays listed instead of
+    // vanishing (a burst of parallel reads through a mixnet is what failed).
+    const one = async (s: StoredShare): Promise<IncomingShare | null> => {
+      const h = this.shareHolding(s);
+      for (let attempt = 0; ; attempt++) {
+        try {
+          const folder = await this.toFolder(h.folder, h, await this.readFolder(h.folder, h));
+          const access = await accessOf(this.sepolia(undefined, h.address), h.folder, h.address);
+          const history = access.roles ? null : await this.sepolia(undefined, h.address).readContract({
+            address: h.folder,
+            abi: driveRegistryAbi,
+            functionName: "historyOf",
+            args: [h.address],
+          });
+          const last = history?.[history.length - 1];
+          const role: Role = roleOf(access.roles) ?? (last ? roleOf(last.roles) : null) ?? "viewer";
+          const until = access.roles ? access.until : last ? (last.endedAt ? Number(last.endedAt) : Number(last.until)) : null;
+          return {
+            folder,
+            sharedBy: folder.kind === "room" ? "unlinked room" : (ownerNameOf(folder.ensName) ?? "a Haven user"),
+            role,
+            until,
+            firstSeenAt: s.seen,
+          };
+        } catch {
+          if (attempt >= 2) {
+            const ensName = h.ensName ?? "";
             return {
-              folder,
-              sharedBy: folder.kind === "room" ? "unlinked room" : (ownerNameOf(folder.ensName) ?? "a Haven user"),
-              role,
-              until,
+              folder: {
+                registry: h.folder,
+                ensName,
+                displayName: "Couldn't load its name, open to retry",
+                kind: ensName ? kindOf(ensName) : "drive",
+                parent: null,
+                inherit: false,
+                myAccess: null,
+                version: 1,
+                refreshPending: false,
+              },
+              sharedBy: "a Haven user",
+              role: "viewer",
+              until: null,
               firstSeenAt: s.seen,
             };
-          } catch {
-            return null;
           }
-        }),
+          await new Promise((ok) => setTimeout(ok, 1500 * (attempt + 1)));
+        }
+      }
+    };
+    const shares: (IncomingShare | null)[] = new Array(wanted.length).fill(null);
+    let next = 0;
+    await Promise.all(
+      Array.from({ length: Math.min(3, wanted.length) }, async () => {
+        while (next < wanted.length) {
+          const i = next++;
+          shares[i] = await one(wanted[i]!);
+        }
+      }),
     );
     return shares.filter((s): s is IncomingShare => s !== null).sort((a, b) => b.firstSeenAt - a.firstSeenAt);
   }

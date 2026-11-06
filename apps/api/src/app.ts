@@ -181,7 +181,8 @@ const LIMITS = {
   dripsPerKeyPerDay: 5,
   roomsPerDay: 150,
   uploadBytesPerKeyPerDay: 512 * 1024 * 1024,
-  arkivCallsPerMinute: 600,
+  // Every page reads Arkiv a few dozen times through this pass-through; shared by all users.
+  arkivCallsPerMinute: 3000,
   keylogPerNamePerDay: 30,
   keylogPerDay: 3000,
   ringsPerAddressPerHour: 240,
