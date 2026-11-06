@@ -319,14 +319,15 @@ NEXT_PUBLIC_BEE_URL=
 NEXT_PUBLIC_SEPOLIA_RPC_URL=
 NEXT_PUBLIC_MAINNET_RPC_URL=              # only to read the Nym/Tor worker specifier once
 NEXT_PUBLIC_TOR_GATEWAYS=                  # comma-separated, only if using Tor
-NEXT_PUBLIC_ARKIV_RPC_URL=https://rpc.rabdi.db-chain.testnet.arkiv.network
-NEXT_PUBLIC_ARKIV_ACCESS_KEY=
+NEXT_PUBLIC_ARKIV_RPC_URL=                 # our API's /arkiv-rpc pass-through (the access key never reaches browsers)
 NEXT_PUBLIC_PRIVATE_NETWORK=nym            # nym | nox | tor | off
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=
 # the extension uses the same names with the WXT_ prefix
 
 # --- api (A) ---
 RELAYER_PRIVATE_KEY=
+ARKIV_RPC_URL=https://rpc.rabdi.db-chain.testnet.arkiv.network
+ARKIV_ACCESS_KEY=                          # from hub.arkiv.network/access-keys; server-side only
 ROOM_POW_DIFFICULTY=20
 DRIP_SEPOLIA_WEI=
 DRIP_ARKIV_WEI=
@@ -409,7 +410,7 @@ in chat, before H3.
 |---|---|---|
 | H3 | B → A | Anon-RPC result: which network is the default, and `supportsAnyHttps` (true/false) |
 | H4 | B → A | `BEE_URL` and `POSTAGE_BATCH_ID` (a private message, not committed) |
-| H4 | A → B | Arkiv access key and app names registered (for B's `.env`) |
+| H4 | A → B | App names registered. The Arkiv access key stays on A's API; B gets the `/arkiv-rpc` URL once the API is live (H12) |
 | H8 | B → A | `@cloakroom/platform` working on `plan-b` (A can copy the built file locally to test; don't commit it) |
 | H12 | A → B | API URL live; contract addresses in `packages/core/src/addresses.ts` |
 | H14 | both | **M1** |
