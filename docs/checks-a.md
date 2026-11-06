@@ -11,7 +11,7 @@ as the submodule `contracts/lib/contracts-v2`. Toolchain: Foundry 1.8.7, solc 0.
 | 3 | PermissionedResolver sets `cloak.key`, deployer keeps no roles | Pending (needs Sepolia funds) |
 | 4 | Namespace aliasing; expired subname stops resolving | Pending (needs Sepolia funds) |
 | 5 | Arkiv: `$createdAt`, custom transport, expiry, tGLM transfer | Pending (needs Arkiv access key) |
-| 8 | Fluidkey kit: keys, S from P, recipient recovers S's key | Pending |
+| 8 | Fluidkey kit: keys, S from P, recipient recovers S's key | **Pass** (below) |
 | 9 | Wallets sign the fixed message identically | Pending. Only MetaMask is available; Rabby and Ledger will be reported as untested |
 
 Keys (in the gitignored repo-root `.env`, never committed): deployer `0xBFfd32f336D5201c0388C71Fd9e9754eC0692a54`,
@@ -64,3 +64,35 @@ prototype; step A2 replaces it.
   initialized atomically by `VerifiableFactory.deployProxy`, and the implementation's constructor disables
   initializers.
 - **`ApprovedUpgradeGate.sol`** is a standalone owner-controlled allowlist. `UserRegistry` doesn't use it.
+
+---
+
+## Check 8: Fluidkey stealth-account-kit 1.1.1
+
+Evidence: `packages/core/scripts/check8-fluidkey.ts`. Run it with `pnpm --filter @cloakroom/core check8`. It uses local
+throwaway keys only and makes no network calls.
+
+| Part | Result |
+|---|---|
+| A local wallet signs the fixed section 5 message twice → identical signatures; same signature → same keys | Pass |
+| A different wallet's signature → different keys | Pass |
+| Sharer: `generateStealthAddresses({ spendingPublicKeys: [P], ephemeralPrivateKey: e })` → S; recipient: `generateStealthPrivateKey({ spendingPrivateKey, ephemeralPublicKey: e·G })` → the key for S | Pass, 200 random rounds |
+| A wrong spending key never recovers S | Pass, 200 rounds |
+| Two shares to the same P give different S (unlinkable on chain) | Pass, plus no repeat across 200 rounds |
+| Recovery cost per welcome note ("Shared with me" scan) | 1.83 ms in Node on this laptop; phones will be slower |
+
+### Notes for A3 (`keys.ts`, `stealth.ts`), from reading the kit's source
+- **What it derives:** `generateKeysFromSignature` sets the spending key to `keccak256(r)` and the viewing key to
+  `keccak256(s)`, ignoring `v`. It only accepts a 65-byte signature (132 hex characters), so compact (EIP-2098) or
+  contract-wallet signatures are rejected, which is consistent with refusing smart wallets.
+- **Why check 9 matters:** a wallet that signs the same message differently gives different keys. Two different
+  signatures from one address must be refused, as planned.
+- **The scheme is multiplicative (Umbra-style):** `S_pub = P · keccak(ECDH(e, P))` and
+  `S_priv = s · keccak(ECDH(s, e·G)) mod n`.
+  - The recipient scans with the **spending** private key; the kit's viewing key isn't used in our flow.
+  - The welcome-note seal (`HKDF(ECDH(e, P))`) reuses the same shared secret, kept separate from the kit's keccak by
+    HKDF with its own info string.
+- **`P` format:** uncompressed, 65 bytes (`0x04…`), as published in `cloak.key`. The kit also accepts compressed keys,
+  but that wasn't tested here.
+- **Dependencies:** the kit pins its own `viem` 2.7.9 and `@noble/secp256k1` 1.7.1 internally. Core itself uses
+  `viem` 2.57.16.
