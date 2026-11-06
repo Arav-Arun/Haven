@@ -63,7 +63,7 @@ the system `unzip`).
 
 ## B5 · `apps/web`
 
-Built and wired to the real client; waiting on `createDriveClient` (see `docs/requests-b.md`).
+Built and wired to the real client; waiting on `createDriveClient` (since done).
 - Routes: `/`, `/onboarding`, `/drive`, `/rooms`, `/shared`, `/groups`, `/public`, `/settings`, `/l`, `/try`.
   Folders are `?f=<registry>` instead of `/drive/[...path]`, because Swarm can't rewrite paths for a static export.
   `/links` is left out: the frozen interface has `createLink` but no way to list links, so links are made from a

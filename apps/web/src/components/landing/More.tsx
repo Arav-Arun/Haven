@@ -78,7 +78,7 @@ const TRACKS = [
     prize: "Anon-RPC · CROPS",
     logo: "/eth.png",
     lead: "Private lookups. Keys stay yours.",
-    points: ["Every chain read goes through Anon-RPC", "The extension only trusts the published build", "No trackers. Open source, MIT"],
+    points: ["Lookups go through Anon-RPC, and receipts flag any that couldn't", "The extension only trusts the signed, published build", "No trackers. Open source, MIT"],
     span: "",
   },
 ];
@@ -169,7 +169,7 @@ const UNSEEN = [
   "Who the members are: each is a fresh address only you and they can link",
   "File names, contents and real sizes",
   "Who owns a data room: rooms aren't linked to your name at all",
-  "Who looked something up: lookups go through a private network",
+  "Who looked something up: lookups go through a private network, and any that go direct are marked",
 ];
 
 export function Privacy() {
@@ -258,7 +258,7 @@ const FAQ = [
   ["What happens when access ends?", "Their role ends onchain on the date you set, and their keys stop at that moment, so every file added afterwards is locked for them. No transaction is needed. What they already opened, they keep, as with any file you share."],
   ["Can anyone tell who I shared with?", "No. Each person appears onchain as a new random address that only you and they can link to their name. A data room isn't linked to you at all. The Public view shows exactly what anyone can see."],
   ["Do I need a wallet or crypto?", "No. Try it creates keys without a wallet. With a wallet you sign one message, and the gas for your name and folders is covered on the test networks."],
-  ["What if your servers go away?", "Your files and records live on Sepolia, Arkiv and Swarm, not on our servers. The website also runs from its Swarm copy, and the whole stack is open source (MIT), so anyone can run it."],
+  ["What if your servers go away?", "Your files and records live on Sepolia, Arkiv and Swarm, not on our servers. Every website release is signed and stored on Swarm, with haven.eth pointing to it, and the whole stack is open source (MIT), so anyone can run it."],
 ] as const;
 
 export function Faq() {

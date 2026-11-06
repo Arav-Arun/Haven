@@ -74,3 +74,6 @@ desktop.ini
 
 # --- Local agent settings ---
 .claude/settings.local.json
+
+# Internal notes for coding agents (kept locally, not published)
+docs/HANDOFF.md

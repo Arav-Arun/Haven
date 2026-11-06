@@ -394,7 +394,7 @@ Spec: the add-ons build spec (F1 key log, F2 subtree sharing, F3 verified fronte
 repo (`haven.*`, `haven.eth`) rather than the spec's older `hush.*`, `hushdrive.eth`.
 
 - **Interface:** `packages/types` is frozen on branches, so the new members live in `packages/core/src/extras.ts`
-  (`HavenClient extends DriveClient`); `docs/requests-b.md` asks for them on `main`.
+  (`HavenClient extends DriveClient`).
 - **F1 check, the signer.** The spec says "the signer is the name's current drive-root K". That holds for
   `<label>.haven.eth` (`driveOwner(findExactRegistry(name))`). Other names (needed for F2: `priya.acme.eth`) have no
   drive root, so their controller is the token owner in the parent registry (`getStatus`, `getExpiry`, `getTokenId`,
