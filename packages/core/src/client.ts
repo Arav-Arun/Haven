@@ -181,7 +181,7 @@ import {
 } from "./records";
 import { createWelcome, openWelcome } from "./stealth";
 import { downloadEncrypted, downloadFolderBlobs, uploadEncrypted, type SwarmConfig } from "./swarm";
-import { anonTransport, isAnonymous, type RouteStep } from "./transport";
+import { anonCanReach, anonTransport, isAnonymous, type RouteStep } from "./transport";
 import { registryHistory, scheduleOf, Validator, type FolderReading } from "./validator";
 
 // ---------------------------------------------------------------- constants
@@ -399,7 +399,7 @@ class Client implements HavenClient {
   /** Calls our API: through the private network when it carries any HTTPS request, otherwise direct (and said so). */
   private async api<T>(path: string, body: unknown, step?: StepSink, method: "GET" | "POST" = "POST"): Promise<T> {
     const anon = this.cfg.anon;
-    const routed = anon.supportsAnyHttps && isAnonymous(anon.status());
+    const routed = anon.supportsAnyHttps && isAnonymous(anon.status()) && anonCanReach(this.cfg.apiUrl);
     const label = `Haven API ${path}`;
     if (!routed) this.direct.add(label);
     step?.({ kind: "route", label, route: routed ? "anon" : "direct", network: anon.status().network });
@@ -2236,7 +2236,7 @@ class Client implements HavenClient {
     // Padded sizes: a HEAD request per blob, the same route the files take.
     const swarm: { ref: Hex; paddedBytes: number }[] = [];
     const anon = this.cfg.anon;
-    const routed = anon.supportsAnyHttps && isAnonymous(anon.status());
+    const routed = anon.supportsAnyHttps && isAnonymous(anon.status()) && anonCanReach(this.cfg.beeUrl);
     if (!routed && reading.files.length) this.direct.add("Swarm (file sizes)");
     const doFetch = routed ? (iso ? anon.isolated(iso) : anon.fetch) : globalThis.fetch.bind(globalThis);
     for (const file of reading.files) {

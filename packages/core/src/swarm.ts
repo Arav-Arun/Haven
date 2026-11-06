@@ -11,7 +11,7 @@ import { getAddress, isAddress, isHex, type LocalAccount, recoverMessageAddress,
 import { sha256 } from "./crypto";
 import { PAD_BUCKETS } from "./padding";
 import { ignoreSteps, type StepSink } from "./receipts";
-import { isAnonymous } from "./transport";
+import { isAnonymous, anonCanReach } from "./transport";
 
 // ---------------------------------------------------------------- signed upload
 
@@ -107,7 +107,7 @@ export interface SwarmConfig {
 /** The fetch to use for API and Bee calls, and the route step that says how the call went. */
 function httpsRoute(config: SwarmConfig, label: string, isolationKey?: string) {
   const status = config.anon.status();
-  if (config.anon.supportsAnyHttps) {
+  if (config.anon.supportsAnyHttps && anonCanReach(config.apiUrl) && anonCanReach(config.beeUrl)) {
     return {
       fetch: isolationKey ? config.anon.isolated(isolationKey) : config.anon.fetch,
       step: {

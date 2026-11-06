@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { arkivEndpoint, expiryAt, weekBucket, WEEK_SECONDS } from "../src/arkiv";
 import { randomBytes } from "../src/crypto";
+import { anonCanReach } from "../src/transport";
 import { encryptPadded, PAD_BUCKETS } from "../src/padding";
 import {
   newFileId,
@@ -197,14 +198,24 @@ describe("swarm client", () => {
     };
   }
 
+  it("only https hosts on port 443 can go through the private network", () => {
+    expect(anonCanReach("https://havenethglobal-api.fly.dev/arkiv-rpc")).toBe(true);
+    expect(anonCanReach("https://rpc.example.org:443")).toBe(true);
+    expect(anonCanReach("http://localhost:8787/arkiv-rpc")).toBe(false);
+    expect(anonCanReach("https://localhost:8787")).toBe(false);
+    expect(anonCanReach("https://example.org:8443")).toBe(false);
+    expect(anonCanReach("http://haven-bee.internal:1633")).toBe(false);
+  });
+
   it("uploads padded ciphertext, downloads it back, and records the route honestly", async () => {
     const writer = privateKeyToAccount(generatePrivateKey());
     const blob = await encryptPadded(randomBytes(32), randomBytes(5000));
     const routed = { apiUrl: base, beeUrl: base, anon: anon(true) };
     const steps: ReceiptStep[] = [];
     const ref = await uploadEncrypted(routed, writer, folder, blob, (s) => steps.push(s), "0xS");
+    // The test server is local http, which Anon-RPC's TLS tunnels can't reach: it goes direct and says so.
     expect(steps).toEqual([
-      expect.objectContaining({ kind: "route", route: "anon", isolationKey: "0xS" }),
+      expect.objectContaining({ kind: "route", route: "direct" }),
       expect.objectContaining({ kind: "swarm", ref, paddedBytes: PAD_BUCKETS[0], ok: true }),
     ]);
 

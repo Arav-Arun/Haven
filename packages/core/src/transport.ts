@@ -18,6 +18,20 @@ export interface AnonTransportOptions {
   onRoute?: (step: RouteStep) => void;
 }
 
+/**
+ * Whether the private network can carry a request to `url` at all. Anon-RPC's TLS tunnels reach https hosts by name
+ * on port 443 only, so a local `http://localhost:8787` (a developer's own API) has to go direct, and is labelled so.
+ */
+export function anonCanReach(url: string): boolean {
+  try {
+    const u = new URL(url);
+    const local = ["localhost", "127.0.0.1", "[::1]", "::1"].includes(u.hostname) || u.hostname.endsWith(".localhost") || u.hostname.endsWith(".internal");
+    return u.protocol === "https:" && (u.port === "" || u.port === "443") && !local;
+  } catch {
+    return false;
+  }
+}
+
 /** True when the call actually goes through the private network. */
 export function isAnonymous(status: AnonStatus): boolean {
   return status.network !== "off" && status.state !== "off";
@@ -28,12 +42,17 @@ export function anonTransport(options: AnonTransportOptions): CustomTransport {
   return custom(
     {
       async request({ method, params }: { method: string; params?: unknown }) {
-        const send = options.isolationKey ? options.anon.isolated(options.isolationKey) : options.anon.fetch;
+        const reachable = anonCanReach(options.url);
+        const send = !reachable
+          ? globalThis.fetch.bind(globalThis)
+          : options.isolationKey
+            ? options.anon.isolated(options.isolationKey)
+            : options.anon.fetch;
         const status = options.anon.status();
         options.onRoute?.({
           kind: "route",
           label: method,
-          route: isAnonymous(status) ? "anon" : "direct",
+          route: reachable && isAnonymous(status) ? "anon" : "direct",
           network: status.network,
           ...(options.isolationKey ? { isolationKey: options.isolationKey } : {}),
         });
