@@ -1,4 +1,5 @@
 import { addToInbox, readInbox } from "@cloakroom/platform";
+import type { DriveClient } from "@cloakroom/types";
 import { describeError } from "@cloakroom/ui/errors";
 import { makeClient, setPersist } from "@/lib/client";
 import { config } from "@/lib/config";
@@ -40,6 +41,33 @@ async function check() {
   const done = await client.maintain();
   if (done.length) notify("Cloakroom housekeeping", done.map((r) => r.action).join(", "));
   await updateBadge();
+  await listen(client).catch((e) => console.warn("Cloakroom doorbells unavailable:", describeError(e).title));
+}
+
+type LiveEvent = { folder: string; type: "file" | "member" | "refresh" | "rotation"; arkivKey: string; receivedAt: number };
+type LiveClient = DriveClient & { subscribe?: (folders: string[], listener: (e: LiveEvent) => void) => () => void };
+let stopListening: (() => void) | null = null;
+
+/**
+ * Add-on F4: listen to the doorbells of every room shared with this account and every room it owns, so new files show
+ * up as a notification within seconds instead of at the next 15-minute check. A manager's app answers a refresh
+ * doorbell by running housekeeping at once, which shortens the group and team removal window to seconds.
+ * Chrome keeps a service worker alive while its WebSocket is active; if the worker is stopped anyway, the next
+ * 15-minute check subscribes again.
+ */
+async function listen(client: DriveClient) {
+  const c = client as LiveClient;
+  if (!c.subscribe) return;
+  const [shared, rooms] = await Promise.all([client.sharedWithMe(), client.listFolders("rooms").catch(() => [])]);
+  const names = new Map<string, string>();
+  for (const s of shared) names.set(s.folder.registry.toLowerCase(), s.folder.displayName);
+  for (const r of rooms) names.set(r.registry.toLowerCase(), r.displayName);
+  stopListening?.();
+  stopListening = c.subscribe([...names.keys()], (e) => {
+    const name = names.get(e.folder.toLowerCase()) ?? "a shared room";
+    if (e.type === "file") notify("New file in Cloakroom", `Something was added to ${name}.`);
+    if (e.type === "refresh") void client.maintain().catch(() => undefined);
+  });
 }
 
 async function pair(seed: number[], persist: boolean): Promise<PairReply> {

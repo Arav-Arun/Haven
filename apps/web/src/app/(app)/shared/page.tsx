@@ -4,12 +4,17 @@ import { EmptyState, ErrorNote, IncomingTickets, Skeleton, useNow } from "@cloak
 import { Inbox } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { RequireIdentity } from "@/components/Gate";
-import { useLoad } from "@/lib/drive";
+import { useDrive, useLoad } from "@/lib/drive";
+import { useLiveFolders } from "@/lib/live";
 
 function Shared() {
   const router = useRouter();
   const now = useNow(1000);
   const shares = useLoad((c) => c.sharedWithMe(), []);
+  // Add-on F4: rooms already shared with you ring their doorbells; a brand-new share is still found by the Arkiv scan,
+  // which the 30-second refresh repeats.
+  const { client } = useDrive();
+  useLiveFolders(client, (shares.data ?? []).map((s) => s.folder.registry), () => shares.reload(), { alwaysPoll: true });
   return (
     <div className="flex flex-col gap-6">
       <div>

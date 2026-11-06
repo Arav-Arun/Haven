@@ -30,6 +30,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
 import { config } from "@/lib/config";
 import { useDrive, useLoad } from "@/lib/drive";
+import { useLiveFolders } from "@/lib/live";
 import { keyDir, profileHref } from "@/lib/keydir";
 import { teams } from "@/lib/teams";
 
@@ -153,6 +154,12 @@ export function FolderView({ client, folder }: { client: DriveClient; folder: Ad
   const subfolders = useLoad((c) => c.listFolders(folder), [folder]);
   const files = useLoad((c) => c.listFiles(folder), [folder]);
   const members = useLoad((c) => c.listMembers(folder), [folder]);
+  // Add-on F4: a doorbell (or the 30-second fallback) reloads what changed; each reload re-reads and validates Arkiv.
+  const live = useLiveFolders(client, [folder], (e) => {
+    if (!e || e.type === "file") files.reload();
+    if (!e || e.type === "member") members.reload();
+    if (!e || e.type === "refresh" || e.type === "rotation") info.reload();
+  });
   const [shareOpen, setShareOpen] = useState(false);
   const groups = useLoad(shareOpen ? (c) => c.listFolders("groups") : null, [shareOpen]);
   const keys = useMemo(() => keyDir(client), [client]);
@@ -247,6 +254,13 @@ export function FolderView({ client, folder }: { client: DriveClient; folder: Ad
         <Link href={`/public?f=${folder}`} className="inline-flex min-h-10 items-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium hover:bg-line/60">
           <Eye size={16} aria-hidden /> Public view
         </Link>
+        <span
+          className="inline-flex items-center gap-1.5 self-center text-xs text-muted"
+          title={live === "live" ? "Changes arrive within seconds through a Swarm doorbell." : "Checking for changes every 30 seconds."}
+        >
+          <span className={`h-2 w-2 rounded-full ${live === "live" ? "bg-private" : "bg-line"}`} aria-hidden />
+          {live === "live" ? "Live" : "Updates every 30 s"}
+        </span>
       </FolderHeader>
       <ErrorNote error={zipError} />
 
