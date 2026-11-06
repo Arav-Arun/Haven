@@ -489,7 +489,7 @@ class Client implements HavenClient {
     step({ kind: "check", label: "Gas requested from the Haven API", detail: `sent in a batch at ${new Date(drip.sendsAt * 1000).toLocaleTimeString()}`, ok: true });
     const deadline = Math.max(drip.sendsAt, now()) + 180;
     while (now() < deadline) {
-      await new Promise((r) => setTimeout(r, 5000));
+      await new Promise((r) => setTimeout(r, 2000));
       if (await enough()) return;
     }
     throw new DriveError("RATE_LIMITED", "Gas from the Haven API didn't arrive in time. Try again in a minute.");

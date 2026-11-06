@@ -10,8 +10,8 @@ primary_region = "sin"
   ROOM_POW_DIFFICULTY = "20"
   DRIP_SEPOLIA_WEI = "3000000000000000"
   DRIP_ARKIV_WEI = "20000000000000000"
-  # The plan says 600. 60 keeps "Try it" usable for judges; drips are still sent together, never one by one.
-  DRIP_BATCH_SECONDS = "60"
+  # The plan says 600. 5 keeps sign-up and new rooms fast; drips are still sent together, never one by one.
+  DRIP_BATCH_SECONDS = "5"
   # Add-on F4: leading bits a doorbell chunk address shares with our Bee node (bee-js default for GSOC mining).
   DOORBELL_PROXIMITY = "12"
 
