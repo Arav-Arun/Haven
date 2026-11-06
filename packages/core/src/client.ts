@@ -929,19 +929,32 @@ class Client implements HavenClient {
     // Only a subfolder can inherit: the drive root has no members of its own.
     const inherit = parent !== "root" && prefix === "f" && opts?.inherit === true;
     const parentRegistry = parent === "root" ? this.driveRoot : getAddress(parent);
-    const parentName = parent === "root" ? this.ensName : (await this.holding(parentRegistry)).ensName;
+    const parentHolding = parent === "root" ? null : await this.holding(parentRegistry);
+    const parentName = parent === "root" ? this.ensName : (parentHolding?.ensName ?? (await this.getFolder(parentRegistry)).ensName);
     if (!parentName) throw new DriveError("NOT_FOUND", "Unknown parent folder.");
+    // A folder inside a room is made, and owned, by that room's key K_room: K holds no role in a room, and using it
+    // would tie the room to your name. Everywhere else, by K.
+    const room = parentHolding?.source === "room" ? parentHolding : null;
     return this.receipts.run(prefix === "g" ? `New group "${displayName}"` : `New folder "${displayName}"`, async (step) => {
       const k: Holding = { folder: parentRegistry, key: keys.driveKey, address: keys.driveAddress, seal: new Uint8Array(32), source: "own" };
-      await this.ensureGas({ ...k, folder: this.driveRoot! }, { sepolia: true, arkiv: true }, step);
+      await this.ensureGas(room ? { ...room, folder: parentRegistry } : { ...k, folder: this.driveRoot! }, { sepolia: true, arkiv: true }, step);
       const label = randomLabel(prefix);
       const { registry } = await ensCreateFolder(
-        this.sepoliaWriter(keys.driveKey, step),
-        { parent: parentRegistry, implementation: requireDeployed("driveRegistryImpl"), driveKey: keys.driveAddress, mainWallet: keys.wallet, label },
+        this.sepoliaWriter(room?.key ?? keys.driveKey, step),
+        {
+          parent: parentRegistry,
+          implementation: requireDeployed("driveRegistryImpl"),
+          driveKey: room?.address ?? keys.driveAddress,
+          mainWallet: room ? null : keys.wallet,
+          label,
+        },
         step,
       );
       const ensName = `${label}.${parentName}`;
-      const h = this.ownHolding(registry, ensName);
+      const h: Holding = room
+        ? { folder: registry, key: room.key, address: room.address, seal: ownSealKey(room.key, registry), source: "room", ensName }
+        : this.ownHolding(registry, ensName);
+      if (room) this.holdings.set(lower(registry), h);
       await this.writeVersion(
         h,
         {
