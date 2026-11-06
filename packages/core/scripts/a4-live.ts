@@ -11,10 +11,6 @@
 // on rooms.cloakroom.eth), ARKIV_RPC_URL, ARKIV_ACCESS_KEY, BEE_URL, POSTAGE_BATCH_ID; and in
 // contracts/deployments/sepolia.json: cloakroom.driveRegistryImpl, cloakroom.roomsRegistry.
 
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-
 import { secp256k1 } from "@noble/curves/secp256k1";
 import type { Hex, ReceiptStep } from "@cloakroom/types";
 import {
@@ -102,22 +98,9 @@ import {
   type SepoliaWriter,
 } from "../src/index";
 import { anonTransport } from "../src/transport";
+import { env } from "./lib";
 
-// ---------------------------------------------------------------- env
-
-const here = dirname(fileURLToPath(import.meta.url));
-for (const file of [resolve(here, "../../../.env"), resolve(here, "../../../apps/api/.env")]) {
-  if (!existsSync(file)) continue;
-  for (const line of readFileSync(file, "utf8").split("\n")) {
-    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
-    if (m && m[2] !== "" && !process.env[m[1]!]) process.env[m[1]!] = m[2]!.replace(/^["']|["']$/g, "");
-  }
-}
-function env(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`${name} is not set (repo-root .env or apps/api/.env)`);
-  return value;
-}
+// ---------------------------------------------------------------- env (repo-root .env and apps/api/.env, via lib.ts)
 
 const SEPOLIA_RPC_URL = env("SEPOLIA_RPC_URL");
 const ARKIV_RPC_URL = env("ARKIV_RPC_URL");

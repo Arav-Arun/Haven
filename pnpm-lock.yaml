@@ -12,6 +12,37 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  apps/api:
+    dependencies:
+      '@cloakroom/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@cloakroom/types':
+        specifier: workspace:*
+        version: link:../../packages/types
+      '@hono/node-server':
+        specifier: 2.1.6
+        version: 2.1.6(hono@4.13.16)
+      hono:
+        specifier: 4.13.16
+        version: 4.13.16
+      viem:
+        specifier: 2.57.16
+        version: 2.57.16(typescript@5.9.3)
+    devDependencies:
+      '@types/node':
+        specifier: 22.20.5
+        version: 22.20.5
+      esbuild:
+        specifier: 0.28.2
+        version: 0.28.2
+      tsx:
+        specifier: 4.23.15
+        version: 4.23.15
+      vitest:
+        specifier: 5.1.0
+        version: 5.1.0(@types/node@22.20.5)(vite@8.3.5(@types/node@22.20.5)(esbuild@0.28.2)(tsx@4.23.15))
+
   packages/core:
     dependencies:
       '@arkiv-network/sdk':
@@ -228,6 +259,12 @@ packages:
 
   '@fluidkey/stealth-account-kit@1.1.1':
     resolution: {integrity: sha512-3+puB4/o5+EhiHa1WHQPHADXZBa3bOeNmr2XL76h6P1tUmL3HSmfPqGOghj/2xzbS4RxIyuvneI+GUCAutmyzw==}
+
+  '@hono/node-server@2.1.6':
+    resolution: {integrity: sha512-p/KH9MnfNcsm3sR6x4lNgm5j+QN4Et8srKredl9DZfXiyZ1UQ3aQ2YVpFLbqktYN5JI+DB+VZFKM2PqE5hLKjQ==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      hono: ^4 || ^5.0.0-0
 
   '@jridgewell/resolve-uri@3.1.2':
     resolution: {integrity: sha512-bRISgCIjP20/tbWSPWMEi54QVPRZExkuD9lJL+UIxUKtwVJA8wW1Trb1jMs1RFXo1CBTNZ/5hpC9QvmKWdopKw==}
@@ -479,6 +516,10 @@ packages:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
     os: [darwin]
+
+  hono@4.13.16:
+    resolution: {integrity: sha512-AOLOEhvrV+iH92xXCnFr/5+3KjPKcI3xP63XJtX5spAnkznPdHijlIsUTpi7/9EhWqrTCekw5c5zh1K+YsVw7A==}
+    engines: {node: '>=16.9.0'}
 
   isows@1.0.3:
     resolution: {integrity: sha512-2cKei4vlmg2cxEjm3wVSqn8pcoRF/LX/wpifuuNquFO4SQmPwarClT+SUCA2lt+l581tTeZIPIZuIDo2jWN1fg==}
@@ -873,6 +914,10 @@ snapshots:
       - utf-8-validate
       - zod
 
+  '@hono/node-server@2.1.6(hono@4.13.16)':
+    dependencies:
+      hono: 4.13.16
+
   '@jridgewell/resolve-uri@3.1.2': {}
 
   '@jridgewell/sourcemap-codec@1.6.0': {}
@@ -1064,6 +1109,8 @@ snapshots:
 
   fsevents@2.3.3:
     optional: true
+
+  hono@4.13.16: {}
 
   isows@1.0.3(ws@8.13.0):
     dependencies:

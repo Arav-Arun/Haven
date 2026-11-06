@@ -2,6 +2,7 @@
 // createDriveClient arrives in step A6; these are the building blocks from steps A2–A4.
 
 export * from "./addresses";
+export * from "./apiAuth";
 export * from "./arkiv";
 export * from "./crypto";
 export * from "./ens";
