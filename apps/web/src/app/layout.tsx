@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { NetworkBadge } from "@/components/NetworkBadge";
 import "./globals.css";
@@ -17,8 +18,15 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body className="min-h-dvh font-sans antialiased">
         <Providers>
           <header className="mx-auto flex max-w-5xl items-center justify-between px-5 py-4">
-            <span className="text-lg font-semibold tracking-tight">Cloakroom</span>
-            <NetworkBadge />
+            <Link href="/" className="text-lg font-semibold tracking-tight">
+              Cloakroom
+            </Link>
+            <nav className="flex items-center gap-4 text-sm">
+              <Link href="/settings" className="text-muted hover:text-ink">
+                Settings
+              </Link>
+              <NetworkBadge />
+            </nav>
           </header>
           <main className="mx-auto max-w-5xl px-5 pb-16">{children}</main>
         </Providers>

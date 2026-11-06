@@ -3,6 +3,7 @@
 import { Wallet } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAccount, useConnect, useDisconnect, usePublicClient } from "wagmi";
+import { WalletConnectQr } from "./WalletConnectQr";
 
 /**
  * Connects a wallet and checks, on Sepolia through Anon-RPC, whether the address has contract code.
@@ -39,6 +40,7 @@ export function ConnectWallet() {
           </button>
         ))}
         {error && <p className="text-sm text-danger">{error.message}</p>}
+        <WalletConnectQr />
       </div>
     );
 
