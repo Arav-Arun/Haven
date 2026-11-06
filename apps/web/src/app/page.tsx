@@ -1,20 +1,18 @@
 "use client";
 
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import "./landing.css";
-import { Arrow, Hanger, Lock } from "@/components/landing/icons";
-import { Apps, BuiltOn, FinalCall, HowItWorks, Privacy, Technology } from "@/components/landing/Sections";
+import { Apps, BuiltOn, Closing, Faq, Privacy, Tracks } from "@/components/landing/More";
+import { Nav } from "@/components/landing/Nav";
 import { Clouds } from "@/components/landing/Sky";
+import { Steps } from "@/components/landing/Steps";
+import { TicketStack } from "@/components/landing/Tickets";
+import { Tour } from "@/components/landing/Tour";
 import { MissingConfig } from "@/components/MissingConfig";
-import { NetworkBadge } from "@/components/NetworkBadge";
 import { useDrive } from "@/lib/drive";
 
-const NAV = [
-  ["How it works", "#how"],
-  ["Privacy", "#privacy"],
-  ["Technology", "#tech"],
-  ["Apps", "#apps"],
-] as const;
+const PROMISES = ["Encrypted on your device", "Recipients stay hidden", "Access ends on its own"];
 
 export default function Home() {
   const { identity, restoring } = useDrive();
@@ -23,75 +21,61 @@ export default function Home() {
 
   return (
     <div className="landing min-h-dvh">
+      <Nav cta={signedIn ? { href: "/drive", label: "Open Haven" } : { href: "/onboarding", label: "Start sharing" }} />
+
       <div className="p-2 sm:p-4">
-        <div className="rounded-[24px] border border-[#d4dfed] bg-white p-1.5 sm:p-2">
-          <section className="sky relative overflow-hidden rounded-[26px]">
-            <Clouds />
-
-            <header className="relative z-20 flex items-center justify-between gap-4 px-5 py-5 sm:px-8 sm:py-6">
-              <Link href="/" className="flex items-center gap-2.5 text-white">
-                <span className="flex size-9 items-center justify-center rounded-full border border-[#cbd8e9] bg-white text-[#2563eb]">
-                  <Hanger width={20} height={20} />
+        <section className="sky relative overflow-hidden rounded-[28px] sm:rounded-[36px]">
+          <Clouds />
+          <div className="relative z-10 px-4 pt-24">
+            <MissingConfig />
+          </div>
+          <div className="hero-copy relative z-30 mx-auto flex max-w-5xl flex-col items-center px-5 pt-14 text-center sm:pt-20">
+            <h1 className="display text-[12vw] text-white drop-shadow-[0_4px_30px_rgb(20_60_150_/_0.35)] sm:text-7xl lg:text-[88px]">
+              Share any file by name.
+              <br />
+              <span className="text-[#0d1b33]">Nobody learns who.</span>
+            </h1>
+            <p className="mt-7 max-w-[40rem] text-lg leading-relaxed text-[#0d1b33]/80 sm:text-xl">
+              Haven encrypts files on your device and shares them with any ENS name. Each person gets a private ticket, and
+              their access ends on the date you pick.
+            </p>
+            <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row">
+              <Link href={primary.href} className="pill-white inline-flex items-center gap-3 rounded-full py-2 pl-7 pr-2 text-[17px] font-semibold">
+                {primary.label}
+                <span className="flex size-10 items-center justify-center rounded-full bg-[#1f4fd1] text-white">
+                  <ArrowRight size={18} />
                 </span>
-                <span className="text-lg font-semibold tracking-tight">Haven</span>
               </Link>
-              <nav className="flex items-center gap-1 sm:gap-2">
-                <ul className="mr-2 hidden items-center gap-1 lg:flex">
-                  {NAV.map(([label, href]) => (
-                    <li key={href}>
-                      <a href={href} className="rounded-full px-4 py-2 text-[15px] text-white/85 transition-colors hover:bg-white/15 hover:text-white">
-                        {label}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-                <span className="hidden sm:block">
-                  <NetworkBadge compact />
-                </span>
-                <Link
-                  href={signedIn ? "/drive" : "/onboarding"}
-                  className="rounded-full border border-[#b9cbe3] bg-white px-5 py-2.5 text-[15px] font-medium text-[#0d1b33] transition-colors hover:border-[#2563eb]"
-                >
-                  {signedIn ? "Open app" : "Sign in"}
+              {!signedIn && (
+                <Link href="/try" className="rounded-full px-5 py-3 text-[16px] font-semibold text-[#0d1b33]/80 transition-colors hover:bg-white/40 hover:text-[#0d1b33]">
+                  Try it without a wallet
                 </Link>
-              </nav>
-            </header>
-
-            <div className="relative z-10 px-4">
-              <MissingConfig />
+              )}
             </div>
-
-            <div className="relative z-30 mx-auto flex max-w-5xl flex-col items-center px-5 pb-12 pt-20 text-center sm:pb-16 sm:pt-28">
-              <span className="glass-soft inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-[#0d1b33]/80">
-                <Lock width={16} height={16} className="text-[#2563eb]" />
-                Private file sharing on ENS
-              </span>
-              <h1 className="headline mt-7 text-[10.6vw] text-[#0d1b33] sm:text-7xl lg:text-[92px]">
-                Share files with any ENS name, privately
-              </h1>
-              <p className="mt-6 max-w-[36rem] text-[17px] leading-relaxed text-[#0d1b33]/70 sm:text-lg">
-                Files are encrypted on your device. Each person gets a claim ticket, not your name, and their access ends on
-                the date you pick. No one else can tell who holds one.
-              </p>
-              <div className="mt-10 flex justify-center">
-                <Link href={primary.href} className="pill-action inline-flex items-center gap-2.5 rounded-full px-8 py-4 text-base font-medium">
-                  {primary.label}
-                  <Arrow width={18} height={18} />
-                </Link>
-              </div>
-            </div>
-            <BuiltOn />
-          </section>
-        </div>
+            <ul className="mt-8 flex flex-wrap justify-center gap-2">
+              {PROMISES.map((p) => (
+                <li key={p} className="glass-soft rounded-full px-4 py-2 text-[15px] font-medium text-[#0d1b33]/80">
+                  {p}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="relative z-10 mt-6 pb-10 sm:mt-10">
+            <TicketStack />
+          </div>
+        </section>
       </div>
 
+      <BuiltOn />
       <main>
-        <HowItWorks />
+        <Steps />
+        <Tour />
+        <Tracks />
         <Privacy />
-        <Technology />
         <Apps />
+        <Faq />
       </main>
-      <FinalCall href={primary.href} label={primary.label} />
+      <Closing href={primary.href} label={primary.label} />
     </div>
   );
 }

@@ -11,7 +11,7 @@ import { ConnectWallet, useWalletKind } from "@/components/ConnectWallet";
 import { NetworkBadge } from "@/components/NetworkBadge";
 import { config } from "@/lib/config";
 import { useDrive } from "@/lib/drive";
-import { Hanger } from "@/components/landing/icons";
+import { HavenMark } from "@/components/landing/Logo";
 import "./onboarding.css";
 
 function Step({ n, title, description, done, active, children }: { n: number; title: string; description: string; done: boolean; active: boolean; children?: ReactNode }) {
@@ -212,7 +212,7 @@ export default function Onboarding() {
       <div className="mx-auto min-h-[calc(100dvh-1.5rem)] max-w-[1600px] overflow-hidden rounded-[26px] border border-white/90 bg-white/55 sm:min-h-[calc(100dvh-2.5rem)]">
       <header className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-6 py-5 sm:px-10 sm:py-7">
         <Link href="/" aria-label="Haven home" className="flex items-center gap-2.5 text-[#0d1b33]">
-          <span className="flex size-9 items-center justify-center rounded-full bg-white text-[#2563eb] shadow-[0_4px_14px_rgb(37_99_235_/_0.12)]"><Hanger width={20} height={20} /></span>
+          <HavenMark size={36} />
           <span className="text-lg font-semibold tracking-tight">Haven</span>
         </Link>
         <NetworkBadge compact />
