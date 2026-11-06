@@ -9,6 +9,8 @@ import { chooseNetwork, getAnon, selectedNetwork, unavailableReason } from "@/li
 import { config } from "@/lib/config";
 import { useDrive } from "@/lib/drive";
 import { useInstall } from "@/lib/pwa";
+import { Devices, KeysInExtension, LinkName, MyKey } from "@/components/KeyDirectory";
+import { useNow } from "@cloakroom/ui";
 
 /**
  * Pairs the browser extension: after the user confirms, the account seed goes to the extension's content script on
@@ -176,6 +178,13 @@ function Account() {
   );
 }
 
+function SettingsDevices() {
+  const { identity } = useDrive();
+  const now = useNow(10_000);
+  if (!identity?.ensName) return null;
+  return <Devices now={now} />;
+}
+
 const ABOUT: Record<PrivateNetwork, string> = {
   nox: "A Sphinx mixnet. Its worker is registered on Sepolia, so it needs no mainnet connection.",
   nym: "The Nym mixnet. About 18 MB to download and a few seconds to start. Its worker is registered on mainnet.",
@@ -206,8 +215,12 @@ export default function SettingsPage() {
     <div className="flex max-w-2xl flex-col gap-6">
       <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
       <Account />
+      <MyKey />
+      <SettingsDevices />
+      <LinkName />
       <Install />
       <ConnectExtension />
+      <KeysInExtension />
 
       <section className="rounded-lg border border-line bg-card p-5">
         <h2 className="font-medium">Private network</h2>

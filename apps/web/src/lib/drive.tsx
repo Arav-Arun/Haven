@@ -1,8 +1,8 @@
 "use client";
 
-import { createDriveClient } from "@cloakroom/core";
-import { createWebStorage } from "@cloakroom/platform";
-import type { DriveClient, Identity, Receipt } from "@cloakroom/types";
+import { createDriveClient, type CloakroomClient } from "@cloakroom/core";
+import { createWebStorage, requestVerifiedKeys } from "@cloakroom/platform";
+import type { Identity, KeyValueStore, Receipt } from "@cloakroom/types";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { getAnon } from "./anon";
 import { CLIENT_NEEDS, config, missingConfig } from "./config";
@@ -17,6 +17,43 @@ function storageName(p: Profile) {
   return p === "me" ? "cloakroom" : `cloakroom-try-${p}`;
 }
 
+// ---------------------------------------------------------------- add-on F3: keys kept in the extension
+
+const CUSTODY_KEY = "cloakroom:custody";
+const SEED_KEY = "seed";
+
+/** True when the user chose "Keep keys in the extension": the seed is then never written to this site's storage. */
+export function keysInExtension(): boolean {
+  return typeof window !== "undefined" && localStorage.getItem(CUSTODY_KEY) === "extension";
+}
+
+/** Turns extension custody on or off. Turning it on deletes the seed this site stored. */
+export async function setKeysInExtension(on: boolean): Promise<void> {
+  if (on) {
+    localStorage.setItem(CUSTODY_KEY, "extension");
+    await createWebStorage({ dbName: storageName("me") }).delete(SEED_KEY);
+  } else localStorage.removeItem(CUSTODY_KEY);
+}
+
+/** Keeps the seed in memory only while extension custody is on, so a swapped copy of this site finds nothing stored. */
+function custodyStorage(base: KeyValueStore): KeyValueStore {
+  const memory = new Map<string, Uint8Array>();
+  return {
+    get: (k) => (k === SEED_KEY && keysInExtension() ? Promise.resolve(memory.get(k) ?? null) : base.get(k)),
+    set: (k, v) => {
+      if (k === SEED_KEY && keysInExtension()) {
+        memory.set(k, v);
+        return Promise.resolve();
+      }
+      return base.set(k, v);
+    },
+    delete: (k) => {
+      memory.delete(k);
+      return base.delete(k);
+    },
+  };
+}
+
 function unavailableReason(): string | null {
   const missing = missingConfig(CLIENT_NEEDS);
   if (missing.length) return `This deployment is missing settings: ${missing.join(", ")}.`;
@@ -24,11 +61,12 @@ function unavailableReason(): string | null {
 }
 
 /** A client for one profile. Exported for "Try it", which keeps both personas signed in at once. */
-export function makeClient(profile: Profile): DriveClient | null {
+export function makeClient(profile: Profile): CloakroomClient | null {
   if (unavailableReason()) return null;
+  const storage = createWebStorage({ dbName: storageName(profile) });
   return createDriveClient({
     anon: getAnon(),
-    storage: createWebStorage({ dbName: storageName(profile) }),
+    storage: profile === "me" ? custodyStorage(storage) : storage,
     appOrigin: config.appOrigin,
     apiUrl: config.apiUrl,
     beeUrl: config.beeUrl,
@@ -40,7 +78,7 @@ export function makeClient(profile: Profile): DriveClient | null {
 }
 
 interface DriveState {
-  client: DriveClient | null;
+  client: CloakroomClient | null;
   /** Why there is no client, in a sentence for the screen. */
   unavailable: string | null;
   profile: Profile;
@@ -50,6 +88,8 @@ interface DriveState {
   restoring: boolean;
   setIdentity: (i: Identity | null) => void;
   receipts: Receipt[];
+  /** Add-on F3: why the extension didn't hand this page its keys, when custody is on. */
+  custodyProblem: string | null;
 }
 
 const Ctx = createContext<DriveState | null>(null);
@@ -59,6 +99,7 @@ export function DriveProvider({ children }: { children: ReactNode }) {
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [restoring, setRestoring] = useState(true);
   const [receipts, setReceipts] = useState<Receipt[]>([]);
+  const [custodyProblem, setCustodyProblem] = useState<string | null>(null);
 
   useEffect(() => {
     const saved = sessionStorage.getItem(PROFILE_KEY);
@@ -76,6 +117,21 @@ export function DriveProvider({ children }: { children: ReactNode }) {
     let live = true;
     client
       .restore()
+      .then(async (i) => {
+        // Keys in the extension: nothing is stored here, so ask it. It checks this page's files first.
+        if (!i && profile === "me" && keysInExtension()) {
+          const keys = await requestVerifiedKeys();
+          if (!keys.ok) {
+            if (live) setCustodyProblem(keys.reason);
+            return null;
+          }
+          setCustodyProblem(null);
+          const me = await client.signIn({ kind: "seed", seed: keys.seed });
+          keys.seed.fill(0);
+          return me;
+        }
+        return i;
+      })
       .then((i) => live && setIdentity(i))
       .catch(() => live && setIdentity(null))
       .finally(() => live && setRestoring(false));
@@ -86,7 +142,7 @@ export function DriveProvider({ children }: { children: ReactNode }) {
       live = false;
       off();
     };
-  }, [client]);
+  }, [client, profile]);
 
   const setProfile = useCallback((p: Profile) => {
     if (p === "me") sessionStorage.removeItem(PROFILE_KEY);
@@ -95,8 +151,8 @@ export function DriveProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ client, unavailable, profile, setProfile, identity, restoring, setIdentity, receipts }),
-    [client, unavailable, profile, setProfile, identity, restoring, receipts],
+    () => ({ client, unavailable, profile, setProfile, identity, restoring, setIdentity, receipts, custodyProblem }),
+    [client, unavailable, profile, setProfile, identity, restoring, receipts, custodyProblem],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
@@ -108,7 +164,7 @@ export function useDrive(): DriveState {
 }
 
 /** Runs `load` with the client whenever its inputs change, with loading and error state. */
-export function useLoad<T>(load: ((c: DriveClient) => Promise<T>) | null, deps: unknown[]) {
+export function useLoad<T>(load: ((c: CloakroomClient) => Promise<T>) | null, deps: unknown[]) {
   const { client } = useDrive();
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<unknown>(null);
