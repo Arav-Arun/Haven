@@ -1,6 +1,7 @@
 # Arkiv schema
 
-Thirteen entity types: eight private ones for folders, and five public ones (add-ons F1 and F3). All are defined in [`packages/core/src/arkiv.ts`](../packages/core/src/arkiv.ts) with the SDK's `defineSchema`.
+Fifteen entity types: eight private ones for folders, five public ones (add-ons F1 and F3), and two for anonymous
+writes (add-on Z1). All are defined in [`packages/core/src/arkiv.ts`](../packages/core/src/arkiv.ts) with the SDK's `defineSchema`.
 
 ## Private: folders
 
@@ -48,3 +49,20 @@ signed by anyone else is simply listed as forged.
 `seq`; it is valid only if `seq` runs 0, 1, 2… with no gap or duplicate, each `prevEntryKey` is the previous entry's
 Arkiv key, and seq 0 is a `publish`. The current key is the last `publish` or `rotate`; it must equal the name's
 `haven.key` text record when there is one. Writes use `NONE` ("none") instead of an empty string.
+
+## Anonymous writes (add-on Z1)
+
+Both are relayed by our API (`POST /zk/join`, `POST /zk/file`), so `$creator` is the API's relayer and says nothing.
+Validity goes by a signature (joins) or a zero-knowledge proof (files); see [`zk.ts`](../packages/core/src/zk.ts).
+
+| Schema | Valid because | Indexed | Stored | Expires |
+|---|---|---|---|---|
+| `haven.zkjoin` | EIP-712 signed by `member` (same domain as above), who held WRITE in `folder` at creation; a member's first valid join counts | `folder`, `member` | `commitment` (Semaphore identity commitment, decimal), `sig` | max, renewable by anyone |
+| `haven.zkfile` | a Semaphore proof over the entry's own fields, against the folder's writer group at creation; then the file read rules, as for a non-manager | `folder`, `fileId`, `version`, `epoch` | `swarmRef`, sealed `meta` (as `haven.file`), `proof` (353 bytes: depth, root, nullifier, scope, 8 points) | max, renewable by anyone |
+
+**The writer group** of a folder at time t: the commitments of valid joins (created at or before the entry's block)
+whose member held WRITE at t, in join order, as Semaphore's LeanIMT. Every reader rebuilds it from these entries and
+`DriveRegistry.wasAllowedMany`, so removal or an end date drops a writer with no new entity. Proofs are made for depth
+5 (up to 32 writers) with a fresh random scope each, so nullifiers link nothing.
+
+**Queries the app runs:** joins and anonymous files by `folder`.
