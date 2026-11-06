@@ -926,12 +926,39 @@ class Client implements HavenClient {
         }
       }
     }
-    const folders = await Promise.all(
-      found.map(async ({ registry, holding }) => {
+    // A few at a time, each tried again on a slow moment: a burst of parallel reads through a mixnet is what used to
+    // fail, and a folder that failed used to vanish from the list. One that still can't be read stays listed.
+    const read = async ({ registry, holding }: { registry: Address; holding: Holding }): Promise<Folder | null> => {
+      for (let attempt = 0; ; attempt++) {
         try {
           return await this.toFolder(registry, holding, await this.readFolder(registry, holding));
-        } catch {
-          return null; // e.g. created but its first version isn't written yet
+        } catch (e) {
+          if (attempt >= 2) {
+            const ensName = holding.ensName ?? "";
+            return {
+              registry,
+              ensName,
+              displayName: "Couldn't load its name, open to retry",
+              kind: ensName ? kindOf(ensName) : "drive",
+              parent: parent === "root" || parent === "rooms" || parent === "groups" ? null : getAddress(parent),
+              inherit: false,
+              myAccess: holding.source === "share" ? null : { role: "owner", until: null, via: "owner" },
+              version: 1,
+              refreshPending: false,
+            };
+          }
+          if (toDriveError(e).code === "NOT_FOUND") return null; // created, first version not written yet
+          await new Promise((ok) => setTimeout(ok, 1500 * (attempt + 1)));
+        }
+      }
+    };
+    const folders: (Folder | null)[] = new Array(found.length).fill(null);
+    let next = 0;
+    await Promise.all(
+      Array.from({ length: Math.min(3, found.length) }, async () => {
+        while (next < found.length) {
+          const i = next++;
+          folders[i] = await read(found[i]!);
         }
       }),
     );

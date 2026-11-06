@@ -7,7 +7,6 @@ import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { config } from "@/lib/config";
 import { PERSONA, useDrive } from "@/lib/drive";
-import { NetworkBadge } from "./NetworkBadge";
 
 const NAV: Omit<NavItem, "active">[] = [
   { href: "/drive", label: "My drive", icon: <HardDrive size={20} aria-hidden />, primary: true },
@@ -50,7 +49,7 @@ export function Shell({ children }: { children: ReactNode }) {
     <AppShell
       nav={NAV.map((n) => ({ ...n, active: path === n.href || path.startsWith(`${n.href}/`) }))}
       Link={Link}
-      status={<NetworkBadge compact />}
+      status={null}
       account={
         identity && (
           <span className="truncate" title={identity.driveKey}>

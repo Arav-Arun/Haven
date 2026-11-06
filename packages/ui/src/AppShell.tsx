@@ -64,10 +64,12 @@ function NavPanel({ nav, Link, account, status, onNavigate }: { nav: NavItem[]; 
           ))}
         </ul>
       </nav>
-      <div className="mt-auto flex flex-col gap-2 border-t border-ink/8 pt-4 text-sm">
-        {account && <div className="min-w-0 font-medium text-ink">{account}</div>}
-        <div>{status}</div>
-      </div>
+      {(account || status) && (
+        <div className="mt-auto flex flex-col gap-2 border-t border-ink/8 pt-4 text-sm">
+          {account && <div className="min-w-0 font-medium text-ink">{account}</div>}
+          {status && <div>{status}</div>}
+        </div>
+      )}
     </div>
   );
 }
