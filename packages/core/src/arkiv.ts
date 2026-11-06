@@ -117,6 +117,32 @@ export const DeviceSchema = defineSchema("cloak.device", {
   sig: bytes(),
 });
 
+// Verified frontend (add-on F3): public release records, so the extension (or anyone) can check that the code a page
+// loaded is a published, open-source build.
+
+/** A release: its manifest's root hash, signed by the release key R. */
+export const ReleaseSchema = defineSchema("cloak.release", {
+  version: str().indexed(),
+  rootHash: str().indexed(),
+  gitCommit: str(),
+  /** The manifest (path → SHA-256 of every .js, .css and .html), as bytes on Swarm. */
+  manifestSwarmRef: str(),
+  /** The whole static site on Swarm (cloakroom.eth's contenthash), for "Open the verified copy". */
+  siteSwarmRef: str(),
+  sig: bytes(),
+});
+
+/** Anyone who rebuilt `rootHash` from its commit and says whether it matched. Counted per distinct writer. */
+export const RebuildSchema = defineSchema("cloak.rebuild", {
+  rootHash: str().indexed(),
+  matched: u64(),
+});
+
+/** R withdraws a release; the extension then treats it as bad. */
+export const ReleaseRevokeSchema = defineSchema("cloak.release-revoke", {
+  rootHash: str().indexed(),
+});
+
 export const SCHEMA_NAMES = [
   "cloak.file",
   "cloak.welcome",
@@ -128,6 +154,9 @@ export const SCHEMA_NAMES = [
   "cloak.tomb",
   "cloak.keylog",
   "cloak.device",
+  "cloak.release",
+  "cloak.rebuild",
+  "cloak.release-revoke",
 ] as const;
 export type SchemaName = (typeof SCHEMA_NAMES)[number];
 
@@ -153,7 +182,9 @@ export function arkivEndpoint(rpcUrl: string, accessKey: string): string {
 }
 
 function chainAndTransport(connection: ArkivConnection) {
-  if (connection.accessKey === "") throw new DriveError("UNKNOWN", "an Arkiv access key is required");
+  // An empty key means rpcUrl is our API's /arkiv-rpc pass-through, which adds the key server-side; browsers and the
+  // extension never hold it (CLOAKROOM_PLAN.md section 10, "Access key").
+  if (connection.accessKey === "" && connection.rpcUrl === "") throw new DriveError("UNKNOWN", "no Arkiv RPC configured");
   return {
     chain: rabdi({ accessKey: connection.accessKey }),
     transport: anonTransport({
@@ -262,6 +293,24 @@ export interface DeviceRecord extends EntityInfo {
   devicePublicKey: Hex;
   label: Uint8Array;
   sig: Hex;
+}
+
+export interface ReleaseRecord extends EntityInfo {
+  version: string;
+  rootHash: Hex;
+  gitCommit: string;
+  manifestSwarmRef: Hex;
+  siteSwarmRef: Hex;
+  sig: Hex;
+}
+
+export interface RebuildRecord extends EntityInfo {
+  rootHash: Hex;
+  matched: boolean;
+}
+
+export interface ReleaseRevokeRecord extends EntityInfo {
+  rootHash: Hex;
 }
 
 /** A query's rows plus how many matching entities didn't fit the schema (planted junk counts as hidden). */
@@ -462,6 +511,47 @@ export function deviceOp(v: {
     },
     expiration: ExpirationTime.fromDays(DEVICE_LIFETIME_DAYS),
     flags: FIXED,
+  };
+}
+
+export function releaseOp(v: {
+  version: string;
+  rootHash: Hex;
+  gitCommit: string;
+  manifestSwarmRef: Hex;
+  siteSwarmRef: Hex;
+  sig: Hex;
+}): CreateOp {
+  return {
+    schema: ReleaseSchema,
+    values: {
+      version: str(v.version),
+      rootHash: str(v.rootHash),
+      gitCommit: str(v.gitCommit),
+      manifestSwarmRef: str(normalizeRef(v.manifestSwarmRef)),
+      siteSwarmRef: str(normalizeRef(v.siteSwarmRef)),
+      sig: hexToBytes(v.sig),
+    },
+    expiration: ExpirationTime.max(),
+    flags: RENEWED,
+  };
+}
+
+export function rebuildOp(v: { rootHash: Hex; matched: boolean }): CreateOp {
+  return {
+    schema: RebuildSchema,
+    values: { rootHash: str(v.rootHash), matched: u64(v.matched ? 1 : 0) },
+    expiration: ExpirationTime.max(),
+    flags: RENEWED,
+  };
+}
+
+export function releaseRevokeOp(v: { rootHash: Hex }): CreateOp {
+  return {
+    schema: ReleaseRevokeSchema,
+    values: { rootHash: str(v.rootHash) },
+    expiration: ExpirationTime.max(),
+    flags: RENEWED,
   };
 }
 
@@ -730,6 +820,34 @@ export function listDevices(reader: ArkivReader, ensName: string): Promise<Page<
     devicePublicKey: hex(r.devicePublicKey!),
     label: blob(r.label!),
     sig: hex(r.sig!),
+  }));
+}
+
+/** Release entities created by the release key R. release.ts still checks each signature. */
+export function listReleases(reader: ArkivReader, signer: Address): Promise<Page<ReleaseRecord>> {
+  return fetchAll(reader, ReleaseSchema, eq("$creator", addr(signer)), (r) => ({
+    ...info(r),
+    version: text(r.version!),
+    rootHash: hex(r.rootHash!),
+    gitCommit: text(r.gitCommit!),
+    manifestSwarmRef: hex(r.manifestSwarmRef!),
+    siteSwarmRef: hex(r.siteSwarmRef!),
+    sig: hex(r.sig!),
+  }));
+}
+
+export function listRebuilds(reader: ArkivReader, rootHash: Hex): Promise<Page<RebuildRecord>> {
+  return fetchAll(reader, RebuildSchema, eq("rootHash", str(rootHash)), (r) => ({
+    ...info(r),
+    rootHash: hex(r.rootHash!),
+    matched: num(r.matched!) === 1,
+  }));
+}
+
+export function listReleaseRevokes(reader: ArkivReader, signer: Address): Promise<Page<ReleaseRevokeRecord>> {
+  return fetchAll(reader, ReleaseRevokeSchema, eq("$creator", addr(signer)), (r) => ({
+    ...info(r),
+    rootHash: hex(r.rootHash!),
   }));
 }
 

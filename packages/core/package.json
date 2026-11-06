@@ -10,6 +10,7 @@
     "gen": "tsx scripts/gen.ts",
     "a4": "tsx scripts/a4-live.ts",
     "f1": "tsx scripts/f1-live.ts",
+    "release": "tsx scripts/release.ts",
     "test": "vitest run"
   },
   "dependencies": {
