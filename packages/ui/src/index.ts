@@ -16,3 +16,4 @@ export * from "./ShareDialog";
 export * from "./Ticket";
 export * from "./UploadDropzone";
 export * from "./zip";
+export * from "./Activity";
