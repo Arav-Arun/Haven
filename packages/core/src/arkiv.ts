@@ -1,5 +1,5 @@
-// Arkiv (CLOAKROOM_PLAN.md section 10): the eight cloak.* schemas, writers, paged queries, renewals and the native
-// tGLM transfer that funds a stealth editor.
+// Arkiv (CLOAKROOM_PLAN.md section 10): the eight cloak.* drive schemas plus the two public key-directory schemas
+// (add-on F1, keydir.ts), writers, paged queries, renewals and the native tGLM transfer that funds a stealth editor.
 //
 // Every entity is created READ-ONLY, so its attributes are exactly what its creator wrote at $createdAt; the validator
 // (validator.ts) checks the creator's role at that time. Arkiv lets an owner hand an entity to someone else, so
@@ -90,6 +90,33 @@ export const TombSchema = defineSchema("cloak.tomb", {
   fileId: str().indexed(),
 });
 
+// Public key directory (add-on F1). Unlike the drive schemas these are deliberately PUBLIC and unsealed: anyone, in
+// any app, can read a name's key history. They hold only public keys, the ENS name (already public) and signatures.
+
+/** One entry of a name's append-only key log, signed by the name's drive key K (keydir.ts). */
+export const KeyLogSchema = defineSchema("cloak.keylog", {
+  ensName: str().indexed(),
+  seq: u64().indexed(),
+  kind: str().indexed(),
+  /** Compressed secp256k1 point (0x + 66 hex), so it fits a 128-byte string attribute. */
+  spendingPublicKey: str(),
+  /** Compressed, or "" when the entry isn't about a device. */
+  devicePublicKey: str(),
+  /** The previous entry's Arkiv key, or "" for seq 0. */
+  prevEntryKey: str(),
+  sig: bytes(),
+});
+
+/** A device the user signed in on. Expires after 90 days unless the device renews it. */
+export const DeviceSchema = defineSchema("cloak.device", {
+  ensName: str().indexed(),
+  deviceId: str().indexed(),
+  devicePublicKey: str(),
+  /** The device's name, sealed to the user (e.g. "Chrome on Pixel"). */
+  label: bytes(),
+  sig: bytes(),
+});
+
 export const SCHEMA_NAMES = [
   "cloak.file",
   "cloak.welcome",
@@ -99,6 +126,8 @@ export const SCHEMA_NAMES = [
   "cloak.refresh",
   "cloak.link",
   "cloak.tomb",
+  "cloak.keylog",
+  "cloak.device",
 ] as const;
 export type SchemaName = (typeof SCHEMA_NAMES)[number];
 
@@ -213,6 +242,28 @@ export interface TombRecord extends EntityInfo {
   fileId: string;
 }
 
+export type KeyLogKind = "publish" | "rotate" | "revoke-device";
+
+export interface KeyLogRecord extends EntityInfo {
+  ensName: string;
+  seq: number;
+  kind: KeyLogKind;
+  spendingPublicKey: Hex;
+  /** null when the entry isn't about a device. */
+  devicePublicKey: Hex | null;
+  /** null for seq 0. */
+  prevEntryKey: Hex | null;
+  sig: Hex;
+}
+
+export interface DeviceRecord extends EntityInfo {
+  ensName: string;
+  deviceId: string;
+  devicePublicKey: Hex;
+  label: Uint8Array;
+  sig: Hex;
+}
+
 /** A query's rows plus how many matching entities didn't fit the schema (planted junk counts as hidden). */
 export interface Page<R> {
   records: R[];
@@ -223,8 +274,9 @@ export interface Page<R> {
 
 
 
-const SECONDS_PER_BLOCK = 2;
-const MAX_LIFETIME_SECONDS = Number(MAX_LIFETIME) * SECONDS_PER_BLOCK;
+/** Arkiv's block time, used to turn an entity's expiry block into a date. */
+export const ARKIV_SECONDS_PER_BLOCK = 2;
+const MAX_LIFETIME_SECONDS = Number(MAX_LIFETIME) * ARKIV_SECONDS_PER_BLOCK;
 const RENEWED = { readonly: true, permissionlessExtension: true } as const;
 const FIXED = { readonly: true, permissionlessExtension: false } as const;
 
@@ -361,6 +413,55 @@ export function tombOp(v: { folder: Address; fileId: string }): CreateOp {
     values: { folder: addr(v.folder), fileId: str(v.fileId) },
     expiration: ExpirationTime.max(),
     flags: RENEWED,
+  };
+}
+
+export function keyLogOp(v: {
+  ensName: string;
+  seq: number;
+  kind: KeyLogKind;
+  spendingPublicKey: Hex;
+  devicePublicKey: Hex | null;
+  prevEntryKey: Hex | null;
+  sig: Hex;
+}): CreateOp {
+  return {
+    schema: KeyLogSchema,
+    values: {
+      ensName: str(v.ensName),
+      seq: u64(v.seq),
+      kind: str(v.kind),
+      spendingPublicKey: str(v.spendingPublicKey),
+      devicePublicKey: str(v.devicePublicKey ?? ""),
+      prevEntryKey: str(v.prevEntryKey ?? ""),
+      sig: hexToBytes(v.sig),
+    },
+    expiration: ExpirationTime.max(),
+    // Anyone may extend a public log's lifetime (no one can change it), so readers can keep a log alive too.
+    flags: RENEWED,
+  };
+}
+
+export const DEVICE_LIFETIME_DAYS = 90;
+
+export function deviceOp(v: {
+  ensName: string;
+  deviceId: string;
+  devicePublicKey: Hex;
+  label: Uint8Array;
+  sig: Hex;
+}): CreateOp {
+  return {
+    schema: DeviceSchema,
+    values: {
+      ensName: str(v.ensName),
+      deviceId: str(v.deviceId),
+      devicePublicKey: str(v.devicePublicKey),
+      label: v.label,
+      sig: hexToBytes(v.sig),
+    },
+    expiration: ExpirationTime.fromDays(DEVICE_LIFETIME_DAYS),
+    flags: FIXED,
   };
 }
 
@@ -594,6 +695,41 @@ export function listTombs(reader: ArkivReader, folder: Address): Promise<Page<To
     ...info(r),
     folder: address(r.folder!),
     fileId: text(r.fileId!),
+  }));
+}
+
+const KEYLOG_KINDS: readonly string[] = ["publish", "rotate", "revoke-device"];
+
+const keyLogKind = (v: ColumnValue): KeyLogKind => {
+  const kind = text(v);
+  if (!KEYLOG_KINDS.includes(kind)) throw new Error("unknown key log kind");
+  return kind as KeyLogKind;
+};
+const optionalHex = (v: ColumnValue): Hex | null => (text(v) === "" ? null : hex(v));
+
+/** Every key-log entry claiming `ensName`, from anyone. keydir.ts decides which ones count. */
+export function listKeyLog(reader: ArkivReader, ensName: string): Promise<Page<KeyLogRecord>> {
+  return fetchAll(reader, KeyLogSchema, eq("ensName", str(ensName)), (r) => ({
+    ...info(r),
+    ensName: text(r.ensName!),
+    seq: num(r.seq!),
+    kind: keyLogKind(r.kind!),
+    spendingPublicKey: hex(r.spendingPublicKey!),
+    devicePublicKey: optionalHex(r.devicePublicKey!),
+    prevEntryKey: optionalHex(r.prevEntryKey!),
+    sig: hex(r.sig!),
+  }));
+}
+
+/** Every live device entry claiming `ensName`. Expired ones are gone from Arkiv, so they are untrusted by absence. */
+export function listDevices(reader: ArkivReader, ensName: string): Promise<Page<DeviceRecord>> {
+  return fetchAll(reader, DeviceSchema, eq("ensName", str(ensName)), (r) => ({
+    ...info(r),
+    ensName: text(r.ensName!),
+    deviceId: text(r.deviceId!),
+    devicePublicKey: hex(r.devicePublicKey!),
+    label: blob(r.label!),
+    sig: hex(r.sig!),
   }));
 }
 

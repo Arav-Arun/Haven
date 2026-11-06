@@ -9,6 +9,7 @@
     "check8": "tsx scripts/check8-fluidkey.ts",
     "gen": "tsx scripts/gen.ts",
     "a4": "tsx scripts/a4-live.ts",
+    "f1": "tsx scripts/f1-live.ts",
     "test": "vitest run"
   },
   "dependencies": {

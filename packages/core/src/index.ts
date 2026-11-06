@@ -8,6 +8,7 @@ export * from "./ens";
 export * from "./epochs";
 export * from "./errors";
 export * from "./keycopies";
+export * from "./keydir";
 export * from "./keys";
 export * from "./naming";
 export * from "./padding";
