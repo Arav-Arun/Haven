@@ -1,6 +1,6 @@
 "use client";
 
-import type { Address, DriveClient, FileEntry, Folder, Receipt, Timestamp } from "@cloakroom/types";
+import type { Address, DriveClient, FileEntry, Folder, Receipt, ShareOptions, Timestamp } from "@cloakroom/types";
 import {
   Button,
   Dialog,
@@ -15,6 +15,8 @@ import {
   saveBlob,
   ShareDialog,
   Skeleton,
+  TeamRulesPanel,
+  teamOf,
   UploadDropzone,
   formatDate,
   makeZip,
@@ -29,6 +31,7 @@ import { useCallback, useMemo, useState } from "react";
 import { config } from "@/lib/config";
 import { useDrive, useLoad } from "@/lib/drive";
 import { keyDir, profileHref } from "@/lib/keydir";
+import { teams } from "@/lib/teams";
 
 /** The padded size anyone can see for an upload, read from its Swarm receipt step. */
 function paddedFor(receipts: Receipt[], ref: string): number | undefined {
@@ -153,6 +156,8 @@ export function FolderView({ client, folder }: { client: DriveClient; folder: Ad
   const [shareOpen, setShareOpen] = useState(false);
   const groups = useLoad(shareOpen ? (c) => c.listFolders("groups") : null, [shareOpen]);
   const keys = useMemo(() => keyDir(client), [client]);
+  const team = useMemo(() => teams(client), [client]);
+  const rules = useLoad(team.listSubtreeRules ? () => team.listSubtreeRules!(folder) : null, [team, folder]);
   const [newOpen, setNewOpen] = useState(false);
   const [uploads, setUploads] = useState<(UploadItem & { ref?: string })[]>([]);
   const [preview, setPreview] = useState<{ file: FileEntry; blob: Blob | null; error: unknown } | null>(null);
@@ -302,10 +307,48 @@ export function FolderView({ client, folder }: { client: DriveClient; folder: Ad
                 members.reload();
                 info.reload();
               }}
+              teamOf={(m) => teamOf(rules.data ?? [], m.address)}
             />
           )}
         </section>
       )}
+
+      {canManage && rules.data && rules.data.length > 0 && (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-sm font-medium text-muted">Shared with teams</h2>
+          <TeamRulesPanel
+            rules={rules.data}
+            now={now}
+            onSync={async () => {
+              await client.maintain();
+              rules.reload();
+              members.reload();
+              info.reload();
+            }}
+            {...(team.excludeFromSubtree
+              ? {
+                  onExclude: async (parent: string, member: string) => {
+                    await team.excludeFromSubtree!(folder, parent, member);
+                    rules.reload();
+                    members.reload();
+                    info.reload();
+                  },
+                }
+              : {})}
+            {...(team.removeSubtreeRule
+              ? {
+                  onRemoveRule: async (parent: string) => {
+                    await team.removeSubtreeRule!(folder, parent);
+                    rules.reload();
+                    members.reload();
+                    info.reload();
+                  },
+                }
+              : {})}
+          />
+        </section>
+      )}
+      {canManage && <ErrorNote error={rules.error} />}
 
       {shareOpen && (
         <ShareDialog
@@ -317,6 +360,17 @@ export function FolderView({ client, folder }: { client: DriveClient; folder: Ad
           lookupRecipient={client.lookupRecipient.bind(client)}
           {...(keys.lookupKey ? { lookupKey: keys.lookupKey, profileHref } : {})}
           {...(keys.confirmKeyChange ? { confirmKeyChange: keys.confirmKeyChange } : {})}
+          {...(team.previewSubtree && team.shareWithSubtree && f.kind !== "group"
+            ? {
+                previewTeam: team.previewSubtree,
+                onShareTeam: async (parent: string, opts: ShareOptions) => {
+                  const rule = await team.shareWithSubtree!(folder, parent, opts);
+                  rules.reload();
+                  members.reload();
+                  return rule;
+                },
+              }
+            : {})}
           onShare={async (recipient, opts) => {
             const m = await client.share(folder, recipient, opts);
             members.reload();

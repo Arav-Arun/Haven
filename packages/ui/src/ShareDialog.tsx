@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { describeError } from "./errors";
 import { cx, formatDate, nowSeconds, ROLE_ABOUT, ROLE_LABEL } from "./format";
 import { type KeyInfoView, RecipientKey } from "./KeyDirectory";
+import { type SubtreePreviewView, type SubtreeRuleView, TEAM_EXPLAINER, TeamPicker } from "./TeamSharing";
 import { Button, Dialog, ErrorNote, inputClass } from "./primitives";
 
 type Preset = "2m" | "1h" | "1d" | "1w" | "month" | "custom" | "never";
@@ -59,6 +60,8 @@ export function ShareDialog({
   lookupKey,
   confirmKeyChange,
   profileHref,
+  previewTeam,
+  onShareTeam,
 }: {
   open: boolean;
   onClose: () => void;
@@ -70,8 +73,17 @@ export function ShareDialog({
   lookupKey?: (ensName: string) => Promise<KeyInfoView>;
   confirmKeyChange?: (ensName: string) => Promise<void>;
   profileHref?: (ensName: string) => string;
+  /** Add-on F2: the "Team" tab, shown only when both are given. */
+  previewTeam?: (parentEnsName: string) => Promise<SubtreePreviewView>;
+  onShareTeam?: (parentEnsName: string, opts: ShareOptions) => Promise<SubtreeRuleView>;
 }) {
-  const [to, setTo] = useState<"name" | "group">("name");
+  const [to, setTo] = useState<"name" | "group" | "team">("name");
+  const [team, setTeam] = useState<string | null>(null);
+  const [doneTeam, setDoneTeam] = useState<SubtreeRuleView | null>(null);
+  const teamEnabled = !!previewTeam && !!onShareTeam;
+  const tabs = (["name", "group", "team"] as const).filter(
+    (k) => k === "name" || (k === "group" && groups.length > 0) || (k === "team" && teamEnabled),
+  );
   const [name, setName] = useState("");
   const [group, setGroup] = useState<string>("");
   const [lookup, setLookup] = useState<Lookup>({ state: "idle" });
@@ -130,15 +142,18 @@ export function ShareDialog({
     !(keyCheck.state === "ok" && keyCheck.info.matchesEns && !keyCheck.info.changedSinceLastShare);
 
   const until = untilFor(preset, custom, nowSeconds());
-  const recipient = to === "name" ? (lookup.state === "ok" ? lookup.ensName : null) : group || null;
+  const recipient =
+    to === "name" ? (lookup.state === "ok" ? lookup.ensName : null) : to === "group" ? group || null : team;
   const customInvalid = preset === "custom" && (until === null || until <= nowSeconds());
 
   const submit = async () => {
     if (!recipient) return;
     setPending(true);
     setError(null);
+    const opts = { role, until: untilFor(preset, custom, nowSeconds()), hideFromMembers: hide };
     try {
-      setDone(await onShare(recipient, { role, until: untilFor(preset, custom, nowSeconds()), hideFromMembers: hide }));
+      if (to === "team" && onShareTeam) setDoneTeam(await onShareTeam(recipient, opts));
+      else setDone(await onShare(recipient, opts));
     } catch (e) {
       setError(e);
     } finally {
@@ -148,6 +163,7 @@ export function ShareDialog({
 
   const close = () => {
     setDone(null);
+    setDoneTeam(null);
     setName("");
     setError(null);
     onClose();
@@ -165,7 +181,21 @@ export function ShareDialog({
 
   return (
     <Dialog open={open} onClose={close} title={`Share ${folder.displayName}`}>
-      {done ? (
+      {doneTeam ? (
+        <div className="flex flex-col gap-4 text-sm">
+          <p>
+            Shared with everyone under {doneTeam.parent} as {ROLE_LABEL[doneTeam.role].toLowerCase()}:{" "}
+            {doneTeam.memberCount} {doneTeam.memberCount === 1 ? "person" : "people"} so far.{" "}
+            {doneTeam.until === null ? "No end date." : `Until ${formatDate(doneTeam.until)}.`}
+          </p>
+          <p className="text-muted">{TEAM_EXPLAINER}</p>
+          <div className="flex justify-end">
+            <Button variant="primary" onClick={close}>
+              Done
+            </Button>
+          </div>
+        </div>
+      ) : done ? (
         <div className="flex flex-col gap-4 text-sm">
           <p>
             Shared with {done.label} as {ROLE_LABEL[done.role].toLowerCase()}.{" "}
@@ -188,9 +218,9 @@ export function ShareDialog({
             void submit();
           }}
         >
-          {groups.length > 0 && (
+          {tabs.length > 1 && (
             <div className="flex gap-1 rounded-md bg-line/50 p-1 text-sm" role="radiogroup" aria-label="Share with">
-              {(["name", "group"] as const).map((k) => (
+              {tabs.map((k) => (
                 <button
                   key={k}
                   type="button"
@@ -199,13 +229,15 @@ export function ShareDialog({
                   onClick={() => setTo(k)}
                   className={cx("flex-1 rounded px-3 py-1.5", to === k ? "bg-card font-medium shadow-sm" : "text-muted")}
                 >
-                  {k === "name" ? "A person" : "A group"}
+                  {k === "name" ? "A person" : k === "group" ? "A group" : "Team"}
                 </button>
               ))}
             </div>
           )}
 
-          {to === "name" ? (
+          {to === "team" && previewTeam ? (
+            <TeamPicker previewTeam={previewTeam} onReady={setTeam} />
+          ) : to === "name" ? (
             <div className="flex flex-col gap-1.5">
               <label className="flex flex-col gap-1.5 text-sm">
                 ENS name

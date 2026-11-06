@@ -13,6 +13,7 @@ export * from "./primitives";
 export * from "./PublicViewPanel";
 export * from "./ReceiptsDrawer";
 export * from "./ShareDialog";
+export * from "./TeamSharing";
 export * from "./Ticket";
 export * from "./UploadDropzone";
 export * from "./zip";
