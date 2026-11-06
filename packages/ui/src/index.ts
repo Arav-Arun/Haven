@@ -6,6 +6,7 @@ export * from "./errors";
 export * from "./FileList";
 export * from "./FilePreview";
 export * from "./format";
+export * from "./KineticMenu";
 export * from "./MembersPanel";
 export * from "./NetworkBadge";
 export * from "./NewFolderDialog";

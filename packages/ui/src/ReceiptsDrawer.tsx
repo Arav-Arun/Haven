@@ -2,7 +2,7 @@
 
 import type { Receipt, ReceiptStep, Timestamp } from "@haven/types";
 import { Check, ExternalLink, LoaderCircle, ShieldCheck, ShieldOff, TriangleAlert, X } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { describeError } from "./errors";
 import { formatAgo, formatBytes, networkName, shortAddress } from "./format";
 
@@ -76,11 +76,14 @@ export function ReceiptsDrawer({
   onClose,
   receipts,
   now,
+  footer,
 }: {
   open: boolean;
   onClose: () => void;
   receipts: Receipt[];
   now: Timestamp;
+  /** Pinned under the list: the signed-in name and whether requests are private. */
+  footer?: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -128,6 +131,11 @@ export function ReceiptsDrawer({
             </ol>
           )}
         </div>
+        {footer && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-sm">
+            {footer}
+          </div>
+        )}
       </div>
     </dialog>
   );
