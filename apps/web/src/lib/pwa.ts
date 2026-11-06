@@ -52,49 +52,6 @@ export function useInstall(): { state: InstallState; install: () => Promise<void
   };
 }
 
-// ---- Files shared into the app (Android share target), parked by the service worker ----
-
-export interface SharedFile {
-  id: IDBValidKey;
-  name: string;
-  type: string;
-  blob: Blob;
-}
-
-function openInbox(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open("cloakroom-inbox", 1);
-    req.onupgradeneeded = () => req.result.createObjectStore("files", { autoIncrement: true });
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-export async function readSharedFiles(): Promise<SharedFile[]> {
-  const db = await openInbox();
-  const files = await new Promise<SharedFile[]>((resolve, reject) => {
-    const out: SharedFile[] = [];
-    const req = db.transaction("files").objectStore("files").openCursor();
-    req.onsuccess = () => {
-      const c = req.result;
-      if (!c) return resolve(out);
-      const v = c.value as Omit<SharedFile, "id">;
-      out.push({ id: c.key, name: v.name, type: v.type, blob: v.blob });
-      c.continue();
-    };
-    req.onerror = () => reject(req.error);
-  });
-  db.close();
-  return files;
-}
-
-export async function removeSharedFile(id: IDBValidKey): Promise<void> {
-  const db = await openInbox();
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction("files", "readwrite");
-    tx.objectStore("files").delete(id);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-  db.close();
-}
+// Files shared into the app from Android's share sheet are parked by sw.js in the inbox from @cloakroom/platform.
+export { readInbox as readSharedFiles, removeFromInbox as removeSharedFile } from "@cloakroom/platform";
+export type { InboxFile as SharedFile } from "@cloakroom/platform";

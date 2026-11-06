@@ -96,4 +96,7 @@ writeFileSync(new URL("icon-192.png", out), png(192, false));
 writeFileSync(new URL("icon-512.png", out), png(512, false));
 writeFileSync(new URL("icon-maskable-512.png", out), png(512, true));
 writeFileSync(new URL("apple-touch-icon.png", out), png(180, true));
-console.log("icons written to", out.pathname);
+// The browser extension's toolbar and store icons.
+const ext = new URL("../../extension/public/icon/", import.meta.url);
+for (const size of [16, 32, 48, 128]) writeFileSync(new URL(`${size}.png`, ext), png(size, false));
+console.log("icons written");

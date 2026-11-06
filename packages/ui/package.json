@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./styles.css": "./src/styles.css"
+    "./styles.css": "./src/styles.css",
+    "./errors": "./src/errors.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",

@@ -10,6 +10,82 @@ import { config } from "@/lib/config";
 import { useDrive } from "@/lib/drive";
 import { useInstall } from "@/lib/pwa";
 
+/**
+ * Pairs the browser extension: after the user confirms, the account seed goes to the extension's content script on
+ * this page (window.postMessage, this origin only), which hands it to the extension's background worker.
+ */
+function ConnectExtension() {
+  const { client, identity } = useDrive();
+  const [present, setPresent] = useState(false);
+  const [persist, setPersist] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; ensName?: string | null; error?: string } | null>(null);
+  const [error, setError] = useState<unknown>(null);
+
+  useEffect(() => {
+    const onMessage = (e: MessageEvent) => {
+      if (e.source !== window || e.origin !== window.location.origin) return;
+      const d = e.data as { source?: string; type?: string; ok?: boolean; ensName?: string | null; error?: string } | null;
+      if (d?.source !== "cloakroom-ext") return;
+      if (d.type === "present") setPresent(true);
+      if (d.type === "paired") {
+        setPending(false);
+        setResult({ ok: !!d.ok, ensName: d.ensName, error: d.error });
+      }
+    };
+    window.addEventListener("message", onMessage);
+    window.postMessage({ source: "cloakroom-web", type: "ping" }, window.location.origin);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
+
+  if (!client || !identity) return null;
+  return (
+    <section className="rounded-lg border border-line bg-card p-5 text-sm">
+      <h2 className="font-medium">Browser extension</h2>
+      {!present ? (
+        <p className="mt-1 text-muted">
+          Install the Cloakroom extension for Chrome, then reload this page. It adds right-click &quot;Save to Cloakroom&quot;, and
+          a badge when something is shared with you.
+        </p>
+      ) : result?.ok ? (
+        <p className="mt-1 text-private">Connected. The extension is signed in as {result.ensName ?? "you"}.</p>
+      ) : (
+        <div className="mt-2 flex flex-col items-start gap-2">
+          <p className="text-muted">
+            Connecting gives the extension in this browser your Cloakroom keys, so it can check for shares and save files.
+            Only do this on your own computer.
+          </p>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" className="accent-ink" checked={persist} onChange={(e) => setPersist(e.target.checked)} />
+            Keep it signed in after the browser restarts
+          </label>
+          <Button
+            variant="primary"
+            pending={pending}
+            onClick={async () => {
+              setError(null);
+              setResult(null);
+              setPending(true);
+              try {
+                const seed = await client.exportSeed();
+                window.postMessage({ source: "cloakroom-web", type: "pair", seed: Array.from(seed), persist }, window.location.origin);
+                seed.fill(0);
+              } catch (e) {
+                setError(e);
+                setPending(false);
+              }
+            }}
+          >
+            Connect extension
+          </Button>
+          {result && !result.ok && <p className="text-danger">The extension couldn&apos;t sign in: {result.error}</p>}
+          <ErrorNote error={error} />
+        </div>
+      )}
+    </section>
+  );
+}
+
 function Install() {
   const { state, install } = useInstall();
   return (
@@ -131,6 +207,7 @@ export default function SettingsPage() {
       <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
       <Account />
       <Install />
+      <ConnectExtension />
 
       <section className="rounded-lg border border-line bg-card p-5">
         <h2 className="font-medium">Private network</h2>

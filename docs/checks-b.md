@@ -90,3 +90,33 @@ Built; the "Done when" needs a real Android phone and iPhone (human).
   worker could not be checked here: the Claude preview browser blocks service workers, as it blocks the Anon-RPC
   iframe. To check: `pnpm --filter @cloakroom/web build`, serve `apps/web/out`, open it in Chrome, then DevTools →
   Application → Service workers / Manifest.
+
+## B7 · Extension
+
+Built (`apps/extension`, WXT 0.21.5, MV3). `pnpm --filter @cloakroom/extension zip` makes the Chrome zip (147 KB).
+The "Done when" (fresh Chrome profile: pair, badge for a new share, save an image) needs `createDriveClient` and a
+human in Chrome.
+- **Private network:** `@anon-rpc/browser-extension-harness` 0.4.0 with its offscreen document and sandboxed page,
+  copied from `node_modules` on every build (the README warns a stale copy fails silently). Sandbox CSP as the README
+  specifies.
+- **Permissions:** `storage`, `contextMenus`, `alarms`, `notifications`, `offscreen`. Host permissions only for our
+  configured RPC, API, Bee and Arkiv pass-through, plus where the Nox worker's code is fetched from, read from its
+  specifier contract on Sepolia (`workerResolvers()`): `raw.githubusercontent.com`, `cdn.jsdelivr.net`, `unpkg.com`.
+  The harness checks those bytes against the contract's `workerHash` (`0xd9fa04b0…`). Saving from another site asks
+  for that one site at the moment you use it (`optional_host_permissions`).
+- **Pairing:** website Settings → "Connect extension" → after the user confirms, the seed goes by `window.postMessage`
+  (this origin only) to the extension's content script, which runs only on the configured `WXT_APP_ORIGIN`, then to
+  the background worker, which calls `signIn({ kind: "seed" })`. Changed from the plan's `externally_connectable`:
+  that needs the extension's ID baked into the website, which differs between an unpacked build and the Chrome Web
+  Store; the content script gives the same "our origin only" guarantee without it. Keys live in
+  `chrome.storage.session` unless the user ticks "Keep it signed in".
+- **Popup:** network badge, "Shared with me" tickets (open in the website), files saved from the web waiting for a
+  folder, and upload into a chosen folder.
+- **Right-click "Save to Cloakroom"** on images, links and the page: fetched without cookies, parked in the shared
+  inbox (`@cloakroom/platform` `inbox.ts`, also used by the phone's share target), encrypted when the user picks a
+  folder.
+- **Background:** a `chrome.alarms` check every 15 minutes: `sharedWithMe({ since })` → badge and notification; then
+  `maintain()` → a notification of what it did.
+- Side panel and Firefox: not built (Should and Stretch).
+- Not checked yet, needs Chrome: whether the popup and the background can each start a worker (an extension may
+  have only one offscreen document), and whether `permissions.request` from the context-menu click shows its prompt.
