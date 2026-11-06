@@ -8,7 +8,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { useAccount, useSignMessage } from "wagmi";
 import { ConnectWallet, useWalletKind } from "@/components/ConnectWallet";
-import { ExtensionSignIn } from "@/components/ExtensionKeys";
 import { ClientUnavailable } from "@/components/Gate";
 import { NetworkBadge } from "@/components/NetworkBadge";
 import { config } from "@/lib/config";
@@ -215,7 +214,6 @@ export default function Onboarding() {
       <main className="flex flex-col gap-6 pb-16 pt-6">
         <h1 className="text-3xl font-semibold tracking-tight">Sign in</h1>
         {!restoring && !client && <ClientUnavailable reason={unavailable ?? "No client."} />}
-        {!signedIn && client && <ExtensionSignIn client={client} onSignedIn={setIdentity} />}
         <ol>
           <Step n={1} title="Connect a wallet" done={signedIn || (isConnected && kind === "eoa")}>
             {!signedIn && <ConnectWallet />}

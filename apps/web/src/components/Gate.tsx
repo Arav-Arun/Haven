@@ -1,8 +1,9 @@
 "use client";
 
-import type { DriveClient, Identity } from "@cloakroom/types";
+import type { CloakroomClient } from "@cloakroom/core";
+import type { Identity } from "@cloakroom/types";
 import { EmptyState, Skeleton } from "@cloakroom/ui";
-import { KeyRound, Plug } from "lucide-react";
+import { KeyRound, Plug, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useDrive } from "@/lib/drive";
@@ -17,7 +18,7 @@ export function ClientUnavailable({ reason }: { reason: string }) {
 }
 
 /** Renders children with a client, or explains why it can't. */
-export function RequireClient({ children }: { children: (client: DriveClient) => ReactNode }) {
+export function RequireClient({ children }: { children: (client: CloakroomClient) => ReactNode }) {
   const { client, unavailable, restoring } = useDrive();
   if (restoring) return <Skeleton />;
   if (!client) return <ClientUnavailable reason={unavailable ?? "No client."} />;
@@ -25,10 +26,20 @@ export function RequireClient({ children }: { children: (client: DriveClient) =>
 }
 
 /** Renders children for a signed-in user, or points to sign-in. */
-export function RequireIdentity({ children }: { children: (client: DriveClient, identity: Identity) => ReactNode }) {
-  const { client, unavailable, restoring, identity } = useDrive();
+export function RequireIdentity({ children }: { children: (client: CloakroomClient, identity: Identity) => ReactNode }) {
+  const { client, unavailable, restoring, identity, custodyProblem } = useDrive();
   if (restoring) return <Skeleton />;
   if (!client) return <ClientUnavailable reason={unavailable ?? "No client."} />;
+  if (!identity && custodyProblem)
+    return (
+      <EmptyState icon={<ShieldAlert size={22} />} title="Your keys stayed in the extension">
+        <p>{custodyProblem}</p>
+        <p>
+          The extension gives your keys only to a page whose code matches a published Cloakroom release. Check the extension&apos;s
+          toolbar icon for details.
+        </p>
+      </EmptyState>
+    );
   if (!identity)
     return (
       <EmptyState icon={<KeyRound size={22} />} title="Sign in to see your files">

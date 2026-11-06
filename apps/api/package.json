@@ -1,0 +1,25 @@
+{
+  "name": "@cloakroom/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "tsx src/main.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@cloakroom/core": "workspace:*",
+    "@cloakroom/types": "workspace:*",
+    "@hono/node-server": "^2.1.6",
+    "hono": "^4.13.16",
+    "tsx": "4.23.15",
+    "viem": "2.57.16"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

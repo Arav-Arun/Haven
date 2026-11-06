@@ -1,6 +1,7 @@
 "use client";
 
-import type { Address, DriveClient, FileEntry, Folder, Receipt, ShareOptions, Timestamp } from "@cloakroom/types";
+import type { CloakroomClient, LiveStatus } from "@cloakroom/core";
+import type { Address, FileEntry, Folder, Receipt, Timestamp } from "@cloakroom/types";
 import {
   Button,
   Dialog,
@@ -15,8 +16,6 @@ import {
   saveBlob,
   ShareDialog,
   Skeleton,
-  TeamRulesPanel,
-  teamOf,
   UploadDropzone,
   formatDate,
   makeZip,
@@ -24,15 +23,12 @@ import {
   useNow,
   type UploadItem,
 } from "@cloakroom/ui";
-import { ArrowLeft, Copy, Eye, FolderDown, FolderPlus, Share2 } from "lucide-react";
+import { ArrowLeft, Copy, Eye, FolderDown, FolderPlus, Radio, Share2, Timer } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { config } from "@/lib/config";
 import { useDrive, useLoad } from "@/lib/drive";
-import { useLiveFolders } from "@/lib/live";
-import { keyDir, profileHref } from "@/lib/keydir";
-import { teams } from "@/lib/teams";
 
 /** The padded size anyone can see for an upload, read from its Swarm receipt step. */
 function paddedFor(receipts: Receipt[], ref: string): number | undefined {
@@ -46,7 +42,7 @@ function backHref(f: Folder): string {
   return f.kind === "room" ? "/rooms" : f.kind === "group" ? "/groups" : "/drive";
 }
 
-function LinkDialog({ client, file, onClose }: { client: DriveClient; file: FileEntry; onClose: () => void }) {
+function LinkDialog({ client, file, onClose }: { client: CloakroomClient; file: FileEntry; onClose: () => void }) {
   const [hours, setHours] = useState(24);
   const [link, setLink] = useState<{ url: string; expiresAt: Timestamp } | null>(null);
   const [pending, setPending] = useState(false);
@@ -114,7 +110,7 @@ function LinkDialog({ client, file, onClose }: { client: DriveClient; file: File
   );
 }
 
-function VersionsDialog({ client, file, onClose }: { client: DriveClient; file: FileEntry; onClose: () => void }) {
+function VersionsDialog({ client, file, onClose }: { client: CloakroomClient; file: FileEntry; onClose: () => void }) {
   const versions = useLoad((c) => c.listVersions(file.folder, file.fileId), [file.folder, file.fileId]);
   const [error, setError] = useState<unknown>(null);
   return (
@@ -146,7 +142,21 @@ function VersionsDialog({ client, file, onClose }: { client: DriveClient; file: 
   );
 }
 
-export function FolderView({ client, folder }: { client: DriveClient; folder: Address }) {
+/** Add-on F4: whether this folder updates live (a Swarm subscription) or is re-read every 30 seconds. */
+function LiveBadge({ status }: { status: LiveStatus | null }) {
+  if (!status || status.mode === "off") return null;
+  return status.mode === "live" ? (
+    <span className="inline-flex items-center gap-1.5 text-xs text-private" title="New files and member changes appear within seconds (Swarm pub/sub). Each one is checked against Arkiv first.">
+      <Radio size={12} aria-hidden /> Live
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1.5 text-xs text-muted" title={status.detail}>
+      <Timer size={12} aria-hidden /> Checking every 30 s
+    </span>
+  );
+}
+
+export function FolderView({ client, folder }: { client: CloakroomClient; folder: Address }) {
   const router = useRouter();
   const { receipts } = useDrive();
   const now = useNow(1000);
@@ -154,17 +164,25 @@ export function FolderView({ client, folder }: { client: DriveClient; folder: Ad
   const subfolders = useLoad((c) => c.listFolders(folder), [folder]);
   const files = useLoad((c) => c.listFiles(folder), [folder]);
   const members = useLoad((c) => c.listMembers(folder), [folder]);
-  // Add-on F4: a doorbell (or the 30-second fallback) reloads what changed; each reload re-reads and validates Arkiv.
-  const live = useLiveFolders(client, [folder], (e) => {
-    if (!e || e.type === "file") files.reload();
-    if (!e || e.type === "member") members.reload();
-    if (!e || e.type === "refresh" || e.type === "rotation") info.reload();
-  });
+  const rules = useLoad((c) => c.listSubtreeRules(folder), [folder]);
+  const [live, setLive] = useState<LiveStatus | null>(null);
+  const reloaders = useRef({ files, members, info, rules });
+  reloaders.current = { files, members, info, rules };
+  useEffect(() => {
+    setLive(null);
+    return client.subscribe(
+      [folder],
+      (e) => {
+        const r = reloaders.current;
+        if (e.type === "file") r.files.reload();
+        if (e.type === "member") (r.members.reload(), r.rules.reload());
+        if (e.type === "rotation" || e.type === "refresh") (r.info.reload(), r.files.reload(), r.members.reload());
+      },
+      setLive,
+    );
+  }, [client, folder]);
   const [shareOpen, setShareOpen] = useState(false);
   const groups = useLoad(shareOpen ? (c) => c.listFolders("groups") : null, [shareOpen]);
-  const keys = useMemo(() => keyDir(client), [client]);
-  const team = useMemo(() => teams(client), [client]);
-  const rules = useLoad(team.listSubtreeRules ? () => team.listSubtreeRules!(folder) : null, [team, folder]);
   const [newOpen, setNewOpen] = useState(false);
   const [uploads, setUploads] = useState<(UploadItem & { ref?: string })[]>([]);
   const [preview, setPreview] = useState<{ file: FileEntry; blob: Blob | null; error: unknown } | null>(null);
@@ -254,14 +272,8 @@ export function FolderView({ client, folder }: { client: DriveClient; folder: Ad
         <Link href={`/public?f=${folder}`} className="inline-flex min-h-10 items-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium hover:bg-line/60">
           <Eye size={16} aria-hidden /> Public view
         </Link>
-        <span
-          className="inline-flex items-center gap-1.5 self-center text-xs text-muted"
-          title={live === "live" ? "Changes arrive within seconds through a Swarm doorbell." : "Checking for changes every 30 seconds."}
-        >
-          <span className={`h-2 w-2 rounded-full ${live === "live" ? "bg-private" : "bg-line"}`} aria-hidden />
-          {live === "live" ? "Live" : "Updates every 30 s"}
-        </span>
       </FolderHeader>
+      <LiveBadge status={live} />
       <ErrorNote error={zipError} />
 
       {f.refreshPending && <RefreshPendingBanner />}
@@ -321,48 +333,29 @@ export function FolderView({ client, folder }: { client: DriveClient; folder: Ad
                 members.reload();
                 info.reload();
               }}
-              teamOf={(m) => teamOf(rules.data ?? [], m.address)}
+              rules={rules.data ?? undefined}
+              onExclude={async (parent, name) => {
+                await client.excludeFromSubtree(folder, parent, name);
+                members.reload();
+                rules.reload();
+                info.reload();
+              }}
+              onSync={async () => {
+                await client.syncSubtrees(folder);
+                members.reload();
+                rules.reload();
+                info.reload();
+              }}
+              onRemoveRule={async (parent) => {
+                await client.removeSubtreeRule(folder, parent);
+                members.reload();
+                rules.reload();
+                info.reload();
+              }}
             />
           )}
         </section>
       )}
-
-      {canManage && rules.data && rules.data.length > 0 && (
-        <section className="flex flex-col gap-2">
-          <h2 className="text-sm font-medium text-muted">Shared with teams</h2>
-          <TeamRulesPanel
-            rules={rules.data}
-            now={now}
-            onSync={async () => {
-              await client.maintain();
-              rules.reload();
-              members.reload();
-              info.reload();
-            }}
-            {...(team.excludeFromSubtree
-              ? {
-                  onExclude: async (parent: string, member: string) => {
-                    await team.excludeFromSubtree!(folder, parent, member);
-                    rules.reload();
-                    members.reload();
-                    info.reload();
-                  },
-                }
-              : {})}
-            {...(team.removeSubtreeRule
-              ? {
-                  onRemoveRule: async (parent: string) => {
-                    await team.removeSubtreeRule!(folder, parent);
-                    rules.reload();
-                    members.reload();
-                    info.reload();
-                  },
-                }
-              : {})}
-          />
-        </section>
-      )}
-      {canManage && <ErrorNote error={rules.error} />}
 
       {shareOpen && (
         <ShareDialog
@@ -372,24 +365,24 @@ export function FolderView({ client, folder }: { client: DriveClient; folder: Ad
           groups={(groups.data ?? []).filter((g) => g.registry !== folder)}
           demoMode={config.demoMode}
           lookupRecipient={client.lookupRecipient.bind(client)}
-          {...(keys.lookupKey ? { lookupKey: keys.lookupKey, profileHref } : {})}
-          {...(keys.confirmKeyChange ? { confirmKeyChange: keys.confirmKeyChange } : {})}
-          {...(team.previewSubtree && team.shareWithSubtree && f.kind !== "group"
-            ? {
-                previewTeam: team.previewSubtree,
-                onShareTeam: async (parent: string, opts: ShareOptions) => {
-                  const rule = await team.shareWithSubtree!(folder, parent, opts);
-                  rules.reload();
-                  members.reload();
-                  return rule;
-                },
-              }
-            : {})}
           onShare={async (recipient, opts) => {
             const m = await client.share(folder, recipient, opts);
             members.reload();
             return m;
           }}
+          lookupKey={client.lookupKey.bind(client)}
+          confirmKeyChange={client.confirmKeyChange.bind(client)}
+          previewTeam={f.kind === "group" ? undefined : client.previewSubtree.bind(client)}
+          onShareTeam={
+            f.kind === "group"
+              ? undefined
+              : async (parent, opts) => {
+                  const rule = await client.shareWithSubtree(folder, parent, opts);
+                  members.reload();
+                  rules.reload();
+                  return { memberCount: rule.memberCount };
+                }
+          }
         />
       )}
       <NewFolderDialog

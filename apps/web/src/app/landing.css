@@ -1,0 +1,161 @@
+/*
+ * Landing page only. The app screens keep the paper-and-ink look from @cloakroom/ui.
+ *
+ * Palette: a daytime sky that fades to white, frosted glass, deep navy ink, one bright blue for the main action.
+ *   sky-top  #3f78e3   sky-mid #8fb5f2   haze #e4eefc   ink #0d1b33   action #2563eb   ticket stamp #9c2b21
+ * The one bold element is the stack of glass claim tickets floating in the clouds. Everything else stays quiet.
+ */
+
+.landing {
+  --sky-top: #3f78e3;
+  --sky-mid: #8fb5f2;
+  --haze: #e4eefc;
+  --ink-deep: #0d1b33;
+  --action: #2563eb;
+  --glass-edge: rgb(255 255 255 / 0.72);
+  background: #eef4fd;
+  color: var(--ink-deep);
+}
+
+.landing ::selection {
+  background: rgb(37 99 235 / 0.2);
+}
+
+.landing :focus-visible {
+  outline: 2px solid var(--action);
+  outline-offset: 3px;
+}
+
+.sky {
+  background:
+    radial-gradient(120% 70% at 50% 0%, rgb(255 255 255 / 0.18), transparent 60%),
+    linear-gradient(180deg, var(--sky-top) 0%, #5b8eec 18%, var(--sky-mid) 40%, #c9dcf8 58%, var(--haze) 72%, #fff 88%);
+}
+
+/* Frosted glass: a bright top edge, a faint blue body, a soft drop shadow. */
+.glass {
+  background: linear-gradient(155deg, rgb(255 255 255 / 0.62), rgb(255 255 255 / 0.16) 55%, rgb(214 230 255 / 0.3));
+  border: 1px solid var(--glass-edge);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.95),
+    inset 0 -24px 48px rgb(120 160 235 / 0.22),
+    0 30px 60px -24px rgb(28 64 140 / 0.38);
+}
+
+.glass-soft {
+  background: linear-gradient(160deg, rgb(255 255 255 / 0.8), rgb(255 255 255 / 0.45));
+  border: 1px solid rgb(255 255 255 / 0.9);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 1px 2px rgb(13 27 51 / 0.04),
+    0 18px 40px -22px rgb(28 64 140 / 0.3);
+}
+
+/* A coat-check stub: notches cut on both sides, at the tear line. */
+.claim {
+  -webkit-mask:
+    radial-gradient(circle 11px at 0 64%, #0000 97%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle 11px at 100% 64%, #0000 97%, #000) right / 51% 100% no-repeat;
+  mask:
+    radial-gradient(circle 11px at 0 64%, #0000 97%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle 11px at 100% 64%, #0000 97%, #000) right / 51% 100% no-repeat;
+}
+
+.perforation {
+  background-image: radial-gradient(circle, rgb(255 255 255 / 0.85) 1.2px, transparent 1.6px);
+  background-size: 9px 3px;
+  background-repeat: repeat-x;
+  height: 3px;
+}
+
+/* The main action: a glossy blue pill. */
+.pill-action {
+  background: linear-gradient(180deg, #4a8bff 0%, var(--action) 100%);
+  color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.45),
+    inset 0 -2px 0 rgb(0 0 0 / 0.08),
+    0 0 0 4px rgb(255 255 255 / 0.55),
+    0 14px 30px -10px rgb(37 99 235 / 0.65);
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+.pill-action:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.5),
+    inset 0 -2px 0 rgb(0 0 0 / 0.08),
+    0 0 0 4px rgb(255 255 255 / 0.7),
+    0 18px 34px -10px rgb(37 99 235 / 0.7);
+}
+
+.headline {
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.005em;
+  line-height: 0.9;
+}
+
+/* One orchestrated moment: the tickets rise out of the clouds and settle, then drift. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 60px, 0) rotate(var(--tilt)) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(var(--tilt)) scale(1);
+  }
+}
+@keyframes drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(var(--tilt));
+  }
+  50% {
+    transform: translate3d(0, -10px, 0) rotate(var(--tilt));
+  }
+}
+.ticket-float {
+  animation:
+    rise 1100ms cubic-bezier(0.2, 0.8, 0.2, 1) var(--delay) both,
+    drift 7s ease-in-out calc(var(--delay) + 1100ms) infinite;
+  transform: rotate(var(--tilt));
+}
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+.spark {
+  animation: twinkle 4s ease-in-out infinite;
+}
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.hero-copy {
+  animation: fade-up 900ms cubic-bezier(0.2, 0.8, 0.2, 1) 500ms both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticket-float,
+  .spark,
+  .hero-copy {
+    animation: none;
+  }
+}

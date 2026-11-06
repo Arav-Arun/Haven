@@ -3,16 +3,14 @@
 import { NETWORKS } from "@cloakroom/platform";
 import type { AnonStatus, PrivateNetwork, Receipt } from "@cloakroom/types";
 import { Button, ErrorNote, shortAddress } from "@cloakroom/ui";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useExtensionCheck, VerificationLine } from "@/components/ExtensionKeys";
-import { MyDevices } from "@/components/MyDevices";
 import { chooseNetwork, getAnon, selectedNetwork, unavailableReason } from "@/lib/anon";
 import { config } from "@/lib/config";
 import { useDrive } from "@/lib/drive";
-import { profileHref } from "@/lib/keydir";
 import { useInstall } from "@/lib/pwa";
+import { Devices, KeysInExtension, LinkName, MyKey } from "@/components/KeyDirectory";
+import { useNow } from "@cloakroom/ui";
 
 /**
  * Pairs the browser extension: after the user confirms, the account seed goes to the extension's content script on
@@ -20,7 +18,6 @@ import { useInstall } from "@/lib/pwa";
  */
 function ConnectExtension() {
   const { client, identity } = useDrive();
-  const { verification } = useExtensionCheck();
   const [present, setPresent] = useState(false);
   const [persist, setPersist] = useState(false);
   const [pending, setPending] = useState(false);
@@ -47,11 +44,6 @@ function ConnectExtension() {
   return (
     <section className="rounded-lg border border-line bg-card p-5 text-sm">
       <h2 className="font-medium">Browser extension</h2>
-      {present && (
-        <div className="mt-1">
-          <VerificationLine verification={verification} />
-        </div>
-      )}
       {!present ? (
         <p className="mt-1 text-muted">
           Install the Cloakroom extension for Chrome, then reload this page. It adds right-click &quot;Save to Cloakroom&quot;, and
@@ -186,25 +178,11 @@ function Account() {
   );
 }
 
-/** Add-on F1: this name's signed-in devices, and a link to its public key page. */
-function Devices() {
-  const { client, identity } = useDrive();
-  if (!client || !identity?.ensName) return null;
-  return (
-    <section className="flex flex-col gap-3 rounded-lg border border-line bg-card p-5 text-sm">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="font-medium">Devices</h2>
-        <Link href={profileHref(identity.ensName)} className="underline">
-          Your public key page
-        </Link>
-      </div>
-      <p className="text-muted">
-        Every device you sign in on is listed in your public key log for 90 days. Remove one you no longer use, or one you
-        lost: every app stops trusting it at once.
-      </p>
-      <MyDevices client={client} />
-    </section>
-  );
+function SettingsDevices() {
+  const { identity } = useDrive();
+  const now = useNow(10_000);
+  if (!identity?.ensName) return null;
+  return <Devices now={now} />;
 }
 
 const ABOUT: Record<PrivateNetwork, string> = {
@@ -237,9 +215,12 @@ export default function SettingsPage() {
     <div className="flex max-w-2xl flex-col gap-6">
       <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
       <Account />
-      <Devices />
+      <MyKey />
+      <SettingsDevices />
+      <LinkName />
       <Install />
       <ConnectExtension />
+      <KeysInExtension />
 
       <section className="rounded-lg border border-line bg-card p-5">
         <h2 className="font-medium">Private network</h2>

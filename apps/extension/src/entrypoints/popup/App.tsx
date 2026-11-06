@@ -14,10 +14,59 @@ import {
   useNow,
   type UploadItem,
 } from "@cloakroom/ui";
-import { ExternalLink, KeyRound, Plug } from "lucide-react";
+import type { VerificationResult } from "@cloakroom/core";
+import { ExternalLink, KeyRound, Plug, ShieldAlert, ShieldCheck, ShieldQuestion } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { getAnon, makeClient, unavailableReason } from "@/lib/client";
 import { config } from "@/lib/config";
+import { verifiedCopyUrl } from "@/lib/verify";
+
+/** Add-on F3: how the active Cloakroom tab checked out against the published releases. */
+function ThisTab() {
+  const [result, setResult] = useState<VerificationResult | null | undefined>(undefined);
+  useEffect(() => {
+    chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+      if (tab?.id === undefined) return setResult(null);
+      chrome.runtime.sendMessage({ type: "verification", tabId: tab.id }).then((r: VerificationResult | null) => setResult(r ?? null), () => setResult(null));
+    });
+  }, []);
+  if (!result) return null;
+  const copy = result.siteSwarmRef ? verifiedCopyUrl(result.siteSwarmRef) : null;
+  if (result.status === "verified")
+    return (
+      <section className="flex gap-2 rounded-lg border border-line bg-card p-3 text-sm">
+        <ShieldCheck size={18} className="shrink-0 text-private" aria-hidden />
+        <div>
+          <p className="font-medium">Verified release {result.version}</p>
+          <p className="text-muted">
+            Matches commit {result.gitCommit?.slice(0, 7)}
+            {result.rebuilds ? `, ${result.rebuilds} independent rebuild${result.rebuilds === 1 ? "" : "s"}` : ", no independent rebuilds yet"}.
+          </p>
+        </div>
+      </section>
+    );
+  if (result.status === "mismatch")
+    return (
+      <section className="flex gap-2 rounded-lg border border-danger bg-card p-3 text-sm">
+        <ShieldAlert size={18} className="shrink-0 text-danger" aria-hidden />
+        <div className="flex flex-col gap-1">
+          <p className="font-medium text-danger">This tab's code doesn't match any published release</p>
+          <p className="text-muted">Your keys stay in the extension. {result.mismatchedFiles?.length ?? 0} file(s) differ.</p>
+          {copy && (
+            <a className="underline" href={copy} target="_blank" rel="noreferrer">
+              Open the verified copy
+            </a>
+          )}
+        </div>
+      </section>
+    );
+  return (
+    <section className="flex gap-2 rounded-lg border border-line bg-card p-3 text-sm">
+      <ShieldQuestion size={18} className="shrink-0 text-muted" aria-hidden />
+      <p className="text-muted">This tab couldn't be checked: {result.detail}</p>
+    </section>
+  );
+}
 
 function openSite(path: string) {
   chrome.tabs.create({ url: `${config.appOrigin}${path}` });
@@ -152,6 +201,7 @@ export function App() {
         <NetworkBadge status={status} compact />
       </header>
 
+      <ThisTab />
       {client === undefined && <Skeleton rows={3} />}
       {client === null && (
         <EmptyState icon={<Plug size={22} />} title="Not connected to Cloakroom yet">

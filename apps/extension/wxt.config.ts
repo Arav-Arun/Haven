@@ -15,14 +15,8 @@ function hostPattern(url: string | undefined): string[] {
 // contract's workerHash, so these hosts can't change what runs.
 const WORKER_RESOLVERS = ["https://raw.githubusercontent.com/*", "https://cdn.jsdelivr.net/*", "https://unpkg.com/*"];
 
-// WXT auto-imports globals such as `storage` and `browser` into every file it bundles. Limit that to this extension's
-// own sources: workspace packages (e.g. @cloakroom/core, which has its own variables named `storage`) must stay as
-// written. `exclude` goes through to unimport's Vite plugin, which WXT's types don't list.
-const autoImports = { exclude: [/[\\/]packages[\\/]/, /[\\/]node_modules[\\/]/] } as Record<string, unknown>;
-
 export default defineConfig({
   srcDir: "src",
-  imports: autoImports,
   vite: () => ({ plugins: [react(), tailwind()] }),
   manifest: ({ mode }) => {
     const env = loadEnv(mode, process.cwd(), "WXT_");
@@ -33,7 +27,7 @@ export default defineConfig({
       // Our own services and the worker's code only. Saving from other sites asks for that site when used.
       host_permissions: [
         ...new Set([
-          // Add-on F3: re-download the website's own files to check them against the published release.
+          // The website itself: its files are re-downloaded and hashed before keys are released to it (add-on F3).
           ...hostPattern(env.WXT_APP_ORIGIN),
           ...hostPattern(env.WXT_SEPOLIA_RPC_URL),
           ...hostPattern(env.WXT_API_URL),

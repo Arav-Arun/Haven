@@ -120,3 +120,42 @@ human in Chrome.
 - Side panel and Firefox: not built (Should and Stretch).
 - Not checked yet, needs Chrome: whether the popup and the background can each start a worker (an extension may
   have only one offscreen document), and whether `permissions.request` from the context-menu click shows its prompt.
+
+## Plan A steps A5 and A6, done on plan-b
+
+At the owner's request, after merging `plan-a` (A1–A4), Plan A's API and client were written here.
+- `packages/core/src/client.ts`: `createDriveClient`, every `DriveClient` method, built on A's library and following
+  the A4 live run. `api.ts`: the signed claim request and the room proof-of-work. Tests: 2 new (claim signatures,
+  proof-of-work); core's 43 non-chain tests pass. The two anvil test files need `forge build` (the ENS submodule).
+- `apps/api` (Hono): `/claim`, `/room`, `/drip`, `/arkiv-rpc`, `/upload`, `/bytes/:ref`, `/config`, `/health`.
+  7 tests: refusals before any network call (unsigned claims, no proof-of-work, disallowed Arkiv methods, unsigned
+  uploads, bad references), config, CORS.
+- `scripts/bootstrap.ts` (implementation, `cloakroom.eth`, `rooms.cloakroom.eth`, relayer registrar) and
+  `scripts/e2e.ts` (the demo story with three random identities; writes `docs/evidence.md`).
+- Both apps now use the real client. The website and extension build with it.
+- **Not run live yet:** needs funded keys, the Arkiv access key, a Bee node or batch, and the deployed API. The order:
+  `bootstrap` → start the API → `e2e`. Until then nothing has been checked against Sepolia, Arkiv or Swarm.
+
+## Add-ons F3 (verified frontend) and the add-on UI
+
+- **Reproducible build (check):** `generateBuildId` = git commit, `SOURCE_DATE_EPOCH` = the commit's time. Two clean
+  builds (`rm -rf out .next && pnpm build`) of the same tree: every `.html`, `.js` and `.css` identical (`shasum`
+  diff: 0 lines; 123 files). `pnpm --filter @cloakroom/core release manifest` prints the root hash.
+- **Extension:** the content script lists the page, every script and stylesheet (performance entries plus the DOM);
+  the background re-downloads and hashes them, and accepts only a release signed by `WXT_RELEASE_SIGNER` and not
+  revoked, whose manifest from Swarm hashes to its `rootHash`. Badge per tab (✓, !, ?), a red full-page overlay on a
+  mismatch with "Open the verified copy" (`https://<cid>.bzz.link/`, CIDv1 of the site's Swarm reference), and the popup
+  shows the active tab's result. Keys go to the page only after a fresh check passes, on a MessageChannel port.
+- **(check) MV3 can't read response bodies,** hence the re-download. This catches files swapped for everyone; it can
+  miss a host that serves bad code to one targeted visitor only (README, Add-ons, Limits). Not built: Firefox's
+  `filterResponseData`.
+- **Website:** Settings → "Keep my keys in the extension" (the seed then stays in memory only and comes from the
+  extension at each load); without the extension it says to install it to verify the page first.
+- **Add-on UI:** profile page `/u/?n=<name>` (fingerprint, "Verify in person", key history, forged entries, own
+  devices); share dialog (fingerprint, a warning with "The words match: trust the new key", a Team tab with "N members
+  found (M have no Cloakroom key)"); members panel ("Via acme.eth", Exclude, last synced, Sync now, Stop sharing);
+  Settings (your key, devices, link another ENS name with the wallet's `signTypedData`); folder view "Live" or
+  "Checking every 30 s"; extension background keeps subscriptions (re-made each minute if the worker was stopped) and
+  notifies.
+- **Not checked in a browser yet:** none of the add-on screens has been exercised against live data (no deployment
+  yet); the extension's verification needs a published release. Web and extension builds pass.

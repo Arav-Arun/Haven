@@ -1,12 +1,10 @@
 "use client";
 
 import type { Folder, Member, Role, ShareOptions, Timestamp } from "@cloakroom/types";
-import { Check, LoaderCircle, TriangleAlert } from "lucide-react";
+import { Check, Fingerprint, LoaderCircle, ShieldAlert, TriangleAlert, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { describeError } from "./errors";
 import { cx, formatDate, nowSeconds, ROLE_ABOUT, ROLE_LABEL } from "./format";
-import { type KeyInfoView, RecipientKey } from "./KeyDirectory";
-import { type SubtreePreviewView, type SubtreeRuleView, TEAM_EXPLAINER, TeamPicker } from "./TeamSharing";
 import { Button, Dialog, ErrorNote, inputClass } from "./primitives";
 
 type Preset = "2m" | "1h" | "1d" | "1w" | "month" | "custom" | "never";
@@ -32,22 +30,48 @@ function untilFor(preset: Preset, custom: string, now: Timestamp): Timestamp | n
   }
 }
 
+/** Add-on F1: what the share dialog shows about a recipient's public key log (core's KeyInfo, structurally). */
+export interface RecipientKeyView {
+  ensName: string;
+  current: string | null;
+  fingerprint: string[];
+  matchesEns: boolean;
+  changedSinceLastShare: boolean;
+  problem: string | null;
+  history: { at: Timestamp }[];
+}
+
+/** Add-on F2: who a team share would reach (core's SubtreePreview, structurally). */
+export interface TeamPreview {
+  parent: string;
+  ready: string[];
+  noKey: { name: string; why: string }[];
+}
+
+/** The eight fingerprint words, for comparing in person. */
+export function FingerprintWords({ words, className }: { words: string[]; className?: string }) {
+  if (!words.length) return null;
+  return (
+    <span className={cx("inline-flex flex-wrap items-center gap-1", className)} aria-label={`Key fingerprint: ${words.join(" ")}`}>
+      <Fingerprint size={12} aria-hidden className="text-muted" />
+      {words.map((w, i) => (
+        <span key={i} className="rounded-sm bg-ink/8 px-1 font-mono text-[11px]">
+          {w}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 type Lookup =
   | { state: "idle" }
   | { state: "checking" }
   | { state: "ok"; ensName: string }
   | { state: "no"; ensName: string; reason: string };
 
-type KeyCheck =
-  | { state: "off" }
-  | { state: "checking" }
-  | { state: "ok"; info: KeyInfoView }
-  | { state: "failed"; error: unknown };
-
 /**
  * Share a folder with an ENS name or one of your groups. The recipient is looked up live: names without a
- * Cloakroom key are refused before anything is sent. With `lookupKey` (add-on F1), the recipient's key is also checked
- * against its public log: sharing is blocked if it disagrees with ENS, and held until confirmed if it changed.
+ * Cloakroom key are refused before anything is sent.
  */
 export function ShareDialog({
   open,
@@ -59,7 +83,6 @@ export function ShareDialog({
   onShare,
   lookupKey,
   confirmKeyChange,
-  profileHref,
   previewTeam,
   onShareTeam,
 }: {
@@ -70,20 +93,20 @@ export function ShareDialog({
   demoMode: boolean;
   lookupRecipient: (ensName: string) => Promise<{ ensName: string; canReceive: boolean }>;
   onShare: (recipient: string, opts: ShareOptions) => Promise<Member>;
-  lookupKey?: (ensName: string) => Promise<KeyInfoView>;
+  /** Add-on F1: the recipient's key log, for the fingerprint and the "key changed" warning. */
+  lookupKey?: (ensName: string) => Promise<RecipientKeyView>;
   confirmKeyChange?: (ensName: string) => Promise<void>;
-  profileHref?: (ensName: string) => string;
-  /** Add-on F2: the "Team" tab, shown only when both are given. */
-  previewTeam?: (parentEnsName: string) => Promise<SubtreePreviewView>;
-  onShareTeam?: (parentEnsName: string, opts: ShareOptions) => Promise<SubtreeRuleView>;
+  /** Add-on F2: share with everyone under an ENS name. */
+  previewTeam?: (parent: string) => Promise<TeamPreview>;
+  onShareTeam?: (parent: string, opts: ShareOptions) => Promise<{ memberCount: number }>;
 }) {
-  const [to, setTo] = useState<"name" | "group" | "team">("name");
-  const [team, setTeam] = useState<string | null>(null);
-  const [doneTeam, setDoneTeam] = useState<SubtreeRuleView | null>(null);
-  const teamEnabled = !!previewTeam && !!onShareTeam;
-  const tabs = (["name", "group", "team"] as const).filter(
-    (k) => k === "name" || (k === "group" && groups.length > 0) || (k === "team" && teamEnabled),
-  );
+  const [to, setTo] = useState<"name" | "team" | "group">("name");
+  const [key, setKey] = useState<RecipientKeyView | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [team, setTeam] = useState("");
+  const [preview, setPreview] = useState<TeamPreview | null | "checking">(null);
+  const [previewError, setPreviewError] = useState<unknown>(null);
+  const [teamDone, setTeamDone] = useState<{ parent: string; memberCount: number } | null>(null);
   const [name, setName] = useState("");
   const [group, setGroup] = useState<string>("");
   const [lookup, setLookup] = useState<Lookup>({ state: "idle" });
@@ -118,41 +141,51 @@ export function ShareDialog({
     };
   }, [name, to, lookupRecipient]);
 
-  const [keyCheck, setKeyCheck] = useState<KeyCheck>({ state: "off" });
-  const [keyTick, setKeyTick] = useState(0);
-  const checkedName = lookup.state === "ok" ? lookup.ensName : null;
-
   useEffect(() => {
-    if (!lookupKey || to !== "name" || !checkedName) return setKeyCheck({ state: "off" });
-    setKeyCheck({ state: "checking" });
+    setKey(null);
+    if (lookup.state !== "ok" || !lookupKey) return;
     let live = true;
-    lookupKey(checkedName).then(
-      (info) => live && setKeyCheck({ state: "ok", info }),
-      (error) => live && setKeyCheck({ state: "failed", error }),
-    );
+    lookupKey(lookup.ensName).then((k) => live && setKey(k), () => undefined);
     return () => {
       live = false;
     };
-  }, [lookupKey, to, checkedName, keyTick]);
+  }, [lookup, lookupKey]);
 
-  /** With F1 on, a person can be shared with only once their key checks out. Groups are checked per member. */
-  const keyBlocks =
-    !!lookupKey &&
-    to === "name" &&
-    !(keyCheck.state === "ok" && keyCheck.info.matchesEns && !keyCheck.info.changedSinceLastShare);
+  useEffect(() => {
+    const p = team.trim().toLowerCase();
+    setPreviewError(null);
+    if (to !== "team" || !previewTeam || !p.includes(".")) return setPreview(null);
+    setPreview("checking");
+    let live = true;
+    const t = setTimeout(() => {
+      previewTeam(p).then(
+        (r) => live && setPreview(r),
+        (e) => {
+          if (!live) return;
+          setPreview(null);
+          setPreviewError(e);
+        },
+      );
+    }, 500);
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+  }, [team, to, previewTeam]);
 
   const until = untilFor(preset, custom, nowSeconds());
+  const keyBlocked = !!key && (key.changedSinceLastShare || !key.matchesEns || !!key.problem);
   const recipient =
-    to === "name" ? (lookup.state === "ok" ? lookup.ensName : null) : to === "group" ? group || null : team;
+    to === "name" ? (lookup.state === "ok" && !keyBlocked ? lookup.ensName : null) : to === "team" ? (preview && preview !== "checking" && preview.ready.length ? preview.parent : null) : group || null;
   const customInvalid = preset === "custom" && (until === null || until <= nowSeconds());
 
   const submit = async () => {
     if (!recipient) return;
     setPending(true);
     setError(null);
-    const opts = { role, until: untilFor(preset, custom, nowSeconds()), hideFromMembers: hide };
     try {
-      if (to === "team" && onShareTeam) setDoneTeam(await onShareTeam(recipient, opts));
+      const opts = { role, until: untilFor(preset, custom, nowSeconds()), hideFromMembers: hide };
+      if (to === "team" && onShareTeam) setTeamDone({ parent: recipient, ...(await onShareTeam(recipient, opts)) });
       else setDone(await onShare(recipient, opts));
     } catch (e) {
       setError(e);
@@ -163,7 +196,8 @@ export function ShareDialog({
 
   const close = () => {
     setDone(null);
-    setDoneTeam(null);
+    setTeamDone(null);
+    setTeam("");
     setName("");
     setError(null);
     onClose();
@@ -181,14 +215,13 @@ export function ShareDialog({
 
   return (
     <Dialog open={open} onClose={close} title={`Share ${folder.displayName}`}>
-      {doneTeam ? (
+      {teamDone ? (
         <div className="flex flex-col gap-4 text-sm">
           <p>
-            Shared with everyone under {doneTeam.parent} as {ROLE_LABEL[doneTeam.role].toLowerCase()}:{" "}
-            {doneTeam.memberCount} {doneTeam.memberCount === 1 ? "person" : "people"} so far.{" "}
-            {doneTeam.until === null ? "No end date." : `Until ${formatDate(doneTeam.until)}.`}
+            Shared with {teamDone.memberCount} {teamDone.memberCount === 1 ? "person" : "people"} under {teamDone.parent}. New names under it
+            get access when your app next syncs; names that go away lose it.
           </p>
-          <p className="text-muted">{TEAM_EXPLAINER}</p>
+          <p className="text-muted">The chain only sees random addresses. It never learns this folder is shared with {teamDone.parent}.</p>
           <div className="flex justify-end">
             <Button variant="primary" onClick={close}>
               Done
@@ -218,9 +251,9 @@ export function ShareDialog({
             void submit();
           }}
         >
-          {tabs.length > 1 && (
+          {(groups.length > 0 || onShareTeam) && (
             <div className="flex gap-1 rounded-md bg-line/50 p-1 text-sm" role="radiogroup" aria-label="Share with">
-              {tabs.map((k) => (
+              {(["name", ...(onShareTeam ? (["team"] as const) : []), ...(groups.length ? (["group"] as const) : [])] as const).map((k) => (
                 <button
                   key={k}
                   type="button"
@@ -229,66 +262,92 @@ export function ShareDialog({
                   onClick={() => setTo(k)}
                   className={cx("flex-1 rounded px-3 py-1.5", to === k ? "bg-card font-medium shadow-sm" : "text-muted")}
                 >
-                  {k === "name" ? "A person" : k === "group" ? "A group" : "Team"}
+                  {k === "name" ? "A person" : k === "team" ? "A team" : "A group"}
                 </button>
               ))}
             </div>
           )}
 
-          {to === "team" && previewTeam ? (
-            <TeamPicker previewTeam={previewTeam} onReady={setTeam} />
-          ) : to === "name" ? (
-            <div className="flex flex-col gap-1.5">
-              <label className="flex flex-col gap-1.5 text-sm">
-                ENS name
+          {to === "name" ? (
+            <label className="flex flex-col gap-1.5 text-sm">
+              ENS name
+              <input
+                className={inputClass}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="name.eth"
+                autoComplete="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                autoFocus
+              />
+              <span aria-live="polite" className="min-h-5 text-xs">
+                {lookup.state === "checking" && (
+                  <span className="inline-flex items-center gap-1 text-muted">
+                    <LoaderCircle size={12} className="animate-spin" aria-hidden /> Looking up {name.trim()}…
+                  </span>
+                )}
+                {lookup.state === "ok" && (
+                  <span className="flex flex-col gap-1">
+                    <span className="inline-flex items-center gap-1 text-private">
+                      <Check size={12} aria-hidden /> {lookup.ensName} can receive files.
+                    </span>
+                    {key && <FingerprintWords words={key.fingerprint} />}
+                  </span>
+                )}
+                {lookup.state === "no" && (
+                  <span className="inline-flex items-center gap-1 text-danger">
+                    <TriangleAlert size={12} aria-hidden /> {lookup.reason}
+                  </span>
+                )}
+              </span>
+            </label>
+          ) : to === "team" ? (
+            <div className="flex flex-col gap-1.5 text-sm">
+              <label className="flex flex-col gap-1.5">
+                Everyone under this ENS name
                 <input
                   className={inputClass}
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="name.eth"
+                  value={team}
+                  onChange={(e) => setTeam(e.target.value)}
+                  placeholder="acme.eth"
                   autoComplete="off"
                   autoCapitalize="none"
                   spellCheck={false}
                   autoFocus
                 />
-                <span aria-live="polite" className="min-h-5 text-xs">
-                  {lookup.state === "checking" && (
-                    <span className="inline-flex items-center gap-1 text-muted">
-                      <LoaderCircle size={12} className="animate-spin" aria-hidden /> Looking up {name.trim()}…
-                    </span>
-                  )}
-                  {lookup.state === "ok" && (
-                    <span className="inline-flex items-center gap-1 text-private">
-                      <Check size={12} aria-hidden /> {lookup.ensName} can receive files.
-                    </span>
-                  )}
-                  {lookup.state === "no" && (
-                    <span className="inline-flex items-center gap-1 text-danger">
-                      <TriangleAlert size={12} aria-hidden /> {lookup.reason}
-                    </span>
-                  )}
-                </span>
               </label>
-              {keyCheck.state === "checking" && (
-                <span className="inline-flex items-center gap-1 text-xs text-muted">
-                  <LoaderCircle size={12} className="animate-spin" aria-hidden /> Checking their key against its public log…
-                </span>
+              <span aria-live="polite" className="min-h-5 text-xs">
+                {preview === "checking" && (
+                  <span className="inline-flex items-center gap-1 text-muted">
+                    <LoaderCircle size={12} className="animate-spin" aria-hidden /> Reading names under {team.trim()}…
+                  </span>
+                )}
+                {preview && preview !== "checking" && (
+                  <span className={cx("inline-flex items-center gap-1", preview.ready.length ? "text-private" : "text-danger")}>
+                    <Users size={12} aria-hidden />
+                    {preview.ready.length + preview.noKey.length} members found
+                    {preview.noKey.length ? ` (${preview.noKey.length} ${preview.noKey.length === 1 ? "has" : "have"} no Cloakroom key)` : ""}
+                  </span>
+                )}
+                {previewError ? <span className="text-danger">{describeError(previewError).title}</span> : null}
+              </span>
+              {preview && preview !== "checking" && preview.ready.length + preview.noKey.length > 0 && (
+                <ul className="max-h-28 overflow-auto rounded-md border border-line bg-paper/60 p-2 text-xs">
+                  {preview.ready.map((n) => (
+                    <li key={n}>{n}</li>
+                  ))}
+                  {preview.noKey.map((n) => (
+                    <li key={n.name} className="text-muted">
+                      {n.name}: {n.why}
+                    </li>
+                  ))}
+                </ul>
               )}
-              {keyCheck.state === "failed" && <ErrorNote error={keyCheck.error} />}
-              {keyCheck.state === "ok" && (
-                <RecipientKey
-                  info={keyCheck.info}
-                  {...(profileHref ? { profileHref: profileHref(keyCheck.info.ensName) } : {})}
-                  {...(confirmKeyChange
-                    ? {
-                        onConfirmChange: async () => {
-                          await confirmKeyChange(keyCheck.info.ensName);
-                          setKeyTick((t) => t + 1);
-                        },
-                      }
-                    : {})}
-                />
-              )}
+              <span className="text-xs text-muted">
+                The chain only sees random addresses. It never learns this folder is shared with {team.trim() || "the team"}. The rule is
+                kept encrypted for managers only.
+              </span>
             </div>
           ) : (
             <label className="flex flex-col gap-1.5 text-sm">
@@ -353,12 +412,45 @@ export function ShareDialog({
             </span>
           </label>
 
+          {to === "name" && key && keyBlocked && (
+            <div role="alert" className="flex flex-col gap-2 rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">
+              <p className="flex items-start gap-2">
+                <ShieldAlert size={16} className="mt-0.5 shrink-0" aria-hidden />
+                {key.problem
+                  ? `${key.ensName}'s public key log is broken (${key.problem}). Nothing can be shared with it safely.`
+                  : !key.matchesEns
+                    ? "This name's key doesn't match its public log."
+                    : `${key.ensName}'s key changed${key.history.length ? ` on ${formatDate(key.history[key.history.length - 1]!.at)}` : ""}. Ask them to read you their eight words and compare them with the ones above before you share.`}
+              </p>
+              {key.changedSinceLastShare && !key.problem && key.matchesEns && confirmKeyChange && (
+                <Button
+                  type="button"
+                  variant="quiet"
+                  pending={confirming}
+                  onClick={async () => {
+                    setConfirming(true);
+                    try {
+                      await confirmKeyChange(key.ensName);
+                      setKey({ ...key, changedSinceLastShare: false });
+                    } catch (e) {
+                      setError(e);
+                    } finally {
+                      setConfirming(false);
+                    }
+                  }}
+                >
+                  The words match: trust the new key
+                </Button>
+              )}
+            </div>
+          )}
+
           <ErrorNote error={error} />
           <div className="flex justify-end gap-2">
             <Button type="button" variant="quiet" onClick={close}>
               Cancel
             </Button>
-            <Button type="submit" variant="primary" pending={pending} disabled={!recipient || customInvalid || keyBlocks}>
+            <Button type="submit" variant="primary" pending={pending} disabled={!recipient || customInvalid}>
               Share
             </Button>
           </div>

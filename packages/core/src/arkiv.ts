@@ -1,5 +1,5 @@
-// Arkiv (CLOAKROOM_PLAN.md section 10): the eight cloak.* drive schemas plus the two public key-directory schemas
-// (add-on F1, keydir.ts), writers, paged queries, renewals and the native tGLM transfer that funds a stealth editor.
+// Arkiv (CLOAKROOM_PLAN.md section 10): the eight cloak.* schemas, writers, paged queries, renewals and the native
+// tGLM transfer that funds a stealth editor.
 //
 // Every entity is created READ-ONLY, so its attributes are exactly what its creator wrote at $createdAt; the validator
 // (validator.ts) checks the creator's role at that time. Arkiv lets an owner hand an entity to someone else, so
@@ -19,7 +19,7 @@ import {
   type WalletArkivClient,
 } from "@arkiv-network/sdk";
 import { rabdi } from "@arkiv-network/sdk/chains";
-import { and, asc, eq, type Expression } from "@arkiv-network/sdk/query";
+import { and, asc, eq, exists, type Expression } from "@arkiv-network/sdk/query";
 import { addr, bytes, defineSchema, str, u64, type Schema } from "@arkiv-network/sdk/schema";
 import { DriveError, type AnonFetch, type Address, type Hex } from "@cloakroom/types";
 import { type Account, type Chain, getAddress, hexToBytes, isHex, type Transport } from "viem";
@@ -90,58 +90,58 @@ export const TombSchema = defineSchema("cloak.tomb", {
   fileId: str().indexed(),
 });
 
-// Public key directory (add-on F1). Unlike the drive schemas these are deliberately PUBLIC and unsealed: anyone, in
-// any app, can read a name's key history. They hold only public keys, the ENS name (already public) and signatures.
+// ---- public schemas (add-ons F1 and F3). Unlike the ones above these hold no secrets: they are meant to be read by
+// anyone. Each entry carries an EIP-712 signature, and readers go by that signature, never by $creator or $owner, so
+// any account may relay an entry (our API does, so users need no tGLM) and a forged one is simply ignored.
 
-/** One entry of a name's append-only key log, signed by the name's drive key K (keydir.ts). */
+/** One step of a name's public key history: seq 0, 1, 2…, each pointing at the previous entry's Arkiv key. */
 export const KeyLogSchema = defineSchema("cloak.keylog", {
   ensName: str().indexed(),
   seq: u64().indexed(),
   kind: str().indexed(),
-  /** Compressed secp256k1 point (0x + 66 hex), so it fits a 128-byte string attribute. */
+  /** Compressed secp256k1 point (0x + 66 hex), so it fits a 128-byte str. */
   spendingPublicKey: str(),
-  /** Compressed, or "" when the entry isn't about a device. */
+  /** For "revoke-device": the device key being revoked; otherwise NONE. */
   devicePublicKey: str(),
-  /** The previous entry's Arkiv key, or "" for seq 0. */
+  /** The previous entry's Arkiv key, or NONE for seq 0. */
   prevEntryKey: str(),
   sig: bytes(),
 });
 
-/** A device the user signed in on. Expires after 90 days unless the device renews it. */
+/** A device signed in to a name. Expires after 90 days unless the device keeps using it. */
 export const DeviceSchema = defineSchema("cloak.device", {
   ensName: str().indexed(),
   deviceId: str().indexed(),
   devicePublicKey: str(),
-  /** The device's name, sealed to the user (e.g. "Chrome on Pixel"). */
+  /** The device's label, sealed to the user (HKDF(K, "device-label")). */
   label: bytes(),
   sig: bytes(),
 });
 
-// Verified frontend (add-on F3): public release records, so the extension (or anyone) can check that the code a page
-// loaded is a published, open-source build.
-
-/** A release: its manifest's root hash, signed by the release key R. */
+/** A published website release (F3): the sha256 of its file manifest, signed by the release key R. */
 export const ReleaseSchema = defineSchema("cloak.release", {
   version: str().indexed(),
   rootHash: str().indexed(),
   gitCommit: str(),
-  /** The manifest (path → SHA-256 of every .js, .css and .html), as bytes on Swarm. */
   manifestSwarmRef: str(),
-  /** The whole static site on Swarm (cloakroom.eth's contenthash), for "Open the verified copy". */
   siteSwarmRef: str(),
   sig: bytes(),
 });
 
-/** Anyone who rebuilt `rootHash` from its commit and says whether it matched. Counted per distinct writer. */
+/** A release R has withdrawn: the extension treats it as bad. */
+export const UnreleaseSchema = defineSchema("cloak.unrelease", {
+  rootHash: str().indexed(),
+  sig: bytes(),
+});
+
+/** Anyone who rebuilt a release from its commit says whether they got the same root hash. */
 export const RebuildSchema = defineSchema("cloak.rebuild", {
   rootHash: str().indexed(),
   matched: u64(),
 });
 
-/** R withdraws a release; the extension then treats it as bad. */
-export const ReleaseRevokeSchema = defineSchema("cloak.release-revoke", {
-  rootHash: str().indexed(),
-});
+/** Written instead of an empty string (Arkiv attributes are either set or absent). */
+export const NONE = "none";
 
 export const SCHEMA_NAMES = [
   "cloak.file",
@@ -155,8 +155,8 @@ export const SCHEMA_NAMES = [
   "cloak.keylog",
   "cloak.device",
   "cloak.release",
+  "cloak.unrelease",
   "cloak.rebuild",
-  "cloak.release-revoke",
 ] as const;
 export type SchemaName = (typeof SCHEMA_NAMES)[number];
 
@@ -168,7 +168,10 @@ export type ArkivWriter = WalletArkivClient<Transport, Chain, Account>;
 export interface ArkivConnection {
   /** DriveConfig.arkivRpcUrl, e.g. https://rpc.rabdi.db-chain.testnet.arkiv.network */
   rpcUrl: string;
-  /** DriveConfig.arkivAccessKey: not a secret (it ships with the app), sent as the last path segment. */
+  /**
+   * The Arkiv access key, sent as the last path segment. Empty in browsers: there `rpcUrl` is our API's /arkiv-rpc
+   * pass-through, which adds the key server-side (Arkiv's guidance: never ship it in a client bundle).
+   */
   accessKey: string;
   anon: AnonFetch;
   isolationKey?: string;
@@ -182,9 +185,7 @@ export function arkivEndpoint(rpcUrl: string, accessKey: string): string {
 }
 
 function chainAndTransport(connection: ArkivConnection) {
-  // An empty key means rpcUrl is our API's /arkiv-rpc pass-through, which adds the key server-side; browsers and the
-  // extension never hold it (CLOAKROOM_PLAN.md section 10, "Access key").
-  if (connection.accessKey === "" && connection.rpcUrl === "") throw new DriveError("UNKNOWN", "no Arkiv RPC configured");
+  if (!connection.rpcUrl) throw new DriveError("UNKNOWN", "no Arkiv RPC URL configured");
   return {
     chain: rabdi({ accessKey: connection.accessKey }),
     transport: anonTransport({
@@ -273,17 +274,13 @@ export interface TombRecord extends EntityInfo {
   fileId: string;
 }
 
-export type KeyLogKind = "publish" | "rotate" | "revoke-device";
-
 export interface KeyLogRecord extends EntityInfo {
   ensName: string;
   seq: number;
-  kind: KeyLogKind;
+  kind: string;
   spendingPublicKey: Hex;
-  /** null when the entry isn't about a device. */
-  devicePublicKey: Hex | null;
-  /** null for seq 0. */
-  prevEntryKey: Hex | null;
+  devicePublicKey: string;
+  prevEntryKey: string;
   sig: Hex;
 }
 
@@ -300,17 +297,18 @@ export interface ReleaseRecord extends EntityInfo {
   rootHash: Hex;
   gitCommit: string;
   manifestSwarmRef: Hex;
-  siteSwarmRef: Hex;
+  siteSwarmRef: string;
+  sig: Hex;
+}
+
+export interface UnreleaseRecord extends EntityInfo {
+  rootHash: Hex;
   sig: Hex;
 }
 
 export interface RebuildRecord extends EntityInfo {
   rootHash: Hex;
   matched: boolean;
-}
-
-export interface ReleaseRevokeRecord extends EntityInfo {
-  rootHash: Hex;
 }
 
 /** A query's rows plus how many matching entities didn't fit the schema (planted junk counts as hidden). */
@@ -323,9 +321,8 @@ export interface Page<R> {
 
 
 
-/** Arkiv's block time, used to turn an entity's expiry block into a date. */
-export const ARKIV_SECONDS_PER_BLOCK = 2;
-const MAX_LIFETIME_SECONDS = Number(MAX_LIFETIME) * ARKIV_SECONDS_PER_BLOCK;
+const SECONDS_PER_BLOCK = 2;
+const MAX_LIFETIME_SECONDS = Number(MAX_LIFETIME) * SECONDS_PER_BLOCK;
 const RENEWED = { readonly: true, permissionlessExtension: true } as const;
 const FIXED = { readonly: true, permissionlessExtension: false } as const;
 
@@ -468,10 +465,10 @@ export function tombOp(v: { folder: Address; fileId: string }): CreateOp {
 export function keyLogOp(v: {
   ensName: string;
   seq: number;
-  kind: KeyLogKind;
-  spendingPublicKey: Hex;
-  devicePublicKey: Hex | null;
-  prevEntryKey: Hex | null;
+  kind: string;
+  spendingPublicKey: string;
+  devicePublicKey: string;
+  prevEntryKey: string;
   sig: Hex;
 }): CreateOp {
   return {
@@ -481,25 +478,18 @@ export function keyLogOp(v: {
       seq: u64(v.seq),
       kind: str(v.kind),
       spendingPublicKey: str(v.spendingPublicKey),
-      devicePublicKey: str(v.devicePublicKey ?? ""),
-      prevEntryKey: str(v.prevEntryKey ?? ""),
+      devicePublicKey: str(v.devicePublicKey),
+      prevEntryKey: str(v.prevEntryKey),
       sig: hexToBytes(v.sig),
     },
     expiration: ExpirationTime.max(),
-    // Anyone may extend a public log's lifetime (no one can change it), so readers can keep a log alive too.
     flags: RENEWED,
   };
 }
 
-export const DEVICE_LIFETIME_DAYS = 90;
+export const DEVICE_DAYS = 90;
 
-export function deviceOp(v: {
-  ensName: string;
-  deviceId: string;
-  devicePublicKey: Hex;
-  label: Uint8Array;
-  sig: Hex;
-}): CreateOp {
+export function deviceOp(v: { ensName: string; deviceId: string; devicePublicKey: string; label: Uint8Array; sig: Hex }): CreateOp {
   return {
     schema: DeviceSchema,
     values: {
@@ -509,7 +499,7 @@ export function deviceOp(v: {
       label: v.label,
       sig: hexToBytes(v.sig),
     },
-    expiration: ExpirationTime.fromDays(DEVICE_LIFETIME_DAYS),
+    expiration: ExpirationTime.fromDays(DEVICE_DAYS),
     flags: FIXED,
   };
 }
@@ -519,7 +509,7 @@ export function releaseOp(v: {
   rootHash: Hex;
   gitCommit: string;
   manifestSwarmRef: Hex;
-  siteSwarmRef: Hex;
+  siteSwarmRef: string;
   sig: Hex;
 }): CreateOp {
   return {
@@ -528,10 +518,19 @@ export function releaseOp(v: {
       version: str(v.version),
       rootHash: str(v.rootHash),
       gitCommit: str(v.gitCommit),
-      manifestSwarmRef: str(normalizeRef(v.manifestSwarmRef)),
-      siteSwarmRef: str(normalizeRef(v.siteSwarmRef)),
+      manifestSwarmRef: str(v.manifestSwarmRef),
+      siteSwarmRef: str(v.siteSwarmRef),
       sig: hexToBytes(v.sig),
     },
+    expiration: ExpirationTime.max(),
+    flags: RENEWED,
+  };
+}
+
+export function unreleaseOp(v: { rootHash: Hex; sig: Hex }): CreateOp {
+  return {
+    schema: UnreleaseSchema,
+    values: { rootHash: str(v.rootHash), sig: hexToBytes(v.sig) },
     expiration: ExpirationTime.max(),
     flags: RENEWED,
   };
@@ -541,15 +540,6 @@ export function rebuildOp(v: { rootHash: Hex; matched: boolean }): CreateOp {
   return {
     schema: RebuildSchema,
     values: { rootHash: str(v.rootHash), matched: u64(v.matched ? 1 : 0) },
-    expiration: ExpirationTime.max(),
-    flags: RENEWED,
-  };
-}
-
-export function releaseRevokeOp(v: { rootHash: Hex }): CreateOp {
-  return {
-    schema: ReleaseRevokeSchema,
-    values: { rootHash: str(v.rootHash) },
     expiration: ExpirationTime.max(),
     flags: RENEWED,
   };
@@ -741,6 +731,28 @@ export function listKeyCopies(reader: ArkivReader, folder: Address, recipient: A
   }));
 }
 
+/** Every key copy in a folder, whoever it's for (the Public view counts them; their contents stay sealed). */
+export function listFolderKeyCopies(reader: ArkivReader, folder: Address): Promise<Page<KeyCopyRecord>> {
+  return fetchAll(reader, KeyCopySchema, eq("folder", addr(folder)), (r) => ({
+    ...info(r),
+    folder: address(r.folder!),
+    recipient: address(r.recipient!),
+    version: num(r.version!),
+    sealed: blob(r.sealed!),
+  }));
+}
+
+/** Every welcome note for a folder (the Public view counts them). */
+export function listFolderWelcomes(reader: ArkivReader, folder: Address): Promise<Page<WelcomeRecord>> {
+  return fetchAll(reader, WelcomeSchema, eq("folder", addr(folder)), (r) => ({
+    ...info(r),
+    folder: address(r.folder!),
+    bucket: num(r.bucket!),
+    ephemeralPub: hex(r.ephemeralPub!),
+    sealedMemberKey: blob(r.sealedMemberKey!),
+  }));
+}
+
 export function listRosters(reader: ArkivReader, folder: Address): Promise<Page<RosterRecord>> {
   return fetchAll(reader, RosterSchema, eq("folder", addr(folder)), (r) => ({
     ...info(r),
@@ -788,31 +800,21 @@ export function listTombs(reader: ArkivReader, folder: Address): Promise<Page<To
   }));
 }
 
-const KEYLOG_KINDS: readonly string[] = ["publish", "rotate", "revoke-device"];
-
-const keyLogKind = (v: ColumnValue): KeyLogKind => {
-  const kind = text(v);
-  if (!KEYLOG_KINDS.includes(kind)) throw new Error("unknown key log kind");
-  return kind as KeyLogKind;
-};
-const optionalHex = (v: ColumnValue): Hex | null => (text(v) === "" ? null : hex(v));
-
-/** Every key-log entry claiming `ensName`, from anyone. keydir.ts decides which ones count. */
+/** Every key-log entry claiming to be about `ensName` (forged ones included: keydir.ts sorts them out). */
 export function listKeyLog(reader: ArkivReader, ensName: string): Promise<Page<KeyLogRecord>> {
   return fetchAll(reader, KeyLogSchema, eq("ensName", str(ensName)), (r) => ({
     ...info(r),
     ensName: text(r.ensName!),
     seq: num(r.seq!),
-    kind: keyLogKind(r.kind!),
+    kind: text(r.kind!),
     spendingPublicKey: hex(r.spendingPublicKey!),
-    devicePublicKey: optionalHex(r.devicePublicKey!),
-    prevEntryKey: optionalHex(r.prevEntryKey!),
+    devicePublicKey: text(r.devicePublicKey!),
+    prevEntryKey: text(r.prevEntryKey!),
     sig: hex(r.sig!),
   }));
 }
 
-/** Every live device entry claiming `ensName`. Expired ones are gone from Arkiv, so they are untrusted by absence. */
-export function listDevices(reader: ArkivReader, ensName: string): Promise<Page<DeviceRecord>> {
+export function listDeviceEntries(reader: ArkivReader, ensName: string): Promise<Page<DeviceRecord>> {
   return fetchAll(reader, DeviceSchema, eq("ensName", str(ensName)), (r) => ({
     ...info(r),
     ensName: text(r.ensName!),
@@ -823,15 +825,22 @@ export function listDevices(reader: ArkivReader, ensName: string): Promise<Page<
   }));
 }
 
-/** Release entities created by the release key R. release.ts still checks each signature. */
-export function listReleases(reader: ArkivReader, signer: Address): Promise<Page<ReleaseRecord>> {
-  return fetchAll(reader, ReleaseSchema, eq("$creator", addr(signer)), (r) => ({
+export function listReleases(reader: ArkivReader): Promise<Page<ReleaseRecord>> {
+  return fetchAll(reader, ReleaseSchema, exists("rootHash"), (r) => ({
     ...info(r),
     version: text(r.version!),
     rootHash: hex(r.rootHash!),
     gitCommit: text(r.gitCommit!),
     manifestSwarmRef: hex(r.manifestSwarmRef!),
-    siteSwarmRef: hex(r.siteSwarmRef!),
+    siteSwarmRef: text(r.siteSwarmRef!),
+    sig: hex(r.sig!),
+  }));
+}
+
+export function listUnreleases(reader: ArkivReader): Promise<Page<UnreleaseRecord>> {
+  return fetchAll(reader, UnreleaseSchema, exists("rootHash"), (r) => ({
+    ...info(r),
+    rootHash: hex(r.rootHash!),
     sig: hex(r.sig!),
   }));
 }
@@ -841,13 +850,6 @@ export function listRebuilds(reader: ArkivReader, rootHash: Hex): Promise<Page<R
     ...info(r),
     rootHash: hex(r.rootHash!),
     matched: num(r.matched!) === 1,
-  }));
-}
-
-export function listReleaseRevokes(reader: ArkivReader, signer: Address): Promise<Page<ReleaseRevokeRecord>> {
-  return fetchAll(reader, ReleaseRevokeSchema, eq("$creator", addr(signer)), (r) => ({
-    ...info(r),
-    rootHash: hex(r.rootHash!),
   }));
 }
 

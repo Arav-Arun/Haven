@@ -32,9 +32,6 @@ export const config = {
   arkivRpcUrl: raw.WXT_ARKIV_RPC_URL ?? "",
   network: (raw.WXT_PRIVATE_NETWORK ?? "off") as PrivateNetwork,
   demoMode: raw.WXT_DEMO_MODE === "true",
-  /**
-   * The release key R's address (add-on F3): only releases it signed count. Without it every page is "unknown" and
-   * keys are never handed to a page.
-   */
-  releaseSigner: /^0x[0-9a-fA-F]{40}$/.test(raw.WXT_RELEASE_SIGNER ?? "") ? (raw.WXT_RELEASE_SIGNER as `0x${string}`) : null,
+  /** Add-on F3: the release key R. Without it, pages are reported as "unknown" and keys are never released to them. */
+  releaseSigner: raw.WXT_RELEASE_SIGNER ?? "",
 };

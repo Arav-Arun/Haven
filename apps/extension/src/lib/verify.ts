@@ -1,78 +1,91 @@
+// Add-on F3, extension side: does the Cloakroom tab run a published release?
+//
+// The page's scripts, styles and HTML are re-downloaded here (MV3 can't read response bodies directly), hashed, and
+// compared with the manifest of a cloak.release entity signed by the release key R (WXT_RELEASE_SIGNER) and not
+// revoked. This catches files swapped for everyone (the Bybit case); a host that serves bad code to one targeted visitor
+// only could still slip past a re-download, which is why the Swarm copy (fixed by its hash) is offered too.
+
+import type { Address } from "@cloakroom/types";
 import {
   arkivReader,
-  downloadPublic,
+  compareWithManifest,
   listRebuilds,
-  listReleaseRevokes,
   listReleases,
+  listUnreleases,
+  manifestMatches,
+  manifestPath,
+  matchingRebuilds,
   sha256Hex,
-  verifyLoaded,
-  type LoadedFile,
+  trustedReleases,
+  type VerificationResult,
 } from "@cloakroom/core";
-import { config } from "./config";
+
 import { getAnon } from "./client";
-import type { VerifyReply } from "./messages";
+import { config } from "./config";
 
-/** At most this many files are re-downloaded per check; a Cloakroom page loads a few dozen. */
-const MAX_FILES = 200;
+const MAX_RELEASES = 5;
 
-/**
- * Add-on F3: re-downloads every file a Cloakroom tab loaded (MV3 can't read the page's own response bodies), hashes
- * it, and checks the set against the newest releases R signed on Arkiv. Re-downloading catches files swapped for
- * everyone (Bybit-style); a host that serves bad code to one visitor and good code to this re-download isn't caught,
- * which is what the Swarm copy is for.
- */
-export async function verifyPage(urls: string[]): Promise<VerifyReply> {
-  if (!config.releaseSigner) return { status: "unknown", reason: "this build of the extension has no release signer configured" };
-  const unique = [...new Set(urls)].slice(0, MAX_FILES);
-  const loaded: LoadedFile[] = [];
-  for (const url of unique) {
-    try {
-      const res = await fetch(url, { credentials: "omit", cache: "no-store" });
-      if (!res.ok) return { status: "mismatch", mismatchedFiles: [url], reason: `${url} answered ${res.status}` };
-      loaded.push({ url, sha256: sha256Hex(new Uint8Array(await res.arrayBuffer())) });
-    } catch {
-      // a cross-origin file the extension may not read is still a file that isn't part of a release
-      loaded.push({ url, sha256: "" });
-    }
+async function hashOf(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, { credentials: "omit", cache: "no-store" });
+    if (!res.ok) return null;
+    return sha256Hex(new Uint8Array(await res.arrayBuffer()));
+  } catch {
+    return null;
   }
+}
 
-  const anon = getAnon();
-  const reader = arkivReader({ rpcUrl: config.arkivRpcUrl, accessKey: "", anon });
+export async function verifyUrls(urls: string[]): Promise<VerificationResult> {
   const signer = config.releaseSigner;
-  const swarm = { apiUrl: config.apiUrl, beeUrl: config.beeUrl, anon };
-  const result = await verifyLoaded(
-    {
-      signer,
-      listReleases: async () => (await listReleases(reader, signer)).records,
-      listRevokes: async () => (await listReleaseRevokes(reader, signer)).records,
-      listRebuilds: async (rootHash) => (await listRebuilds(reader, rootHash)).records,
-      fetchManifest: (ref) => downloadPublic(swarm, ref),
-    },
-    loaded,
-    config.appOrigin,
-  );
+  if (!/^0x[0-9a-fA-F]{40}$/.test(signer)) return { status: "unknown", detail: "This build of the extension has no release key (WXT_RELEASE_SIGNER)." };
+  const loaded = new Map<string, string | null>();
+  for (const url of new Set(urls)) {
+    const path = manifestPath(url, config.appOrigin);
+    if (path === null) loaded.set(url, null);
+    else if (!loaded.has(path)) loaded.set(path, await hashOf(url));
+  }
+  const reader = arkivReader({ rpcUrl: config.arkivRpcUrl, accessKey: "", anon: getAnon() });
+  const [releases, unreleases] = await Promise.all([listReleases(reader), listUnreleases(reader)]);
+  const trusted = (await trustedReleases(releases.records, unreleases.records, signer as Address)).slice(0, MAX_RELEASES);
+  if (!trusted.length) return { status: "unknown", detail: "No published Cloakroom release was found on Arkiv." };
+  let best: { files: string[]; version: string } | null = null;
+  for (const r of trusted) {
+    const res = await getAnon().fetch(`${config.beeUrl.replace(/\/+$/, "")}/bytes/${r.manifestSwarmRef.slice(2)}`).catch(() => null);
+    if (!res?.ok) continue;
+    const manifest = manifestMatches(new Uint8Array(await res.arrayBuffer()), r.rootHash);
+    if (!manifest) continue;
+    const bad = compareWithManifest(loaded, manifest);
+    if (!bad.length) {
+      const rebuilds = matchingRebuilds((await listRebuilds(reader, r.rootHash)).records, signer as Address);
+      return { status: "verified", version: r.version, gitCommit: r.gitCommit, rootHash: r.rootHash, rebuilds, siteSwarmRef: r.siteSwarmRef };
+    }
+    if (!best || bad.length < best.files.length) best = { files: bad, version: r.version };
+  }
   return {
-    ...result,
-    ...(result.siteSwarmRef ? { verifiedCopyUrl: `${config.beeUrl.replace(/\/$/, "")}/bzz/${result.siteSwarmRef.slice(2)}/` } : {}),
+    status: "mismatch",
+    mismatchedFiles: best?.files ?? [...loaded.keys()],
+    siteSwarmRef: trusted[0]!.siteSwarmRef,
+    detail: best ? `closest release: ${best.version}` : "no release manifest could be read from Swarm",
   };
 }
 
-const BADGE: Record<VerifyReply["status"], { text: string; color: string; title: string }> = {
-  verified: { text: "✓", color: "#1d6b4b", title: "Cloakroom: this page matches a published release" },
-  mismatch: { text: "!", color: "#b3261e", title: "Cloakroom: this page's code doesn't match any published release" },
-  unknown: { text: "?", color: "#8a5a00", title: "Cloakroom: this page couldn't be checked" },
-};
-
-/** The per-tab badge: green ✓, red !, or amber ?. It overrides the shares count on that tab only. */
-export async function showOnTab(tabId: number, result: VerifyReply): Promise<void> {
-  const b = BADGE[result.status];
-  const title =
-    result.status === "verified"
-      ? `${b.title} (v${result.version}, commit ${result.gitCommit?.slice(0, 7)}, ${result.rebuilds ?? 0} independent rebuilds)`
-      : result.reason
-        ? `${b.title}: ${result.reason}`
-        : b.title;
-  await chrome.action.setBadgeText({ tabId, text: b.text });
-  await chrome.action.setBadgeBackgroundColor({ tabId, color: b.color });
-  await chrome.action.setTitle({ tabId, title });
+/** https://<cid>.bzz.link/ for a Swarm site: CIDv1, swarm-manifest codec (0xfa), keccak-256 multihash (0x1b), base32. */
+export function verifiedCopyUrl(siteSwarmRef: string): string | null {
+  if (!/^(0x)?[0-9a-f]{64}$/i.test(siteSwarmRef)) return null;
+  const ref = siteSwarmRef.replace(/^0x/, "");
+  const bytes = [0x01, 0xfa, 0x01, 0x1b, 0x20, ...ref.match(/../g)!.map((h) => parseInt(h, 16))];
+  const alphabet = "abcdefghijklmnopqrstuvwxyz234567";
+  let bits = 0;
+  let value = 0;
+  let out = "b";
+  for (const b of bytes) {
+    value = (value << 8) | b;
+    bits += 8;
+    while (bits >= 5) {
+      out += alphabet[(value >>> (bits - 5)) & 31];
+      bits -= 5;
+    }
+  }
+  if (bits > 0) out += alphabet[(value << (5 - bits)) & 31];
+  return `https://${out}.bzz.link/`;
 }

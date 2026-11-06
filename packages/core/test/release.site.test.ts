@@ -1,7 +1,7 @@
-// Add-on F3 against the real static export (apps/web/out): serve it over HTTP, collect what each page loads the way
-// the extension's content script does (the page URL plus every script and stylesheet it references), re-download and
-// hash them the way the background worker does, and check them with verifyLoaded against a manifest of the build and a
-// release signed by a fresh R. Then change one byte of a real chunk and expect a mismatch naming it.
+// Add-on F3 against the real static export (apps/web/out), not hand-made fixtures: serve it over HTTP, collect what each
+// page loads the way the extension's content script does (the page plus every script and stylesheet it references),
+// re-download and hash them the way apps/extension/src/lib/verify.ts does, and compare with a manifest of the build.
+// Then change one byte of a real chunk and expect a mismatch naming it.
 // Skipped when there is no build: run `next build` in apps/web first.
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -10,20 +10,17 @@ import type { AddressInfo } from "node:net";
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { Hex } from "@cloakroom/types";
-import { toHex } from "viem";
-import { generatePrivateKey, privateKeyToAddress } from "viem/accounts";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import type { ReleaseRecord } from "../src/arkiv";
-import { randomBytes, utf8 } from "../src/crypto";
+import { utf8 } from "../src/crypto";
 import {
-  manifestRootHash,
-  MANIFEST_EXTENSIONS,
+  buildManifest,
+  canonicalJson,
+  compareWithManifest,
+  manifestMatches,
+  manifestPath,
+  rootHashOf,
   sha256Hex,
-  signRelease,
-  verifyLoaded,
-  type LoadedFile,
   type ReleaseManifest,
 } from "../src/release";
 
@@ -65,48 +62,29 @@ async function pageLoads(page: string): Promise<string[]> {
   return [`${origin}/${page}`, ...refs.map((r) => new URL(r, `${origin}/${page}`).href)];
 }
 
-/** The background worker's view: re-download and hash. */
-async function hashAll(urls: string[]): Promise<LoadedFile[]> {
-  return Promise.all(
-    urls.map(async (url) => ({ url, sha256: sha256Hex(new Uint8Array(await (await fetch(url)).arrayBuffer())) })),
-  );
+/** The extension's view (verify.ts): manifest path → sha256 of a fresh download, null for another origin. */
+async function hashAll(urls: string[]): Promise<Map<string, string | null>> {
+  const loaded = new Map<string, string | null>();
+  for (const url of urls) {
+    const path = manifestPath(url, origin);
+    if (path === null) loaded.set(url, null);
+    else loaded.set(path, sha256Hex(new Uint8Array(await (await fetch(url)).arrayBuffer())));
+  }
+  return loaded;
 }
 
 describe.skipIf(!built)("a real static build", () => {
-  const manifest: ReleaseManifest = { version: "test", gitCommit: "local", files: {} };
-  let sources: Parameters<typeof verifyLoaded>[0];
+  let manifest: ReleaseManifest;
 
-  beforeAll(async () => {
-    for (const path of walk(OUT)) {
-      if (path === "release-manifest.json" || !MANIFEST_EXTENSIONS.some((e) => path.endsWith(e))) continue;
-      manifest.files[path] = sha256Hex(new Uint8Array(readFileSync(join(OUT, path))));
-    }
-    const r = generatePrivateKey();
-    const unsigned = {
-      version: manifest.version,
-      rootHash: manifestRootHash(manifest),
-      gitCommit: manifest.gitCommit,
-      manifestSwarmRef: toHex(randomBytes(32)) as Hex,
-      siteSwarmRef: toHex(randomBytes(32)) as Hex,
-    };
-    const release: ReleaseRecord = {
-      ...unsigned,
-      sig: await signRelease(r, unsigned),
-      key: toHex(randomBytes(32)),
-      creator: privateKeyToAddress(r),
-      owner: privateKeyToAddress(r),
-      createdAtBlock: 1n,
-      expiresAtBlock: 2n,
-      readonly: true,
-    };
-    const manifestBytes = utf8(JSON.stringify(manifest));
-    sources = {
-      signer: privateKeyToAddress(r),
-      listReleases: async () => [release],
-      listRevokes: async () => [],
-      listRebuilds: async () => [],
-      fetchManifest: async () => manifestBytes,
-    };
+  beforeAll(() => {
+    manifest = buildManifest(
+      walk(OUT).map((path) => ({ path, bytes: new Uint8Array(readFileSync(join(OUT, path))) })),
+      { version: "test", gitCommit: "local", publicEnv: {} },
+    );
+  });
+
+  it("the manifest round-trips through its root hash, as the extension reads it from Swarm", () => {
+    expect(manifestMatches(utf8(canonicalJson(manifest)), rootHashOf(manifest))).toEqual(manifest);
   });
 
   it("every exported page verifies, with each file it loads in the manifest", async () => {
@@ -116,8 +94,8 @@ describe.skipIf(!built)("a real static build", () => {
     expect(pages.length).toBeGreaterThan(5);
     for (const page of pages) {
       const loaded = await hashAll(await pageLoads(page));
-      expect(loaded.length).toBeGreaterThan(1);
-      expect(await verifyLoaded(sources, loaded, origin), page || "/").toMatchObject({ status: "verified" });
+      expect(loaded.size).toBeGreaterThan(1);
+      expect(compareWithManifest(loaded, manifest), page || "/").toEqual([]);
     }
   });
 
@@ -129,10 +107,7 @@ describe.skipIf(!built)("a real static build", () => {
     bytes[bytes.length - 1]! ^= 1;
     overrides.set(path, bytes);
     try {
-      expect(await verifyLoaded(sources, await hashAll(urls), origin)).toMatchObject({
-        status: "mismatch",
-        mismatchedFiles: [path],
-      });
+      expect(compareWithManifest(await hashAll(urls), manifest)).toEqual([path]);
     } finally {
       overrides.delete(path);
     }

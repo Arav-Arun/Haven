@@ -2,19 +2,34 @@
 
 import { EmptyState, ErrorNote, IncomingTickets, Skeleton, useNow } from "@cloakroom/ui";
 import { Inbox } from "lucide-react";
+import type { Address } from "@cloakroom/types";
 import { useRouter } from "next/navigation";
+import { useEffect, useRef } from "react";
 import { RequireIdentity } from "@/components/Gate";
 import { useDrive, useLoad } from "@/lib/drive";
-import { useLiveFolders } from "@/lib/live";
+
+/** Brand-new shares ring no doorbell you already listen to, so the Arkiv scan is repeated this often. */
+const NEW_SHARE_POLL_MS = 30_000;
 
 function Shared() {
   const router = useRouter();
   const now = useNow(1000);
-  const shares = useLoad((c) => c.sharedWithMe(), []);
-  // Add-on F4: rooms already shared with you ring their doorbells; a brand-new share is still found by the Arkiv scan,
-  // which the 30-second refresh repeats.
   const { client } = useDrive();
-  useLiveFolders(client, (shares.data ?? []).map((s) => s.folder.registry), () => shares.reload(), { alwaysPoll: true });
+  const shares = useLoad((c) => c.sharedWithMe(), []);
+  const reload = useRef(shares.reload);
+  reload.current = shares.reload;
+  // Add-on F4: rooms already shared with you update within seconds through their doorbells.
+  const rooms = (shares.data ?? []).map((s) => s.folder.registry).sort().join(",");
+  useEffect(() => {
+    if (!client) return;
+    const folders = rooms ? (rooms.split(",") as Address[]) : [];
+    const off = folders.length ? client.subscribe(folders, () => reload.current()) : () => undefined;
+    const timer = setInterval(() => reload.current(), NEW_SHARE_POLL_MS);
+    return () => {
+      off();
+      clearInterval(timer);
+    };
+  }, [client, rooms]);
   return (
     <div className="flex flex-col gap-6">
       <div>

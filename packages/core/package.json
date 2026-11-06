@@ -9,10 +9,10 @@
     "check8": "tsx scripts/check8-fluidkey.ts",
     "gen": "tsx scripts/gen.ts",
     "a4": "tsx scripts/a4-live.ts",
-    "f1": "tsx scripts/f1-live.ts",
-    "release": "tsx scripts/release.ts",
-    "f4": "tsx scripts/f4-live.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "bootstrap": "tsx scripts/bootstrap.ts",
+    "e2e": "tsx scripts/e2e.ts",
+    "release": "tsx scripts/release.ts"
   },
   "dependencies": {
     "@arkiv-network/sdk": "1.0.1",

@@ -1,259 +1,188 @@
-// Verified frontend (add-on F3).
+// Add-on F3: a verified frontend. Keys live in the browser, so a swapped website (hacked host, DNS, CDN or dependency)
+// could steal them, the way the Bybit attackers swapped a wallet site's JavaScript in February 2025.
 //
-// Keys live in the browser, so the biggest real risk is the website itself being swapped: a hacked host, DNS, CDN or
-// dependency serving different JavaScript (how the Bybit theft worked in Feb 2025). So:
-//   1. every release publishes a manifest (path → SHA-256 of every .js, .css and .html), and its root hash goes to a
-//      public cloak.release entity on Arkiv, signed by a dedicated release key R; the site itself goes to Swarm;
-//   2. the extension hashes what a Cloakroom tab actually loaded and compares it with a published, non-revoked
-//      release, and gives keys to the page only when every file matches;
-//   3. anyone can rebuild a commit and post a cloak.rebuild saying whether the hashes matched.
-// Limits (also in the README): this catches files swapped for everyone, not a host that serves bad code to one
-// targeted visitor and good code to the extension's re-download. The Swarm copy defends against that case.
+// Every release publishes:
+//   - manifest.json = { version, gitCommit, publicEnv, files: { "<path>": "<sha256 hex>" } } over every .html, .js and
+//     .css file of the static build; rootHash = sha256(canonical JSON of the manifest);
+//   - the manifest and the whole site on Swarm (cloakroom.eth's contenthash points at the site);
+//   - a cloak.release entity on Arkiv, signed (EIP-712) by the release key R.
+// The extension re-downloads every file a Cloakroom tab loaded, hashes it, and releases keys to the page only when every
+// hash is in a published, non-revoked manifest.
 
 import type { Address, Hex } from "@cloakroom/types";
 import { bytesToHex, isAddressEqual, recoverTypedDataAddress } from "viem";
-import { signTypedData } from "viem/accounts";
 
-import type { RebuildRecord, ReleaseRecord, ReleaseRevokeRecord } from "./arkiv";
+import type { RebuildRecord, ReleaseRecord, UnreleaseRecord } from "./arkiv";
 import { sha256, utf8 } from "./crypto";
-import { KEYDIR_DOMAIN } from "./keydir";
-
-// ---------------------------------------------------------------- the manifest
+import { KEYLOG_DOMAIN } from "./keydir";
 
 export interface ReleaseManifest {
   version: string;
   gitCommit: string;
-  /** Path relative to the site root ("index.html", "drive/index.html", "_next/static/…js") → SHA-256, lowercase hex. */
+  /** The NEXT_PUBLIC_* values the build used: needed to rebuild it byte for byte, and public anyway. */
+  publicEnv: Record<string, string>;
   files: Record<string, string>;
 }
 
-/** The file types a manifest covers: everything that can run or style code on the page. */
-export const MANIFEST_EXTENSIONS = [".js", ".css", ".html"] as const;
+export const HASHED_EXTENSIONS = [".html", ".js", ".css"];
 
-/** JSON with object keys sorted at every level, so the same manifest always gives the same bytes and root hash. */
+/** JSON with keys sorted at every level and no whitespace, so the same manifest always gives the same bytes. */
 export function canonicalJson(value: unknown): string {
-  if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  const entries = Object.entries(value as Record<string, unknown>)
-    .filter(([, v]) => v !== undefined)
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-  return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(",")}}`;
+  if (value && typeof value === "object") {
+    const o = value as Record<string, unknown>;
+    return `{${Object.keys(o)
+      .sort()
+      .map((k) => `${JSON.stringify(k)}:${canonicalJson(o[k])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
 }
 
 export function sha256Hex(bytes: Uint8Array): string {
   return bytesToHex(sha256(bytes)).slice(2);
 }
 
-export function manifestRootHash(manifest: ReleaseManifest): Hex {
+export function rootHashOf(manifest: ReleaseManifest): Hex {
   return bytesToHex(sha256(utf8(canonicalJson(manifest))));
 }
 
-/** Reads a manifest downloaded from Swarm, refusing anything that isn't exactly the expected shape. */
-export function parseManifest(bytes: Uint8Array): ReleaseManifest {
-  const value = JSON.parse(new TextDecoder().decode(bytes)) as Record<string, unknown>;
-  const files = value.files as Record<string, unknown> | undefined;
-  if (typeof value.version !== "string" || typeof value.gitCommit !== "string" || !files || typeof files !== "object") {
-    throw new Error("malformed release manifest");
-  }
-  for (const [path, hash] of Object.entries(files)) {
-    if (typeof hash !== "string" || !/^[0-9a-f]{64}$/.test(hash) || path.startsWith("/") || path.includes("..")) {
-      throw new Error("malformed release manifest");
-    }
-  }
-  return { version: value.version, gitCommit: value.gitCommit, files: files as Record<string, string> };
+export function isHashedPath(path: string): boolean {
+  return HASHED_EXTENSIONS.some((ext) => path.endsWith(ext));
+}
+
+/** Builds the manifest from the static export's files (paths relative to the export root, with "/" separators). */
+export function buildManifest(
+  files: Iterable<{ path: string; bytes: Uint8Array }>,
+  meta: { version: string; gitCommit: string; publicEnv: Record<string, string> },
+): ReleaseManifest {
+  const out: Record<string, string> = {};
+  for (const f of files) if (isHashedPath(f.path)) out[f.path] = sha256Hex(f.bytes);
+  return { ...meta, files: out };
 }
 
 /**
- * The manifest path a loaded URL corresponds to, or null for a URL from another origin (never part of a release).
- * Query strings and fragments don't change the file ("/drive/?f=0x…" is "drive/index.html").
+ * The manifest path a URL on the app's origin is served from. The export uses trailingSlash, so "/drive/" is
+ * "drive/index.html". Null for another origin (nothing from another origin is ever in a release).
  */
-export function manifestPath(url: string, origin: string): string | null {
-  const u = new URL(url, origin);
-  if (u.origin !== new URL(origin).origin) return null;
-  let path = decodeURIComponent(u.pathname).replace(/^\/+/, "");
-  if (path === "" || path.endsWith("/")) path += "index.html";
-  return path;
-}
-
-export interface LoadedFile {
-  url: string;
-  /** SHA-256 of the bytes, lowercase hex. */
-  sha256: string;
-}
-
-/** Every loaded file that isn't in the manifest with exactly this hash (a cross-origin script is never in it). */
-export function compareToManifest(loaded: readonly LoadedFile[], manifest: ReleaseManifest, origin: string): string[] {
-  const bad: string[] = [];
-  for (const f of loaded) {
-    const path = manifestPath(f.url, origin);
-    if (path === null) bad.push(f.url);
-    else if (manifest.files[path] !== f.sha256.toLowerCase()) bad.push(path);
+export function manifestPath(url: string, appOrigin: string): string | null {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return null;
   }
-  return [...new Set(bad)];
+  if (u.origin !== new URL(appOrigin).origin) return null;
+  let p = decodeURIComponent(u.pathname).replace(/^\/+/, "");
+  if (p === "" || p.endsWith("/")) p += "index.html";
+  else if (!/\.[a-z0-9]+$/i.test(p)) p += "/index.html";
+  return p;
 }
 
-// ---------------------------------------------------------------- signatures (EIP-712, by the release key R)
+// ---------------------------------------------------------------- signatures
 
-const RELEASE_TYPES = {
+export const RELEASE_TYPES = {
   Release: [
     { name: "version", type: "string" },
-    { name: "rootHash", type: "bytes32" },
+    { name: "rootHash", type: "string" },
     { name: "gitCommit", type: "string" },
-    { name: "manifestSwarmRef", type: "bytes" },
-    { name: "siteSwarmRef", type: "bytes" },
+    { name: "manifestSwarmRef", type: "string" },
+    { name: "siteSwarmRef", type: "string" },
   ],
 } as const;
+
+export const UNRELEASE_TYPES = { Unrelease: [{ name: "rootHash", type: "string" }] } as const;
 
 export interface UnsignedRelease {
   version: string;
   rootHash: Hex;
   gitCommit: string;
   manifestSwarmRef: Hex;
-  siteSwarmRef: Hex;
+  siteSwarmRef: string;
 }
 
-const releaseMessage = (r: UnsignedRelease) => ({
-  version: r.version,
-  rootHash: r.rootHash,
-  gitCommit: r.gitCommit,
-  manifestSwarmRef: r.manifestSwarmRef,
-  siteSwarmRef: r.siteSwarmRef,
-});
-
-export function signRelease(releaseKey: Hex, release: UnsignedRelease): Promise<Hex> {
-  return signTypedData({
-    privateKey: releaseKey,
-    domain: KEYDIR_DOMAIN,
-    types: RELEASE_TYPES,
-    primaryType: "Release",
-    message: releaseMessage(release),
-  });
+export function releaseTypedData(r: UnsignedRelease) {
+  return { domain: KEYLOG_DOMAIN, types: RELEASE_TYPES, primaryType: "Release" as const, message: r };
 }
 
-async function releaseSigner(r: UnsignedRelease & { sig: Hex }): Promise<Address | null> {
-  try {
-    return await recoverTypedDataAddress({
-      domain: KEYDIR_DOMAIN,
-      types: RELEASE_TYPES,
-      primaryType: "Release",
-      message: releaseMessage(r),
-      signature: r.sig,
-    });
-  } catch {
-    return null;
-  }
+export function unreleaseTypedData(rootHash: Hex) {
+  return { domain: KEYLOG_DOMAIN, types: UNRELEASE_TYPES, primaryType: "Unrelease" as const, message: { rootHash } };
 }
 
-// ---------------------------------------------------------------- which releases count
-
-/**
- * R's valid releases, newest first, minus revoked ones. A release counts only if R both wrote it (read-only) and
- * signed it; a revocation counts only if R wrote it.
- */
-export async function validReleases(
+/** Releases signed by R and not revoked by R, newest first. */
+export async function trustedReleases(
   releases: readonly ReleaseRecord[],
-  revokes: readonly ReleaseRevokeRecord[],
-  signer: Address,
-): Promise<{ releases: ReleaseRecord[]; revoked: Set<string>; ignored: number }> {
-  const revoked = new Set(
-    revokes.filter((r) => r.readonly && isAddressEqual(r.creator, signer)).map((r) => r.rootHash.toLowerCase()),
-  );
-  const valid: ReleaseRecord[] = [];
-  let ignored = 0;
-  for (const r of releases) {
-    const by = r.readonly && isAddressEqual(r.creator, signer) ? await releaseSigner(r) : null;
-    if (!by || !isAddressEqual(by, signer)) ignored++;
-    else if (!revoked.has(r.rootHash.toLowerCase())) valid.push(r);
-  }
-  valid.sort((a, b) => (a.createdAtBlock === b.createdAtBlock ? 0 : a.createdAtBlock > b.createdAtBlock ? -1 : 1));
-  return { releases: valid, revoked, ignored };
-}
-
-/** Independent rebuilds that matched: one per distinct writer, never counting R itself. */
-export function countRebuilds(rebuilds: readonly RebuildRecord[], rootHash: Hex, signer: Address): number {
-  const writers = new Set<string>();
-  for (const r of rebuilds) {
-    if (r.readonly && r.matched && r.rootHash.toLowerCase() === rootHash.toLowerCase() && !isAddressEqual(r.creator, signer)) {
-      writers.add(r.creator.toLowerCase());
+  unreleases: readonly UnreleaseRecord[],
+  releaseSigner: Address,
+): Promise<ReleaseRecord[]> {
+  const revoked = new Set<string>();
+  for (const u of unreleases) {
+    try {
+      const signer = await recoverTypedDataAddress({ ...unreleaseTypedData(u.rootHash), signature: u.sig });
+      if (isAddressEqual(signer, releaseSigner)) revoked.add(u.rootHash.toLowerCase());
+    } catch {
+      // unsigned junk revokes nothing
     }
   }
-  return writers.size;
+  const out: ReleaseRecord[] = [];
+  for (const r of releases) {
+    if (revoked.has(r.rootHash.toLowerCase())) continue;
+    try {
+      const signer = await recoverTypedDataAddress({
+        ...releaseTypedData({
+          version: r.version,
+          rootHash: r.rootHash,
+          gitCommit: r.gitCommit,
+          manifestSwarmRef: r.manifestSwarmRef,
+          siteSwarmRef: r.siteSwarmRef,
+        }),
+        signature: r.sig,
+      });
+      if (isAddressEqual(signer, releaseSigner)) out.push(r);
+    } catch {
+      // ignored
+    }
+  }
+  return out.sort((a, b) => Number(b.createdAtBlock - a.createdAtBlock));
 }
 
-// ---------------------------------------------------------------- verifying a page
+/** Independent rebuilds that matched: one per creator, never R itself. */
+export function matchingRebuilds(rebuilds: readonly RebuildRecord[], releaseSigner: Address): number {
+  const who = new Set<string>();
+  for (const r of rebuilds) if (r.matched && r.readonly && !isAddressEqual(r.creator, releaseSigner)) who.add(r.creator.toLowerCase());
+  return who.size;
+}
+
+// ---------------------------------------------------------------- checking a page
 
 export interface VerificationResult {
   status: "verified" | "mismatch" | "unknown";
   version?: string;
   gitCommit?: string;
+  rootHash?: Hex;
   rebuilds?: number;
+  /** Files whose hash isn't in the release (or that came from another origin). */
   mismatchedFiles?: string[];
-  /** The verified copy on Swarm (latest valid release), for "Open the verified copy". */
-  siteSwarmRef?: Hex;
-  /** Why the status is "unknown" (no release published, the network failed…). */
-  reason?: string;
+  /** The Swarm reference of the verified build, for "Open the verified copy". */
+  siteSwarmRef?: string;
+  detail?: string;
 }
 
-export interface ReleaseSources {
-  /** The release key R's address (configuration, from env). */
-  signer: Address;
-  listReleases: () => Promise<ReleaseRecord[]>;
-  listRevokes: () => Promise<ReleaseRevokeRecord[]>;
-  listRebuilds: (rootHash: Hex) => Promise<RebuildRecord[]>;
-  /** Manifest bytes by Swarm reference. */
-  fetchManifest: (ref: Hex) => Promise<Uint8Array>;
+/** Compares what a page loaded (manifest path → sha256 hex, or null for another origin) with one manifest. */
+export function compareWithManifest(loaded: ReadonlyMap<string, string | null>, manifest: ReleaseManifest): string[] {
+  const bad: string[] = [];
+  for (const [path, hash] of loaded) {
+    if (hash === null || manifest.files[path] !== hash) bad.push(path);
+  }
+  return bad.sort();
 }
 
-/** How many recent releases a page may match: a deploy rolling out, or a tab opened just before one. */
-export const RELEASES_TO_TRY = 3;
-
-/**
- * Checks what a tab loaded against the newest valid releases. "verified" only if every file matches one release's
- * manifest, and that manifest's root hash is the one R signed.
- */
-export async function verifyLoaded(
-  sources: ReleaseSources,
-  loaded: readonly LoadedFile[],
-  origin: string,
-): Promise<VerificationResult> {
-  let candidates: ReleaseRecord[];
+/** Checks the manifest fetched from Swarm is the one the release signed. */
+export function manifestMatches(manifestBytes: Uint8Array, rootHash: Hex): ReleaseManifest | null {
   try {
-    const [releases, revokes] = await Promise.all([sources.listReleases(), sources.listRevokes()]);
-    candidates = (await validReleases(releases, revokes, sources.signer)).releases;
-  } catch (error) {
-    return { status: "unknown", reason: `couldn't read releases: ${error instanceof Error ? error.message : String(error)}` };
+    const manifest = JSON.parse(new TextDecoder().decode(manifestBytes)) as ReleaseManifest;
+    return rootHashOf(manifest).toLowerCase() === rootHash.toLowerCase() ? manifest : null;
+  } catch {
+    return null;
   }
-  if (!candidates.length) return { status: "unknown", reason: "no release has been published yet" };
-  if (!loaded.length) return { status: "unknown", reason: "the page hasn't loaded any code yet" };
-
-  const latest = candidates[0]!;
-  let firstMismatch: string[] | null = null;
-  for (const release of candidates.slice(0, RELEASES_TO_TRY)) {
-    let manifest: ReleaseManifest;
-    try {
-      manifest = parseManifest(await sources.fetchManifest(release.manifestSwarmRef));
-    } catch {
-      continue; // unreadable or unavailable: try the next release
-    }
-    if (manifestRootHash(manifest).toLowerCase() !== release.rootHash.toLowerCase()) continue; // not what R signed
-    const bad = compareToManifest(loaded, manifest, origin);
-    if (bad.length === 0) {
-      let rebuilds = 0;
-      try {
-        rebuilds = countRebuilds(await sources.listRebuilds(release.rootHash), release.rootHash, sources.signer);
-      } catch {
-        // the count is informational
-      }
-      return {
-        status: "verified",
-        version: release.version,
-        gitCommit: release.gitCommit,
-        rebuilds,
-        siteSwarmRef: latest.siteSwarmRef,
-      };
-    }
-    firstMismatch ??= bad;
-  }
-  if (!firstMismatch) return { status: "unknown", reason: "no release manifest could be read", siteSwarmRef: latest.siteSwarmRef };
-  return { status: "mismatch", mismatchedFiles: firstMismatch, siteSwarmRef: latest.siteSwarmRef };
 }

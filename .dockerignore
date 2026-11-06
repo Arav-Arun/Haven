@@ -1,0 +1,12 @@
+**/node_modules
+**/.next
+**/out
+**/.output
+**/.wxt
+**/.env
+**/.env.*
+!**/.env.example
+contracts/lib
+contracts/out
+contracts/cache
+.git
