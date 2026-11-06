@@ -23,7 +23,7 @@ export default defineConfig({
     return {
       name: "Haven",
       description: "Share files privately with any ENS name. Save images and pages to your drive, and see new shares.",
-      permissions: ["storage", "contextMenus", "alarms", "notifications", "offscreen"],
+      permissions: ["storage", "contextMenus", "alarms", "notifications", "offscreen", "sidePanel"],
       // Our own services and the worker's code only. Saving from other sites asks for that site when used.
       host_permissions: [
         ...new Set([

@@ -8,6 +8,7 @@
     "dev": "pnpm anon-assets && wxt",
     "build": "pnpm anon-assets && wxt build",
     "zip": "pnpm anon-assets && wxt zip",
+    "zip:web": "pnpm zip && node scripts/zip-for-web.mjs",
     "typecheck": "wxt prepare && tsc --noEmit"
   },
   "dependencies": {

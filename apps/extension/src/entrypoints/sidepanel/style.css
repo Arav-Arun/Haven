@@ -1,0 +1,9 @@
+@import "tailwindcss";
+@import "@haven/ui/styles.css";
+
+/* Tailwind scans the popup's components from here too. */
+@source "../popup";
+
+body {
+  min-height: 100dvh;
+}

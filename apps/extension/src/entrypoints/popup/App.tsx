@@ -161,7 +161,8 @@ function Upload({ client, folders }: { client: DriveClient; folders: Folder[] | 
   );
 }
 
-export function App() {
+/** "popup": the toolbar popup. "panel": the same screens in Chrome's side panel, with more room. */
+export function App({ surface = "popup" }: { surface?: "popup" | "panel" }) {
   const [client, setClient] = useState<DriveClient | null | undefined>(undefined);
   const [identity, setIdentity] = useState<Identity | null | undefined>(undefined);
   const [status, setStatus] = useState<AnonStatus | null>(null);
@@ -195,7 +196,7 @@ export function App() {
   }, [loadData]);
 
   return (
-    <div className="flex flex-col gap-4 p-4">
+    <div className={surface === "panel" ? "mx-auto flex max-w-xl flex-col gap-4 p-4" : "flex flex-col gap-4 p-4"}>
       <header className="flex items-center justify-between gap-2">
         <Wordmark className="text-xl" />
         <NetworkBadge status={status} compact />
@@ -226,7 +227,7 @@ export function App() {
             {!shares && <Skeleton rows={2} />}
             {shares?.length === 0 && <p className="text-sm text-muted">Nothing yet. New shares show up here and on the toolbar icon.</p>}
             {shares && shares.length > 0 && (
-              <IncomingTickets shares={shares.slice(0, 5)} now={now} onOpen={(s) => openSite(`/drive/?f=${s.folder.registry}`)} />
+              <IncomingTickets shares={surface === "panel" ? shares : shares.slice(0, 5)} now={now} onOpen={(s) => openSite(`/drive/?f=${s.folder.registry}`)} />
             )}
           </section>
           <Upload client={client} folders={folders} />
@@ -238,11 +239,27 @@ export function App() {
         <button className="inline-flex items-center gap-1 underline" onClick={() => openSite("/drive/")} disabled={!config.appOrigin}>
           Open Haven <ExternalLink size={12} aria-hidden />
         </button>
-        {identity && (
-          <button className="text-muted underline" onClick={() => chrome.runtime.sendMessage({ type: "check-now" })}>
-            Check now
-          </button>
-        )}
+        <span className="flex items-center gap-3">
+          {surface === "popup" && chrome.sidePanel && (
+            <button
+              className="text-muted underline"
+              onClick={() =>
+                // Opened from the click itself: Chrome only allows it during a user gesture.
+                chrome.windows.getCurrent().then(async (w) => {
+                  if (w.id !== undefined) await chrome.sidePanel.open({ windowId: w.id });
+                  window.close();
+                })
+              }
+            >
+              Open in side panel
+            </button>
+          )}
+          {identity && (
+            <button className="text-muted underline" onClick={() => chrome.runtime.sendMessage({ type: "check-now" })}>
+              Check now
+            </button>
+          )}
+        </span>
       </footer>
     </div>
   );

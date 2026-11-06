@@ -1,7 +1,7 @@
 import { addToInbox, readInbox } from "@haven/platform";
 import { describeError } from "@haven/ui/errors";
 import type { VerificationResult } from "@haven/core";
-import type { Address } from "@haven/types";
+import type { Address, IncomingShare } from "@haven/types";
 import { makeClient, setPersist } from "@/lib/client";
 import { config } from "@/lib/config";
 import { LAST_CHECK_KEY, NEW_SHARES_KEY, type ExtMessage, type KeysReply, type PairReply } from "@/lib/messages";
@@ -11,8 +11,37 @@ const CHECK_ALARM = "haven-check";
 const LIVE_ALARM = "haven-live";
 const MENU_ID = "save-to-haven";
 
-function notify(title: string, message: string) {
-  chrome.notifications.create({ type: "basic", iconUrl: chrome.runtime.getURL("icon/128.png"), title, message });
+/** A notification; with `open`, clicking it opens that page of the website (a path such as /shared/). */
+function notify(title: string, message: string, open?: string) {
+  const id = open ? `open:${open}:${crypto.randomUUID()}` : "";
+  chrome.notifications.create(id, { type: "basic", iconUrl: chrome.runtime.getURL("icon/128.png"), title, message });
+}
+
+const WARNED_KEY = "haven:warnedEnds";
+/** How long before a share's end the extension reminds you to save what you need. */
+const WARN_BEFORE_S = 60 * 60;
+
+function when(t: number): string {
+  return new Date(t * 1000).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
+}
+
+function untilText(until: number | null): string {
+  return until ? `, until ${when(until)}` : "";
+}
+
+/** One reminder per share, an hour (or less) before its access ends. */
+async function warnEndingSoon(shares: IncomingShare[]) {
+  const now = Math.floor(Date.now() / 1000);
+  const warned = new Set(((await chrome.storage.local.get(WARNED_KEY))[WARNED_KEY] as string[] | undefined) ?? []);
+  const soon = shares.filter((s) => s.until && s.until > now && s.until - now <= WARN_BEFORE_S && !warned.has(`${s.folder.registry}:${s.until}`));
+  for (const s of soon) {
+    const mins = Math.max(1, Math.round((s.until! - now) / 60));
+    notify(`Access to ${s.folder.displayName} ends soon`, `In about ${mins} min (${when(s.until!)}). Open or download what you need before then.`, `/drive/?f=${s.folder.registry}`);
+    warned.add(`${s.folder.registry}:${s.until}`);
+  }
+  // Keep the list short: only ends that haven't passed.
+  const keep = [...warned].filter((k) => Number(k.split(":")[1]) > now);
+  await chrome.storage.local.set({ [WARNED_KEY]: keep });
 }
 
 /** Badge: new shares since the popup was last opened, plus saved files still waiting for a folder. */
@@ -37,9 +66,11 @@ async function check() {
     await chrome.storage.local.set({ [NEW_SHARES_KEY]: prev + shares.length });
     notify(
       shares.length === 1 ? "Shared with you" : `${shares.length} new shares`,
-      shares.map((s) => `${s.folder.displayName}, from ${s.sharedBy}`).join("\n"),
+      shares.map((s) => `${s.folder.displayName}, from ${s.sharedBy}${untilText(s.until)}`).join("\n"),
+      shares.length === 1 ? `/drive/?f=${shares[0]!.folder.registry}` : "/shared/",
     );
   }
+  await warnEndingSoon(await client.sharedWithMe().catch(() => [])).catch(() => undefined);
   const done = await client.maintain();
   void ensureLive().catch(() => undefined);
   if (done.length) notify("Haven housekeeping", done.map((r) => r.action).join(", "));
@@ -179,6 +210,13 @@ export default defineBackground(() => {
       return true;
     }
     return false;
+  });
+
+  // A notification about a share opens that folder (or the Shared list) on the website.
+  chrome.notifications.onClicked.addListener((id) => {
+    chrome.notifications.clear(id);
+    const m = id.match(/^open:(.*):[0-9a-f-]{36}$/);
+    if (m && config.appOrigin) void chrome.tabs.create({ url: `${config.appOrigin}${m[1]}` });
   });
 
   // "Save to Haven": fetch what was clicked and park it in the inbox; the popup encrypts it into a folder.
