@@ -68,6 +68,9 @@ const defaultFactory = (platform: "web" | "extension"): WorkerFactory => async (
  * Returns the AnonFetch the frozen interface expects. Calls made before the worker is ready are
  * queued by the harness. If the worker fails, calls reject: they never fall back to plain fetch.
  */
+/** How long the worker may take to load before calls through it fail instead of waiting. */
+const START_TIMEOUT_MS = 45_000;
+
 export function createAnonFetch(opts: CreateAnonFetchOptions): AnonFetch {
   const listeners = new Set<(s: AnonStatus) => void>();
   const onStatus = (l: (s: AnonStatus) => void) => {
@@ -134,9 +137,23 @@ export function createAnonFetch(opts: CreateAnonFetchOptions): AnonFetch {
     })
     .catch((e: unknown) => setStatus({ network: opts.network, state: "failed", detail: e instanceof Error ? e.message : String(e) }));
 
+  // A worker that never loads (its iframe blocked, a network that never answers) must not leave every call waiting
+  // for ever: after START_TIMEOUT_MS calls fail with a reason, and the status says so.
+  let started = false;
+  void workerPromise.then(() => (started = true), () => undefined);
+  const startDeadline = new Promise<never>((_, reject) =>
+    setTimeout(() => {
+      if (started) return;
+      const detail = "The private network didn't start. Reload the page, or pick another network in Settings.";
+      setStatus({ network: opts.network, state: "failed", detail });
+      reject(new Error(detail));
+    }, START_TIMEOUT_MS),
+  );
+  startDeadline.catch(() => undefined);
+
   const routed = (isolationKey?: string): typeof fetch =>
     (async (input: RequestInfo | URL, init?: RequestInit) => {
-      const worker = await workerPromise;
+      const worker = await Promise.race([workerPromise, startDeadline]);
       const anonInit = isolationKey ? { ...init, anonOptions: { isolationKey } } : init;
       return worker.fetch(input as string | URL | Request, anonInit);
     }) as typeof fetch;
