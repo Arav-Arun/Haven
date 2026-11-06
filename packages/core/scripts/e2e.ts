@@ -16,9 +16,9 @@ import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { DriveClient, Receipt } from "@cloakroom/types";
+import type { Receipt } from "@cloakroom/types";
 
-import { createDriveClient, memoryStore, passthroughAnon } from "../src/index";
+import { createDriveClient, memoryStore, passthroughAnon, type CloakroomClient } from "../src/index";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../../..");
@@ -45,7 +45,7 @@ const check = (label: string, ok: boolean) => {
   if (!ok) process.exitCode = 1;
 };
 
-function person(name: string): DriveClient {
+function person(name: string): CloakroomClient {
   const client = createDriveClient({
     anon: passthroughAnon(),
     storage: memoryStore(),
@@ -82,6 +82,14 @@ for (const [c, p] of [[founder, "founder"], [investor, "investor"], [editor, "ed
 }
 const investorName = (await investor.restore())!.ensName!;
 const editorName = (await editor.restore())!.ensName!;
+
+out("### 1b. Public key log (add-on F1)");
+const log = await founder.lookupKey(investorName);
+check("the investor's name has a public key log starting at seq 0 (publish)", log.history[0]?.seq === 0 && log.history[0]?.kind === "publish");
+check("the log agrees with the cloak.key record", log.ensRecord === "match" && log.problem === null);
+out(`- fingerprint of ${investorName}: ${log.fingerprint.join(" ")}`);
+const devices = await investor.listDevices();
+check("the investor's device is listed and trusted", devices.some((d) => d.thisDevice && d.trusted));
 
 out("### 2. Founder makes a room and uploads two files");
 const room = await founder.createRoom("Series A");
