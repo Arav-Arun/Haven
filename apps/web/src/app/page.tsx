@@ -1,5 +1,6 @@
 "use client";
 
+import { FxLabel } from "@haven/ui";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import "./landing.css";
@@ -37,11 +38,13 @@ export default function Home() {
               their access ends on the date you pick.
             </p>
             <div className="mt-10 flex justify-center">
-              <Link href={primary.href} className="pill-white inline-flex items-center gap-3 rounded-full py-2 pl-7 pr-2 text-[17px] font-semibold">
-                {primary.label}
-                <span className="flex size-10 items-center justify-center rounded-full bg-[#1f4fd1] text-white">
-                  <ArrowRight size={18} />
-                </span>
+              <Link href={primary.href} className="btn-clay fx inline-flex items-center gap-3 rounded-full py-2 pl-7 pr-2 text-[17px] font-semibold">
+                <FxLabel>
+                  {primary.label}
+                  <span className="flex size-10 items-center justify-center rounded-full bg-[#1f4fd1] text-white [.fx-hover_&]:bg-white [.fx-hover_&]:text-[#1f4fd1]">
+                    <ArrowRight size={18} />
+                  </span>
+                </FxLabel>
               </Link>
             </div>
           </div>

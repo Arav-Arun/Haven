@@ -49,18 +49,145 @@
 }
 
 @layer components {
-  /* The main action, as on the landing page: a glossy blue pill. */
+  /*
+   * Rising-circle hover (the React Bits PillNav pattern, in CSS): a circle grows up from the bottom of the pill while
+   * the label rolls up and out and a copy rolls in, in --fx-text. Markup comes from FxLabel; set --fx-fill and
+   * --fx-text per use. Only for pointers that can hover, so a tap on a phone never leaves it stuck.
+   */
+  .fx {
+    --fx-fill: var(--color-action);
+    --fx-text: #fff;
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    /* Its own layer: without it Chrome can skip the rounded clip while the circle animates. */
+    transform: translateZ(0);
+  }
+  .fx-circle {
+    position: absolute;
+    left: 50%;
+    top: 100%;
+    z-index: -1;
+    /* Centred on the bottom edge and wide enough to cover both top corners of any pill up to ~5rem tall. */
+    width: calc(100% + 5rem);
+    aspect-ratio: 1;
+    border-radius: 9999px;
+    background: var(--fx-fill);
+    transform: translate(-50%, -50%) scale(0);
+    transition: transform 200ms cubic-bezier(0.33, 1, 0.68, 1);
+    pointer-events: none;
+  }
+  .fx-stack {
+    position: relative;
+    z-index: 1;
+    display: inline-grid;
+    gap: inherit;
+  }
+  .fx-stack > * {
+    grid-area: 1 / 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: inherit;
+    transition:
+      transform 200ms cubic-bezier(0.33, 1, 0.68, 1),
+      opacity 200ms ease;
+  }
+  .fx-hover {
+    color: var(--fx-text);
+    opacity: 0;
+    transform: translateY(calc(100% + 12px));
+  }
+  @media (hover: hover) {
+    .fx:not(:disabled):hover .fx-circle {
+      transform: translate(-50%, -50%) scale(1);
+      transition-duration: 300ms;
+    }
+    .fx:not(:disabled):hover .fx-label {
+      transform: translateY(calc(-100% - 8px));
+      transition-duration: 300ms;
+    }
+    .fx:not(:disabled):hover .fx-hover {
+      transform: none;
+      opacity: 1;
+      transition-duration: 300ms;
+    }
+  }
+
+  /*
+   * Clay buttons: soft, puffy pills. A light inner highlight at the top left, a darker inner shade at the bottom
+   * right and a soft drop shadow. The inner shading is drawn on ::after, above the .fx circle and below the label,
+   * so the pill stays puffy while the hover fill rises. Blue fills white on hover; white fills blue.
+   *   .btn-action  the main action (blue)    .btn-clay  everything else (white)    .btn-danger  destructive (red)
+   */
+  .btn-action,
+  .btn-clay,
+  .btn-danger {
+    position: relative;
+    isolation: isolate;
+    border-radius: 9999px;
+    transition:
+      transform 160ms ease,
+      box-shadow 160ms ease;
+  }
+  .btn-action::after,
+  .btn-clay::after,
+  .btn-danger::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+  }
   .btn-action {
-    background: linear-gradient(180deg, #4d82ff 0%, var(--color-action) 100%);
+    --fx-fill: #ffffff;
+    --fx-text: var(--color-action);
+    background: linear-gradient(160deg, #5b8dff 0%, #3466ec 55%, var(--color-action) 100%);
     color: #fff;
     box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 0.4),
-      inset 0 -2px 0 rgb(0 0 0 / 0.08),
-      0 10px 22px -12px rgb(31 79 209 / 0.7);
+      0 12px 22px -10px rgb(31 79 209 / 0.6),
+      0 3px 6px -2px rgb(31 79 209 / 0.3);
   }
-  .btn-action:hover:not(:disabled) {
-    background: linear-gradient(180deg, #5b8dff 0%, #2a5be0 100%);
+  .btn-action::after {
+    box-shadow:
+      inset 3px 3px 6px rgb(255 255 255 / 0.45),
+      inset -3px -4px 8px rgb(10 30 110 / 0.35);
   }
+  .btn-clay {
+    --fx-fill: var(--color-action);
+    --fx-text: #fff;
+    background: linear-gradient(160deg, #ffffff 0%, #f3f7ff 100%);
+    color: var(--color-action);
+    box-shadow:
+      0 12px 22px -12px rgb(28 64 140 / 0.45),
+      0 3px 6px -3px rgb(28 64 140 / 0.2);
+  }
+  .btn-clay::after {
+    box-shadow:
+      inset 3px 3px 6px #ffffff,
+      inset -3px -4px 8px rgb(120 150 210 / 0.35);
+  }
+  .btn-danger {
+    --fx-fill: #ffffff;
+    --fx-text: var(--color-danger);
+    background: linear-gradient(160deg, #d2453a 0%, var(--color-danger) 100%);
+    color: #fff;
+    box-shadow:
+      0 12px 22px -10px rgb(163 38 29 / 0.55),
+      0 3px 6px -2px rgb(163 38 29 / 0.25);
+  }
+  .btn-danger::after {
+    box-shadow:
+      inset 3px 3px 6px rgb(255 255 255 / 0.35),
+      inset -3px -4px 8px rgb(80 10 5 / 0.35);
+  }
+  :is(.btn-action, .btn-clay, .btn-danger):not(:disabled):hover {
+    transform: translateY(-1px);
+  }
+  :is(.btn-action, .btn-clay, .btn-danger):not(:disabled):active {
+    transform: translateY(1px) scale(0.98);
+  }
+
   /* A white card on the sky page. */
   .surface {
     background: var(--color-card);

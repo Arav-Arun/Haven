@@ -1,6 +1,6 @@
 "use client";
 
-import { AppShell, ReceiptsDrawer, useNow, type NavItem } from "@haven/ui";
+import { AppShell, FxLabel, ReceiptsDrawer, useNow, type NavItem } from "@haven/ui";
 import { DoorClosed, HardDrive, Inbox, ReceiptText, Settings, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -61,12 +61,14 @@ export function Shell({ children }: { children: ReactNode }) {
       actions={
         <button
           onClick={() => setOpen(true)}
-          className="inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-2 text-sm font-semibold text-action shadow-[0_10px_30px_-14px_rgb(13_27_51/0.4)] transition-transform hover:-translate-y-px"
+          className="btn-clay fx inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold"
           aria-label={`Receipts${pending ? ", an action is in progress" : ""}`}
         >
-          <ReceiptText size={18} aria-hidden />
-          <span className="hidden sm:inline">Receipts</span>
-          {pending && <span className="h-2 w-2 animate-pulse rounded-full bg-private" aria-hidden />}
+          <FxLabel>
+            <ReceiptText size={18} aria-hidden />
+            <span className="hidden sm:inline">Receipts</span>
+            {pending && <span className="h-2 w-2 animate-pulse rounded-full bg-private" aria-hidden />}
+          </FxLabel>
         </button>
       }
     >

@@ -8,12 +8,31 @@ import { cx } from "./format";
 
 type Variant = "primary" | "secondary" | "quiet" | "danger";
 
+// Clay pills (styles.css) with the rising-circle hover (.fx): blue fills white, white fills blue. "quiet" stays flat.
 const VARIANT: Record<Variant, string> = {
-  primary: "btn-action",
-  secondary: "border border-line bg-card text-ink shadow-[0_1px_2px_rgb(13_27_51/0.05)] hover:border-action/40 hover:text-action",
+  primary: "btn-action fx",
+  secondary: "btn-clay fx",
   quiet: "text-ink hover:bg-ink/5",
-  danger: "bg-danger text-white hover:bg-danger/90",
+  danger: "btn-danger fx",
 };
+
+/**
+ * The inside of an .fx pill: the circle that rises on hover, the label, and a copy of the label that rolls in.
+ * The copy is hidden from screen readers, so the name is read once.
+ */
+export function FxLabel({ children }: { children: ReactNode }) {
+  return (
+    <>
+      <span className="fx-circle" aria-hidden />
+      <span className="fx-stack">
+        <span className="fx-label">{children}</span>
+        <span className="fx-hover" aria-hidden>
+          {children}
+        </span>
+      </span>
+    </>
+  );
+}
 
 export function Button({
   variant = "secondary",
@@ -29,13 +48,13 @@ export function Button({
       disabled={disabled || pending}
       aria-busy={pending || undefined}
       className={cx(
-        "inline-flex min-h-10 items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-[color,background-color,border-color,transform] active:translate-y-px disabled:cursor-not-allowed disabled:opacity-55",
+        "inline-flex min-h-10 items-center justify-center gap-2 rounded-full px-4.5 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-55",
         VARIANT[variant],
         className,
       )}
     >
       {pending && <LoaderCircle size={16} className="animate-spin" aria-hidden />}
-      {children}
+      {variant === "quiet" ? children : <FxLabel>{children}</FxLabel>}
     </button>
   );
 }

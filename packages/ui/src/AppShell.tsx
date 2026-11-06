@@ -2,6 +2,7 @@
 
 import { useId, type ComponentType, type ReactNode } from "react";
 import { CloudBank } from "./Clouds";
+import { FxLabel } from "./primitives";
 import { cx } from "./format";
 
 export interface NavItem {
@@ -86,11 +87,20 @@ export function AppShell({
                 "flex items-center gap-3 rounded-full px-3 py-2.5 text-sm font-medium transition-colors",
                 n.active
                   ? "bg-white text-action shadow-[0_1px_2px_rgb(13_27_51/0.05),0_10px_24px_-14px_rgb(28_64_140/0.45)]"
-                  : "text-ink/70 hover:bg-white/70 hover:text-ink",
+                  : "fx justify-start text-ink/70",
               )}
             >
-              {n.icon}
-              {n.label}
+              {n.active ? (
+                <>
+                  {n.icon}
+                  {n.label}
+                </>
+              ) : (
+                <FxLabel>
+                  {n.icon}
+                  {n.label}
+                </FxLabel>
+              )}
             </Link>
           ))}
         </nav>

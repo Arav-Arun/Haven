@@ -8,6 +8,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { useInView } from "./hooks";
+import { FxLabel } from "@haven/ui";
 import { HavenLogo } from "./Logo";
 import { NAV } from "./Nav";
 import { FrontClouds } from "./Sky";
@@ -253,9 +254,11 @@ export function Closing({ href, label }: { href: string; label: string }) {
         <FrontClouds />
         <div className="relative z-30 mx-auto max-w-3xl">
           <h2 className="display text-5xl text-white drop-shadow-[0_2px_20px_rgb(20_60_150_/_0.35)] sm:text-7xl">Hand over a file. Keep the names to yourself.</h2>
-          <Link href={href} className="pill-white mt-10 inline-flex items-center gap-2.5 rounded-full px-7 py-3.5 text-[16px] font-semibold">
-            {label}
-            <ArrowRight size={18} />
+          <Link href={href} className="btn-clay fx mt-10 inline-flex items-center gap-2.5 rounded-full px-7 py-3.5 text-[16px] font-semibold">
+            <FxLabel>
+              {label}
+              <ArrowRight size={18} />
+            </FxLabel>
           </Link>
         </div>
       </div>

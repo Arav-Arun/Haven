@@ -4,6 +4,7 @@ import { Camera, Check, TriangleAlert, Upload } from "lucide-react";
 import { useId, useRef, useState } from "react";
 import { describeError } from "./errors";
 import { cx, formatBytes } from "./format";
+import { FxLabel } from "./primitives";
 
 export interface UploadItem {
   id: string;
@@ -64,16 +65,20 @@ export function UploadDropzone({
             onClick={() => pick.current?.click()}
             disabled={disabled}
             aria-describedby={hintId}
-            className="inline-flex items-center gap-2 btn-action rounded-full px-4 py-2 font-semibold disabled:opacity-55"
+            className="btn-action fx inline-flex items-center gap-2 rounded-full px-4.5 py-2 font-semibold disabled:opacity-55"
           >
-            <Upload size={16} aria-hidden /> Choose files
+            <FxLabel>
+              <Upload size={16} aria-hidden /> Choose files
+            </FxLabel>
           </button>
           <button
             onClick={() => camera.current?.click()}
             disabled={disabled}
-            className="inline-flex items-center gap-2 rounded-full border border-line bg-card px-4 py-2 font-medium sm:hidden"
+            className="btn-clay fx inline-flex items-center gap-2 rounded-full px-4.5 py-2 font-semibold sm:hidden"
           >
-            <Camera size={16} aria-hidden /> Take a photo
+            <FxLabel>
+              <Camera size={16} aria-hidden /> Take a photo
+            </FxLabel>
           </button>
         </div>
         <input ref={pick} type="file" multiple hidden onChange={(e) => (take(e.target.files), (e.target.value = ""))} />

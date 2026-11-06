@@ -104,9 +104,6 @@ export function FolderListPage({
       {list.data?.length === 0 && (
         <EmptyState icon={empty.icon} title={empty.title}>
           <p>{empty.body}</p>
-          <Button variant="primary" onClick={() => setOpen(true)}>
-            <Plus size={16} aria-hidden /> {action}
-          </Button>
         </EmptyState>
       )}
       {list.data && <FolderRows folders={list.data} now={now} onOpen={go} />}

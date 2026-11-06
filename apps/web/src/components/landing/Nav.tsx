@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { FxLabel } from "@haven/ui";
 import { HavenLogo } from "./Logo";
 
 export const NAV = [
@@ -36,9 +37,9 @@ export function Nav({ cta }: { cta: { href: string; label: string } }) {
               <li key={href}>
                 <a
                   href={href}
-                  className={`rounded-full px-3.5 py-2 text-[15px] transition-colors ${floating ? "text-[#0d1b33]/70 hover:text-[#0d1b33]" : "text-white/85 hover:bg-white/15 hover:text-white"}`}
+                  className={`fx inline-flex rounded-full px-3.5 py-2 text-[15px] ${floating ? "text-[#0d1b33]/70 [--fx-fill:#1f4fd1]" : "text-white/85 [--fx-fill:#fff] [--fx-text:#1f4fd1]"}`}
                 >
-                  {label}
+                  <FxLabel>{label}</FxLabel>
                 </a>
               </li>
             ))}
@@ -46,9 +47,9 @@ export function Nav({ cta }: { cta: { href: string; label: string } }) {
         </nav>
         <Link
           href={cta.href}
-          className={`rounded-full px-5 py-2.5 text-[15px] font-semibold transition-colors ${floating ? "bg-[#1f4fd1] text-white hover:bg-[#1a43b3]" : "bg-white text-[#1f4fd1] hover:bg-white/90"}`}
+          className={`fx rounded-full px-5 py-2.5 text-[15px] font-semibold ${floating ? "btn-action" : "btn-clay"}`}
         >
-          {cta.label}
+          <FxLabel>{cta.label}</FxLabel>
         </Link>
       </header>
     </div>

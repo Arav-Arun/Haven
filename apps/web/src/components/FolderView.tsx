@@ -10,6 +10,7 @@ import {
   FilePreview,
   FolderHeader,
   FolderRows,
+  FxLabel,
   MembersPanel,
   NewFolderDialog,
   RefreshPendingBanner,
@@ -269,17 +270,21 @@ export function FolderView({ client, folder }: { client: HavenClient; folder: Ad
             {zipProgress === null ? "Download folder" : `Downloading ${Math.round(zipProgress * 100)}%`}
           </Button>
         )}
-        <Link href={`/public?f=${folder}`} className="inline-flex min-h-10 items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold hover:bg-white/70">
-          <Eye size={16} aria-hidden /> Public view
+        <Link href={`/public?f=${folder}`} className="fx inline-flex min-h-10 items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold">
+          <FxLabel>
+            <Eye size={16} aria-hidden /> Public view
+          </FxLabel>
         </Link>
         <a
           href={`${config.explorerUrl}/address/${folder}`}
           target="_blank"
           rel="noreferrer noopener"
           title="This folder is its own ENS registry contract on Sepolia"
-          className="inline-flex min-h-10 items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold hover:bg-white/70"
+          className="fx inline-flex min-h-10 items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold"
         >
-          <ExternalLink size={16} aria-hidden /> View on Etherscan
+          <FxLabel>
+            <ExternalLink size={16} aria-hidden /> View on Etherscan
+          </FxLabel>
         </a>
       </FolderHeader>
       <LiveBadge status={live} />
