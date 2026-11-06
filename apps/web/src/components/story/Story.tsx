@@ -19,6 +19,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { HavenLogo, HavenMark } from "@/components/landing/Logo";
 import { PullUpFooter } from "@/components/SiteFooter";
+import { Faq, Privacy, Tracks } from "@/components/landing/More";
+import { Steps } from "@/components/landing/Steps";
 import { useDrive } from "@/lib/drive";
 import { bank, farBank, mass, rng, skyline, wisps } from "./textures";
 import { paneRect, tower, type TowerSpec } from "./tower";
@@ -900,13 +902,20 @@ export function Story() {
                     </span>
                   </FxLabel>
                 </Link>
-                <Link href="/home" className="btn-action fx inline-flex items-center rounded-full px-6 py-3.5 text-[17px] font-semibold">
+                <Link href="#how" className="btn-action fx inline-flex items-center rounded-full px-6 py-3.5 text-[17px] font-semibold">
                   <FxLabel>See how it works</FxLabel>
                 </Link>
               </div>
             </section>
           </div>
         </div>
+        {/* After the story: the essentials, compact, on the same page. */}
+        <main className="story-info">
+          <Steps />
+          <Tracks />
+          <Privacy />
+          <Faq />
+        </main>
       </PullUpFooter>
     </div>
   );
@@ -924,10 +933,10 @@ function StoryNav({ cta }: { cta: { href: string; label: string } }) {
           <ul className="flex items-center gap-1">
             {(
               [
-                ["How it works", "/home#how"],
-                ["Features", "/home#features"],
-                ["Privacy", "/home#privacy"],
-                ["FAQ", "/home#faq"],
+                ["How it works", "#how"],
+                ["Tracks", "#tracks"],
+                ["Privacy", "#privacy"],
+                ["FAQ", "#faq"],
               ] as const
             ).map(([label, href]) => (
               <li key={href}>

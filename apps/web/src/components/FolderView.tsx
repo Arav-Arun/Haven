@@ -335,13 +335,14 @@ export function FolderView({ client, folder }: { client: HavenClient; folder: Ad
             <FileRows
               files={files.data}
               now={now}
+              accessUntil={f.myAccess?.until ?? null}
               onPreview={open}
               onDownload={(file) => {
                 setFileError(null);
                 client.download(file).then((b) => saveBlob(b, file.name ?? "file"), setFileError);
               }}
               onVersions={setVersionsOf}
-              onLink={canManage ? setLinkFor : undefined}
+              onLink={role === "owner" ? setLinkFor : undefined}
               onDelete={canManage ? setDeleting : undefined}
               proved={proved.data ?? undefined}
               onProof={setProofOf}
