@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Haven's icons from its mark (a shield holding a database over linked blocks).
+"""Haven's icons: its mark (a shield holding a database over linked blocks) in white on the blue clay tile.
 
-The mark is kept once, as apps/web/public/haven-mark.webp: white on transparent, square, 512 px. Every icon is that
-mark in black: on white where an icon must be opaque (PWA, iOS), on transparent elsewhere (favicon,
-extension). The site draws the same file as a CSS mask, so it takes the text colour. Outputs are committed.
+The mark is kept once, as apps/web/public/haven-mark.webp: white on transparent, square, 512 px. Every icon is the
+same tile the site draws in components/landing/Logo.tsx: a rounded square, #5b93ff at the top to #1f4fd1 at the
+bottom, a soft shine over its upper half, and the mark in white. Maskable and iOS icons fill the whole square (the
+platform rounds it); the rest keep the tile's own rounded corners on transparent. Outputs are committed.
 
   python3 apps/web/scripts/make-icons.py                      # redraw the icons from haven-mark.webp
   python3 apps/web/scripts/make-icons.py --from <black-on-white.png>   # replace the mark first, then redraw
@@ -12,7 +13,7 @@ extension). The site draws the same file as a CSS mask, so it takes the text col
 import sys
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parents[3]
 WEB = ROOT / "apps/web/public"
@@ -36,15 +37,31 @@ def mark_from(src: Path) -> Image.Image:
     return out
 
 
-def icon(size: int, background: tuple | None, mark_share: float, ink=(0, 0, 0)) -> Image.Image:
-    """The mark in ink, centred; on white for app icons that must be opaque, else on transparent."""
-    mark = Image.open(MARK).convert("RGBA")
-    m = round(size * 4 * mark_share)
-    alpha = mark.getchannel("A").resize((m, m), Image.LANCZOS)
+TOP = (0x5B, 0x93, 0xFF)
+BOTTOM = (0x1F, 0x4F, 0xD1)
+
+
+def icon(size: int, mark_share: float, full_bleed: bool) -> Image.Image:
+    """The blue tile with its shine and the white mark, centred. Drawn at 4x, then scaled down for smooth edges."""
     s = size * 4
-    out = Image.new("RGBA", (s, s), (*(background or (255, 255, 255)), 255 if background else 0))
-    out.paste(Image.new("RGBA", (m, m), (*ink, 255)), ((s - m) // 2, (s - m) // 2), alpha)
-    return out.resize((size, size), Image.LANCZOS)
+    ramp = Image.new("RGBA", (1, s))
+    for y in range(s):
+        t = y / (s - 1)
+        ramp.putpixel((0, y), (*(round(a + (b - a) * t) for a, b in zip(TOP, BOTTOM)), 255))
+    tile = ramp.resize((s, s))
+    # The shine: white at 45% at the top, gone by the middle, as on the site's tile.
+    shine = Image.new("L", (1, s))
+    for y in range(s):
+        shine.putpixel((0, y), round(115 * max(0.0, 1 - y / (s / 2))))
+    tile.paste(Image.new("RGBA", (s, s), (255, 255, 255, 255)), (0, 0), shine.resize((s, s)))
+    mark = Image.open(MARK).convert("RGBA")
+    m = round(s * mark_share)
+    tile.paste(Image.new("RGBA", (m, m), (255, 255, 255, 255)), ((s - m) // 2, (s - m) // 2), mark.getchannel("A").resize((m, m), Image.LANCZOS))
+    if not full_bleed:
+        corners = Image.new("L", (s, s), 0)
+        ImageDraw.Draw(corners).rounded_rectangle((0, 0, s - 1, s - 1), radius=round(s * 0.28), fill=255)
+        tile.putalpha(corners)
+    return tile.resize((size, size), Image.LANCZOS)
 
 
 def main() -> None:
@@ -53,14 +70,13 @@ def main() -> None:
     EXT.mkdir(parents=True, exist_ok=True)
     (EXT / "icon").mkdir(exist_ok=True)
     Image.open(MARK).save(EXT / "haven-mark.webp", "WEBP", lossless=True, method=6)
-    white = (255, 255, 255)
-    icon(512, white, 0.72).save(WEB / "icon-512.png", optimize=True)
-    icon(192, white, 0.72).save(WEB / "icon-192.png", optimize=True)
-    icon(512, white, 0.56).save(WEB / "icon-maskable-512.png", optimize=True)  # inside the maskable safe zone
-    icon(180, white, 0.7).save(WEB / "apple-touch-icon.png", optimize=True)
-    icon(64, None, 0.94).save(WEB / "favicon.png", optimize=True)
+    icon(512, 0.64, False).save(WEB / "icon-512.png", optimize=True)
+    icon(192, 0.64, False).save(WEB / "icon-192.png", optimize=True)
+    icon(512, 0.5, True).save(WEB / "icon-maskable-512.png", optimize=True)  # inside the maskable safe zone
+    icon(180, 0.6, True).save(WEB / "apple-touch-icon.png", optimize=True)
+    icon(64, 0.66, False).save(WEB / "favicon.png", optimize=True)
     for size in (16, 32, 48, 128):
-        icon(size, None, 0.94).save(EXT / "icon" / f"{size}.png", optimize=True)
+        icon(size, 0.66, False).save(EXT / "icon" / f"{size}.png", optimize=True)
 
 if __name__ == "__main__":
     main()

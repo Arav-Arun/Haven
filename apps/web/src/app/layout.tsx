@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Hanken_Grotesk } from "next/font/google";
 import type { ReactNode } from "react";
+import { preload } from "react-dom";
 import "@rainbow-me/rainbowkit/styles.css";
 import "./globals.css";
 import { Intro } from "@/components/intro/Intro";
@@ -14,7 +15,8 @@ export const metadata: Metadata = {
   description: "Share files privately with any ENS name. No one can see who you shared with, and new files lock when access ends.",
   applicationName: "Haven",
   manifest: "/manifest.webmanifest",
-  icons: { icon: [{ url: "/favicon.png", sizes: "64x64", type: "image/png" }, { url: "/icon-192.png", sizes: "192x192", type: "image/png" }], apple: "/apple-touch-icon.png" },
+  // `?v=` makes browsers drop the icons they cached before the clay tile.
+  icons: { icon: [{ url: "/favicon.png?v=3", sizes: "64x64", type: "image/png" }, { url: "/icon-192.png?v=3", sizes: "192x192", type: "image/png" }], apple: "/apple-touch-icon.png?v=3" },
   appleWebApp: { capable: true, title: "Haven", statusBarStyle: "default" },
   openGraph: {
     title: "Haven",
@@ -48,6 +50,8 @@ const CSP = [
 ].join("; ");
 
 export default function RootLayout({ children }: { children: ReactNode }) {
+  // The loading cover draws the logo from this file; fetching it with the HTML lets the glass appear sooner.
+  preload("/haven-mark.webp", { as: "image", fetchPriority: "high" });
   return (
     <html lang="en" className={hanken.variable}>
       {process.env.NODE_ENV === "production" && (
