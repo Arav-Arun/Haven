@@ -297,10 +297,10 @@ interface TofuEntry {
 
 /** Remembers the key each recipient had the first time this user shared with them (kept in local storage only). */
 export class KeyMemory {
-  constructor(private readonly storage: KeyValueStore) {}
+  constructor(private readonly store: KeyValueStore) {}
 
   private async all(): Promise<Record<string, TofuEntry>> {
-    const raw = await this.storage.get(TOFU_KEY);
+    const raw = await this.store.get(TOFU_KEY);
     return raw ? (JSON.parse(new TextDecoder().decode(raw)) as Record<string, TofuEntry>) : {};
   }
 
@@ -311,7 +311,7 @@ export class KeyMemory {
   async remember(ensName: string, key: Hex, at: Timestamp): Promise<void> {
     const all = await this.all();
     all[ensName.toLowerCase()] = { key: compressKey(key), at };
-    await this.storage.set(TOFU_KEY, utf8(JSON.stringify(all)));
+    await this.store.set(TOFU_KEY, utf8(JSON.stringify(all)));
   }
 
   /** True when this user shared with the name before, under a different key. */

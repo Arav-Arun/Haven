@@ -6,7 +6,7 @@
   "scripts": {
     "anon-iframe": "node scripts/copy-anon-iframe.mjs",
     "dev": "pnpm anon-iframe && next dev",
-    "build": "pnpm anon-iframe && next build",
+    "build": "pnpm anon-iframe && SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) next build",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

@@ -1,7 +1,7 @@
 import { AnonRpcWorker } from "@anon-rpc/browser-extension-harness";
-import { createDriveClient } from "@cloakroom/core";
+import { createDriveClient, type CloakroomClient } from "@cloakroom/core";
 import { createAnonFetch, createExtensionStorage, type HarnessWorker } from "@cloakroom/platform";
-import type { AnonFetch, DriveClient } from "@cloakroom/types";
+import type { AnonFetch } from "@cloakroom/types";
 import { config, missingConfig } from "./config";
 
 
@@ -37,7 +37,7 @@ export function getAnon(): AnonFetch {
   }));
 }
 
-export async function makeClient(): Promise<DriveClient | null> {
+export async function makeClient(): Promise<CloakroomClient | null> {
   if (unavailableReason()) return null;
   return createDriveClient({
     anon: getAnon(),

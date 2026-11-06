@@ -27,6 +27,8 @@ export default defineConfig({
       // Our own services and the worker's code only. Saving from other sites asks for that site when used.
       host_permissions: [
         ...new Set([
+          // The website itself: its files are re-downloaded and hashed before keys are released to it (add-on F3).
+          ...hostPattern(env.WXT_APP_ORIGIN),
           ...hostPattern(env.WXT_SEPOLIA_RPC_URL),
           ...hostPattern(env.WXT_API_URL),
           ...hostPattern(env.WXT_BEE_URL),

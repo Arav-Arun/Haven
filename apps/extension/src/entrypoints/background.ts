@@ -1,9 +1,14 @@
 import { addToInbox, readInbox } from "@cloakroom/platform";
 import { describeError } from "@cloakroom/ui/errors";
+import type { VerificationResult } from "@cloakroom/core";
+import type { Address } from "@cloakroom/types";
 import { makeClient, setPersist } from "@/lib/client";
-import { LAST_CHECK_KEY, NEW_SHARES_KEY, type ExtMessage, type PairReply } from "@/lib/messages";
+import { config } from "@/lib/config";
+import { LAST_CHECK_KEY, NEW_SHARES_KEY, type ExtMessage, type KeysReply, type PairReply } from "@/lib/messages";
+import { verifyUrls } from "@/lib/verify";
 
 const CHECK_ALARM = "cloakroom-check";
+const LIVE_ALARM = "cloakroom-live";
 const MENU_ID = "save-to-cloakroom";
 
 function notify(title: string, message: string) {
@@ -36,8 +41,63 @@ async function check() {
     );
   }
   const done = await client.maintain();
+  void ensureLive().catch(() => undefined);
   if (done.length) notify("Cloakroom housekeeping", done.map((r) => r.action).join(", "));
   await updateBadge();
+}
+
+// ---------------------------------------------------------------- add-on F3: verified frontend
+
+const verifyKey = (tabId: number) => `cloak:verify:${tabId}`;
+
+async function verifyTab(tabId: number, urls: string[]): Promise<VerificationResult> {
+  let result: VerificationResult;
+  try {
+    result = await verifyUrls(urls);
+  } catch (e) {
+    result = { status: "unknown", detail: describeError(e).title };
+  }
+  await chrome.storage.session.set({ [verifyKey(tabId)]: result });
+  const text = result.status === "verified" ? "✓" : result.status === "mismatch" ? "!" : "?";
+  const color = result.status === "verified" ? "#1f6f4a" : result.status === "mismatch" ? "#9c2b21" : "#6b6b6b";
+  await chrome.action.setBadgeBackgroundColor({ tabId, color });
+  await chrome.action.setBadgeText({ tabId, text });
+  return result;
+}
+
+/** The account seed, only for a tab whose files were just checked against a published release. */
+async function releaseKeys(tabId: number, urls: string[]): Promise<KeysReply> {
+  const result = await verifyTab(tabId, urls);
+  if (result.status !== "verified") {
+    return { ok: false, reason: result.status === "mismatch" ? "This page's code doesn't match any published Cloakroom release." : (result.detail ?? "This page couldn't be checked.") };
+  }
+  const client = await makeClient();
+  if (!client || !(await client.restore())) return { ok: false, reason: "The extension isn't signed in. Connect it from the website's Settings first." };
+  return { ok: true, seed: Array.from(await client.exportSeed()) };
+}
+
+// ---------------------------------------------------------------- add-on F4: live updates while the browser is open
+
+let unsubscribe: (() => void) | null = null;
+let lastNotice = 0;
+
+async function ensureLive() {
+  if (unsubscribe) return;
+  const client = await makeClient();
+  if (!client || !(await client.restore())) return;
+  const folders = new Map<string, string>();
+  for (const f of [...(await client.listFolders("root").catch(() => [])), ...(await client.listFolders("rooms").catch(() => []))]) folders.set(f.registry, f.displayName);
+  for (const s of await client.sharedWithMe().catch(() => [])) folders.set(s.folder.registry, s.folder.displayName);
+  if (!folders.size) return;
+  unsubscribe = client.subscribe([...folders.keys()] as Address[], (e) => {
+    if (e.type === "refresh") void client.maintain().catch(() => undefined);
+    if (e.type !== "file" && e.type !== "member") return;
+    const now = Date.now();
+    if (now - lastNotice < 10_000) return; // one notice per burst
+    lastNotice = now;
+    const name = folders.get(e.folder) ?? "a folder";
+    notify(e.type === "file" ? `New file in ${name}` : `Members changed in ${name}`, "Checked against Arkiv. Open Cloakroom to see it.");
+  });
 }
 
 async function pair(seed: number[], persist: boolean): Promise<PairReply> {
@@ -65,15 +125,19 @@ export default defineBackground(() => {
   chrome.runtime.onInstalled.addListener(() => {
     chrome.contextMenus.create({ id: MENU_ID, title: "Save to Cloakroom", contexts: ["image", "link", "page"] });
     chrome.alarms.create(CHECK_ALARM, { periodInMinutes: 15, delayInMinutes: 1 });
+    chrome.alarms.create(LIVE_ALARM, { periodInMinutes: 1 });
     void updateBadge();
   });
   chrome.runtime.onStartup.addListener(() => {
     chrome.alarms.create(CHECK_ALARM, { periodInMinutes: 15, delayInMinutes: 1 });
+    chrome.alarms.create(LIVE_ALARM, { periodInMinutes: 1 });
     void updateBadge();
   });
 
   chrome.alarms.onAlarm.addListener((a) => {
     if (a.name === CHECK_ALARM) check().catch((e) => console.warn("Cloakroom check failed:", describeError(e).title));
+    // A service worker that was stopped loses its subscriptions; this brings them back within a minute.
+    if (a.name === LIVE_ALARM) ensureLive().catch(() => undefined);
   });
 
   chrome.runtime.onMessage.addListener((msg: ExtMessage, sender, reply) => {
@@ -88,6 +152,26 @@ export default defineBackground(() => {
         () => reply({ ok: true }),
         (e) => reply({ ok: false, error: describeError(e).title }),
       );
+      return true;
+    }
+    const fromApp = (() => {
+      try {
+        return !!sender.url && new URL(sender.url).origin === config.appOrigin;
+      } catch {
+        return false;
+      }
+    })();
+    if ((msg.type === "verify" || msg.type === "release-keys") && !fromApp) return false;
+    if (msg.type === "verify" && sender.tab?.id !== undefined) {
+      verifyTab(sender.tab.id, msg.urls).then(reply);
+      return true;
+    }
+    if (msg.type === "release-keys" && sender.tab?.id !== undefined) {
+      releaseKeys(sender.tab.id, msg.urls).then(reply, (e) => reply({ ok: false, reason: describeError(e).title }));
+      return true;
+    }
+    if (msg.type === "verification") {
+      chrome.storage.session.get(verifyKey(msg.tabId)).then((v) => reply((v[verifyKey(msg.tabId)] as VerificationResult | undefined) ?? null));
       return true;
     }
     if (msg.type === "seen") {
