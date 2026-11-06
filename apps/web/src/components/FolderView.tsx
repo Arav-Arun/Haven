@@ -25,9 +25,10 @@ import {
 import { ArrowLeft, Copy, Eye, FolderDown, FolderPlus, Share2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { config } from "@/lib/config";
 import { useDrive, useLoad } from "@/lib/drive";
+import { keyDir, profileHref } from "@/lib/keydir";
 
 /** The padded size anyone can see for an upload, read from its Swarm receipt step. */
 function paddedFor(receipts: Receipt[], ref: string): number | undefined {
@@ -151,6 +152,7 @@ export function FolderView({ client, folder }: { client: DriveClient; folder: Ad
   const members = useLoad((c) => c.listMembers(folder), [folder]);
   const [shareOpen, setShareOpen] = useState(false);
   const groups = useLoad(shareOpen ? (c) => c.listFolders("groups") : null, [shareOpen]);
+  const keys = useMemo(() => keyDir(client), [client]);
   const [newOpen, setNewOpen] = useState(false);
   const [uploads, setUploads] = useState<(UploadItem & { ref?: string })[]>([]);
   const [preview, setPreview] = useState<{ file: FileEntry; blob: Blob | null; error: unknown } | null>(null);
@@ -313,6 +315,8 @@ export function FolderView({ client, folder }: { client: DriveClient; folder: Ad
           groups={(groups.data ?? []).filter((g) => g.registry !== folder)}
           demoMode={config.demoMode}
           lookupRecipient={client.lookupRecipient.bind(client)}
+          {...(keys.lookupKey ? { lookupKey: keys.lookupKey, profileHref } : {})}
+          {...(keys.confirmKeyChange ? { confirmKeyChange: keys.confirmKeyChange } : {})}
           onShare={async (recipient, opts) => {
             const m = await client.share(folder, recipient, opts);
             members.reload();

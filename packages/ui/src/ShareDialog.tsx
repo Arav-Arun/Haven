@@ -5,6 +5,7 @@ import { Check, LoaderCircle, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { describeError } from "./errors";
 import { cx, formatDate, nowSeconds, ROLE_ABOUT, ROLE_LABEL } from "./format";
+import { type KeyInfoView, RecipientKey } from "./KeyDirectory";
 import { Button, Dialog, ErrorNote, inputClass } from "./primitives";
 
 type Preset = "2m" | "1h" | "1d" | "1w" | "month" | "custom" | "never";
@@ -36,9 +37,16 @@ type Lookup =
   | { state: "ok"; ensName: string }
   | { state: "no"; ensName: string; reason: string };
 
+type KeyCheck =
+  | { state: "off" }
+  | { state: "checking" }
+  | { state: "ok"; info: KeyInfoView }
+  | { state: "failed"; error: unknown };
+
 /**
  * Share a folder with an ENS name or one of your groups. The recipient is looked up live: names without a
- * Cloakroom key are refused before anything is sent.
+ * Cloakroom key are refused before anything is sent. With `lookupKey` (add-on F1), the recipient's key is also checked
+ * against its public log: sharing is blocked if it disagrees with ENS, and held until confirmed if it changed.
  */
 export function ShareDialog({
   open,
@@ -48,6 +56,9 @@ export function ShareDialog({
   demoMode,
   lookupRecipient,
   onShare,
+  lookupKey,
+  confirmKeyChange,
+  profileHref,
 }: {
   open: boolean;
   onClose: () => void;
@@ -56,6 +67,9 @@ export function ShareDialog({
   demoMode: boolean;
   lookupRecipient: (ensName: string) => Promise<{ ensName: string; canReceive: boolean }>;
   onShare: (recipient: string, opts: ShareOptions) => Promise<Member>;
+  lookupKey?: (ensName: string) => Promise<KeyInfoView>;
+  confirmKeyChange?: (ensName: string) => Promise<void>;
+  profileHref?: (ensName: string) => string;
 }) {
   const [to, setTo] = useState<"name" | "group">("name");
   const [name, setName] = useState("");
@@ -91,6 +105,29 @@ export function ShareDialog({
       clearTimeout(t);
     };
   }, [name, to, lookupRecipient]);
+
+  const [keyCheck, setKeyCheck] = useState<KeyCheck>({ state: "off" });
+  const [keyTick, setKeyTick] = useState(0);
+  const checkedName = lookup.state === "ok" ? lookup.ensName : null;
+
+  useEffect(() => {
+    if (!lookupKey || to !== "name" || !checkedName) return setKeyCheck({ state: "off" });
+    setKeyCheck({ state: "checking" });
+    let live = true;
+    lookupKey(checkedName).then(
+      (info) => live && setKeyCheck({ state: "ok", info }),
+      (error) => live && setKeyCheck({ state: "failed", error }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [lookupKey, to, checkedName, keyTick]);
+
+  /** With F1 on, a person can be shared with only once their key checks out. Groups are checked per member. */
+  const keyBlocks =
+    !!lookupKey &&
+    to === "name" &&
+    !(keyCheck.state === "ok" && keyCheck.info.matchesEns && !keyCheck.info.changedSinceLastShare);
 
   const until = untilFor(preset, custom, nowSeconds());
   const recipient = to === "name" ? (lookup.state === "ok" ? lookup.ensName : null) : group || null;
@@ -169,36 +206,58 @@ export function ShareDialog({
           )}
 
           {to === "name" ? (
-            <label className="flex flex-col gap-1.5 text-sm">
-              ENS name
-              <input
-                className={inputClass}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="name.eth"
-                autoComplete="off"
-                autoCapitalize="none"
-                spellCheck={false}
-                autoFocus
-              />
-              <span aria-live="polite" className="min-h-5 text-xs">
-                {lookup.state === "checking" && (
-                  <span className="inline-flex items-center gap-1 text-muted">
-                    <LoaderCircle size={12} className="animate-spin" aria-hidden /> Looking up {name.trim()}…
-                  </span>
-                )}
-                {lookup.state === "ok" && (
-                  <span className="inline-flex items-center gap-1 text-private">
-                    <Check size={12} aria-hidden /> {lookup.ensName} can receive files.
-                  </span>
-                )}
-                {lookup.state === "no" && (
-                  <span className="inline-flex items-center gap-1 text-danger">
-                    <TriangleAlert size={12} aria-hidden /> {lookup.reason}
-                  </span>
-                )}
-              </span>
-            </label>
+            <div className="flex flex-col gap-1.5">
+              <label className="flex flex-col gap-1.5 text-sm">
+                ENS name
+                <input
+                  className={inputClass}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="name.eth"
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  autoFocus
+                />
+                <span aria-live="polite" className="min-h-5 text-xs">
+                  {lookup.state === "checking" && (
+                    <span className="inline-flex items-center gap-1 text-muted">
+                      <LoaderCircle size={12} className="animate-spin" aria-hidden /> Looking up {name.trim()}…
+                    </span>
+                  )}
+                  {lookup.state === "ok" && (
+                    <span className="inline-flex items-center gap-1 text-private">
+                      <Check size={12} aria-hidden /> {lookup.ensName} can receive files.
+                    </span>
+                  )}
+                  {lookup.state === "no" && (
+                    <span className="inline-flex items-center gap-1 text-danger">
+                      <TriangleAlert size={12} aria-hidden /> {lookup.reason}
+                    </span>
+                  )}
+                </span>
+              </label>
+              {keyCheck.state === "checking" && (
+                <span className="inline-flex items-center gap-1 text-xs text-muted">
+                  <LoaderCircle size={12} className="animate-spin" aria-hidden /> Checking their key against its public log…
+                </span>
+              )}
+              {keyCheck.state === "failed" && <ErrorNote error={keyCheck.error} />}
+              {keyCheck.state === "ok" && (
+                <RecipientKey
+                  info={keyCheck.info}
+                  {...(profileHref ? { profileHref: profileHref(keyCheck.info.ensName) } : {})}
+                  {...(confirmKeyChange
+                    ? {
+                        onConfirmChange: async () => {
+                          await confirmKeyChange(keyCheck.info.ensName);
+                          setKeyTick((t) => t + 1);
+                        },
+                      }
+                    : {})}
+                />
+              )}
+            </div>
           ) : (
             <label className="flex flex-col gap-1.5 text-sm">
               Group
@@ -267,7 +326,7 @@ export function ShareDialog({
             <Button type="button" variant="quiet" onClick={close}>
               Cancel
             </Button>
-            <Button type="submit" variant="primary" pending={pending} disabled={!recipient || customInvalid}>
+            <Button type="submit" variant="primary" pending={pending} disabled={!recipient || customInvalid || keyBlocks}>
               Share
             </Button>
           </div>

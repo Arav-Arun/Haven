@@ -3,11 +3,14 @@
 import { NETWORKS } from "@cloakroom/platform";
 import type { AnonStatus, PrivateNetwork, Receipt } from "@cloakroom/types";
 import { Button, ErrorNote, shortAddress } from "@cloakroom/ui";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { MyDevices } from "@/components/MyDevices";
 import { chooseNetwork, getAnon, selectedNetwork, unavailableReason } from "@/lib/anon";
 import { config } from "@/lib/config";
 import { useDrive } from "@/lib/drive";
+import { profileHref } from "@/lib/keydir";
 import { useInstall } from "@/lib/pwa";
 
 /**
@@ -176,6 +179,27 @@ function Account() {
   );
 }
 
+/** Add-on F1: this name's signed-in devices, and a link to its public key page. */
+function Devices() {
+  const { client, identity } = useDrive();
+  if (!client || !identity?.ensName) return null;
+  return (
+    <section className="flex flex-col gap-3 rounded-lg border border-line bg-card p-5 text-sm">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="font-medium">Devices</h2>
+        <Link href={profileHref(identity.ensName)} className="underline">
+          Your public key page
+        </Link>
+      </div>
+      <p className="text-muted">
+        Every device you sign in on is listed in your public key log for 90 days. Remove one you no longer use, or one you
+        lost: every app stops trusting it at once.
+      </p>
+      <MyDevices client={client} />
+    </section>
+  );
+}
+
 const ABOUT: Record<PrivateNetwork, string> = {
   nox: "A Sphinx mixnet. Its worker is registered on Sepolia, so it needs no mainnet connection.",
   nym: "The Nym mixnet. About 18 MB to download and a few seconds to start. Its worker is registered on mainnet.",
@@ -206,6 +230,7 @@ export default function SettingsPage() {
     <div className="flex max-w-2xl flex-col gap-6">
       <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
       <Account />
+      <Devices />
       <Install />
       <ConnectExtension />
 
