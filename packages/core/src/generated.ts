@@ -2351,5 +2351,13 @@ export const sepoliaDeployment = {
     "MockUSDC": "0x240b0316Df57887DBBE58b586508b19e633a14aa",
     "MockDAI": "0xF6faC8A58a0BE13b9197f27C41B73162Fe32572b"
   },
-  "haven": {}
+  "haven": {
+    "driveRegistryImpl": "0x779Ee739785907454748aAfed760130Bdf0b7628",
+    "driveRegistryImplBlock": 12076551,
+    "appRegistry": "0xd20bC8330a9E9fCc14B8111Ab0D2CA5626Fc0632",
+    "appResolver": "0x1162Fc8f4713F684e3c9864402606CC20e81E2D5",
+    "roomsRegistry": "0x951D7D861710dcb645013eD1Fb3A0589980174db",
+    "relayer": "0xc09b72D5DceF2eE9716b91CEfb14Bd06D2856969",
+    "deployer": "0x03E0eab0E4AeA87F9bff8CA2923ab748D820Da9c"
+  }
 } as const;
