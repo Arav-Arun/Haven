@@ -1,3 +1,7 @@
 packages:
   - "packages/*"
   - "apps/*"
+
+# pnpm 11 blocks install scripts unless allowed here.
+allowBuilds:
+  esbuild: true
