@@ -8,6 +8,33 @@ import { useEffect, useState } from "react";
 import { chooseNetwork, getAnon, selectedNetwork, unavailableReason } from "@/lib/anon";
 import { config } from "@/lib/config";
 import { useDrive } from "@/lib/drive";
+import { useInstall } from "@/lib/pwa";
+
+function Install() {
+  const { state, install } = useInstall();
+  return (
+    <section className="rounded-lg border border-line bg-card p-5 text-sm">
+      <h2 className="font-medium">Phone app</h2>
+      {state === "installed" && <p className="mt-1 text-muted">Installed. Cloakroom opens from your home screen, even offline.</p>}
+      {state === "can-install" && (
+        <div className="mt-2 flex flex-col items-start gap-2">
+          <p className="text-muted">Install Cloakroom to open it from your home screen and share files into it from other apps.</p>
+          <Button variant="primary" onClick={install}>
+            Install the app
+          </Button>
+        </div>
+      )}
+      {state === "ios" && (
+        <p className="mt-1 text-muted">On iPhone: tap the Share button in Safari, then &quot;Add to Home Screen&quot;.</p>
+      )}
+      {state === "unavailable" && (
+        <p className="mt-1 text-muted">
+          Open this site on your phone to install it. On Android, use Chrome; on iPhone, Safari&apos;s &quot;Add to Home Screen&quot;.
+        </p>
+      )}
+    </section>
+  );
+}
 
 /** Who is signed in, the housekeeping run, and sign-out. */
 function Account() {
@@ -103,6 +130,7 @@ export default function SettingsPage() {
     <div className="flex max-w-2xl flex-col gap-6">
       <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
       <Account />
+      <Install />
 
       <section className="rounded-lg border border-line bg-card p-5">
         <h2 className="font-medium">Private network</h2>

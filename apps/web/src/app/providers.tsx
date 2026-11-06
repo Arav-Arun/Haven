@@ -1,7 +1,7 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { custom } from "viem";
 import { sepolia } from "viem/chains";
 import { createConfig, WagmiProvider, type CreateConnectorFn } from "wagmi";
@@ -9,6 +9,7 @@ import { injected, walletConnect } from "wagmi/connectors";
 import { anonJsonRpc } from "@/lib/anon";
 import { config } from "@/lib/config";
 import { DriveProvider } from "@/lib/drive";
+import { registerServiceWorker } from "@/lib/pwa";
 
 function connectors(): CreateConnectorFn[] {
   const list: CreateConnectorFn[] = [injected()];
@@ -54,6 +55,7 @@ function getWagmiConfig() {
 export function Providers({ children }: { children: ReactNode }) {
   const [wagmi] = useState(getWagmiConfig);
   const [queries] = useState(() => new QueryClient());
+  useEffect(registerServiceWorker, []);
   return (
     <WagmiProvider config={wagmi}>
       <QueryClientProvider client={queries}>

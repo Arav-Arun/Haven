@@ -3,20 +3,27 @@
 import type { Address } from "@cloakroom/types";
 import { Skeleton } from "@cloakroom/ui";
 import { HardDrive } from "lucide-react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { FolderListPage } from "@/components/FolderListPage";
 import { FolderView } from "@/components/FolderView";
 import { RequireIdentity } from "@/components/Gate";
+import { SharedInbox } from "@/components/SharedInbox";
 
 // One static page for the whole drive: the folder is in ?f=, so the same build works on Vercel and from Swarm,
 // which can't rewrite paths.
 function Drive() {
-  const f = useSearchParams().get("f") as Address | null;
+  const router = useRouter();
+  const params = useSearchParams();
+  const f = params.get("f") as Address | null;
+  // Set by the service worker after files are shared into the app from Android's share sheet.
+  const shared = params.has("shared");
   return (
     <RequireIdentity>
       {(client) =>
-        f ? (
+        shared ? (
+          <SharedInbox client={client} onDone={() => router.replace("/drive")} />
+        ) : f ? (
           <FolderView key={f} client={client} folder={f} />
         ) : (
           <FolderListPage

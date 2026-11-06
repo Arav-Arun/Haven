@@ -73,3 +73,20 @@ Built and wired to the real client; waiting on `createDriveClient` (see `docs/re
   desktop widths.
 - Still to do: the strict CSP in `vercel.json`, after the Nox test in Chrome shows which origins the Anon-RPC worker
   needs; the Vercel deploy.
+
+## B6 · Phone (PWA)
+
+Built; the "Done when" needs a real Android phone and iPhone (human).
+- `public/manifest.webmanifest`: standalone, start at `/drive/`, icons (SVG, 192, 512, maskable 512, Apple touch),
+  and an Android `share_target` (POST, multipart, any file type).
+- Icons are drawn by `scripts/make-icons.mjs` (a ticket on spruce), no image tools needed.
+- `public/sw.js`: caches the app's pages and hashed assets so it starts offline; never touches cross-origin traffic
+  (RPCs, Bee, API). Shared files are parked in IndexedDB and the drive opens a "Save shared files" dialog to pick a
+  folder; each is then encrypted and uploaded like any other file. Registered only in production builds.
+- Settings → "Phone app": Chrome's install prompt, or iOS's "Add to Home Screen" steps. Camera upload on phones.
+- No push notifications (a push server would learn who waits for what): the app checks on open.
+- Pages export as `route/index.html` (`trailingSlash`), which Swarm can serve without rewrites (B10).
+- Checked: the static build serves the manifest (`application/manifest+json`) and self-hosted fonts. The service
+  worker could not be checked here: the Claude preview browser blocks service workers, as it blocks the Anon-RPC
+  iframe. To check: `pnpm --filter @cloakroom/web build`, serve `apps/web/out`, open it in Chrome, then DevTools →
+  Application → Service workers / Manifest.
