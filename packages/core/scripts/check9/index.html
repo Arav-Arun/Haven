@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'" />
+    <title>Check 9: wallet signatures</title>
+    <style>
+      body { font: 15px/1.5 system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+      button { font: inherit; padding: 0.4rem 0.9rem; margin: 0.2rem 0.4rem 0.2rem 0; }
+      pre { background: #f4f4f4; padding: 0.8rem; white-space: pre-wrap; word-break: break-all; }
+      .pass { color: #0a6b2d; } .fail { color: #a11; }
+    </style>
+  </head>
+  <body>
+    <h1>Check 9: does this wallet sign the fixed message identically?</h1>
+    <p>
+      This page asks your wallet to sign Cloakroom's sign-in message twice, then checks the two signatures on this
+      machine (nothing leaves it except the read of your address's code on Sepolia). The message names the real app
+      origin, and this page runs on localhost, so a SIWE-aware wallet should <b>warn about the domain</b>: note whether
+      it did.
+    </p>
+    <p><button id="go">Connect and sign twice</button></p>
+    <pre id="message">(the message appears here)</pre>
+    <p id="result"></p>
+    <p id="warning" hidden>
+      Did the wallet show a domain warning before signing?
+      <button data-warning="yes">Yes</button><button data-warning="no">No</button>
+    </p>
+    <script>
+      const $ = (id) => document.getElementById(id);
+      let address = null;
+      $("go").onclick = async () => {
+        if (!window.ethereum) { $("result").textContent = "No injected wallet found."; return; }
+        try {
+          [address] = await window.ethereum.request({ method: "eth_requestAccounts" });
+          const { message } = await (await fetch(`/message?address=${address}`)).json();
+          $("message").textContent = message;
+          const hex = "0x" + Array.from(new TextEncoder().encode(message), (b) => b.toString(16).padStart(2, "0")).join("");
+          const first = await window.ethereum.request({ method: "personal_sign", params: [hex, address] });
+          const second = await window.ethereum.request({ method: "personal_sign", params: [hex, address] });
+          const wallet = prompt("Which wallet is this (e.g. MetaMask 13.x)?", "MetaMask") || "unknown";
+          const res = await (await fetch("/check", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ address, signatures: [first, second], wallet }),
+          })).json();
+          $("result").className = res.ok ? "pass" : "fail";
+          $("result").textContent = res.ok ? `PASS — ${res.detail}` : `FAIL — ${res.detail}`;
+          $("warning").hidden = false;
+        } catch (error) {
+          $("result").className = "fail";
+          $("result").textContent = String(error && error.message ? error.message : error);
+        }
+      };
+      for (const b of document.querySelectorAll("[data-warning]")) {
+        b.onclick = async () => {
+          await fetch("/warning", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ address, shown: b.dataset.warning === "yes" }) });
+          $("warning").textContent = "Recorded. You can close this page.";
+        };
+      }
+    </script>
+  </body>
+</html>

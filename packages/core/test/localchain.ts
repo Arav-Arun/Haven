@@ -53,6 +53,10 @@ export interface LocalChain {
   public: PublicClient<Transport, typeof foundry>;
   factory: Address;
   implementation: Address;
+  labelStore: Address;
+  namer: Address;
+  /** Deploys any compiled contract from contracts/out with a funded throwaway key. */
+  deploy(file: string, name: string, args?: unknown[]): Promise<Address>;
   /** A fresh funded key, as a SepoliaWriter for ens.ts. */
   newWriter(): Promise<{ key: Hex; address: Address; writer: SepoliaWriter }>;
   /** Unix time of the latest block. */
@@ -107,6 +111,9 @@ export async function startLocalChain(): Promise<LocalChain> {
     public: publicClient,
     factory,
     implementation,
+    labelStore,
+    namer,
+    deploy,
     async newWriter() {
       const key = generatePrivateKey();
       const account = privateKeyToAccount(key);
