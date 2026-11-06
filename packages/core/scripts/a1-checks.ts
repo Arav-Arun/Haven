@@ -169,7 +169,13 @@ for (const [who, account] of [
       data: encodeFunctionData({ abi: driveRegistryAbi, functionName: "upgradeToAndCall", args: [ensv2.UserRegistryImpl, "0x"] }),
     });
   } catch (error) {
-    const data = (error as { cause?: { data?: Hex }; data?: Hex }).cause?.data ?? (error as { data?: Hex }).data;
+    // viem nests the revert data at different depths per error type: walk the cause chain, as ens.ts does.
+    let data: Hex | undefined;
+    for (let e: unknown = error, depth = 0; e && !data && depth < 10; e = (e as { cause?: unknown }).cause, depth++) {
+      const d = (e as { data?: unknown }).data;
+      if (typeof d === "string" && d.startsWith("0x") && d.length >= 10) data = d as Hex;
+      else if (d && typeof (d as { data?: unknown }).data === "string") data = (d as { data: Hex }).data;
+    }
     try {
       reverted = data ? decodeErrorResult({ abi: driveRegistryAbi, data }).errorName : String(error).slice(0, 80);
     } catch {

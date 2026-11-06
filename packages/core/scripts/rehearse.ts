@@ -43,7 +43,13 @@ try {
   const childEnv = { ...process.env, SEPOLIA_RPC_URL: forkUrl, DEPLOYMENT_FILE: deploymentFile };
   for (const script of ["scripts/bootstrap-sepolia.ts", "scripts/a1-checks.ts"]) {
     log(`\n=== ${script} (rehearsal)`);
-    const run = spawnSync("pnpm", ["exec", "tsx", script], { cwd: resolve(repoRoot, "packages/core"), env: childEnv, stdio: "inherit" });
+    // The same node with tsx loaded: spawning "pnpm" fails on Windows (it's pnpm.cmd), and pnpm may not be on PATH.
+    const run = spawnSync(process.execPath, ["--import", "tsx", script], {
+      cwd: resolve(repoRoot, "packages/core"),
+      env: childEnv,
+      stdio: "inherit",
+    });
+    if (run.error) log(`could not start ${script}: ${run.error.message}`);
     if (run.status !== 0) {
       process.exitCode = 1;
       break;
