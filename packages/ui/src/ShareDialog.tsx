@@ -437,7 +437,7 @@ export function ShareDialog({
           <fieldset className="flex flex-col gap-2 text-sm">
             <legend className="mb-1.5 font-medium">Access until</legend>
             {/* Quick picks as one even bar; typing a length below takes over from them. */}
-            <div role="group" aria-label="Quick lengths" className="grid grid-cols-3 gap-1 rounded-2xl bg-ink/[0.05] p-1 sm:grid-cols-6">
+            <div role="group" aria-label="Quick lengths" className="grid grid-cols-3 gap-1 rounded-2xl bg-ink/[0.05] p-1">
               {presets.map(([p, label]) => (
                 <button
                   key={p}
@@ -449,7 +449,7 @@ export function ShareDialog({
                     setPickDate(false);
                   }}
                   className={cx(
-                    "rounded-xl px-2 py-2 text-[13px] font-medium transition-colors",
+                    "whitespace-nowrap rounded-xl px-2 py-2 text-[13px] font-medium transition-colors",
                     preset === p ? "bg-white text-ink shadow-[0_4px_12px_-6px_rgb(13_27_51/0.4)]" : "text-muted hover:text-ink",
                   )}
                 >

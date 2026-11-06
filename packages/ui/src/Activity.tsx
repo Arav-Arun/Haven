@@ -17,6 +17,8 @@ export function describeStep(step: ReceiptStep | undefined): string {
     if (l.includes("/drip")) return "Getting free test gas";
     if (l.includes("/keylog")) return "Publishing your public key on Arkiv";
     if (l.includes("/doorbell")) return "Telling members something changed";
+    if (l.includes("/zk/join")) return "Joining the anonymous writer group";
+    if (l.includes("/zk/")) return "Sending the anonymous upload";
     if (/upload/i.test(l)) return "Uploading the encrypted file to Swarm";
     if (/download/i.test(l)) return "Downloading from Swarm";
     if (/arkiv transactions/i.test(l)) return "Writing encrypted records to Arkiv";
