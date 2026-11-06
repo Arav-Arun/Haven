@@ -43,6 +43,7 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { sepolia } from "viem/chains";
+import { normalize } from "viem/ens";
 
 import { EXPLORERS, requireDeployed, cloakroom } from "./addresses";
 import { signClaim, solveRoomPow, type ApiInfo, type ClaimResponse, type DripResponse, type RoomResponse } from "./api";
@@ -50,7 +51,10 @@ import {
   arkivReader,
   arkivWriter,
   BlockClock,
+  deviceOp,
   fileOp,
+  listDeviceEntries,
+  listKeyLog,
   keyCopyOp,
   linkOp,
   listFiles as arkivListFiles,
@@ -76,7 +80,39 @@ import {
   type FileRecord,
   type RosterRecord,
 } from "./arkiv";
-import { randomBytes, utf8 } from "./crypto";
+import { randomBytes, toPrivateKey, utf8 } from "./crypto";
+import { doorbellTopic, mineGsocKey, openDoorbell, sealDoorbell, signRing, type DoorbellConfig, type DoorbellEvent, type GsocKey } from "./doorbell";
+import type {
+  CloakroomClient,
+  DeviceInfo,
+  KeyInfo,
+  LiveEvent,
+  LiveStatus,
+  SignTypedData,
+  SubtreePreview,
+  SubtreeRule,
+} from "./extras";
+import {
+  checkDevices,
+  checkKeyLog,
+  compressKey,
+  currentKey,
+  deviceIdOf,
+  deviceTypedData,
+  ensAgreement,
+  fingerprint,
+  fingerprintText,
+  KeyMemory,
+  keyLogTypedData,
+  keyProblem,
+  nextEntry,
+  openDeviceLabel,
+  sameKey,
+  sealDeviceLabel,
+  type KeyLogRelayRequest,
+  type KeyLogRelayResponse,
+} from "./keydir";
+import { listSubtreeHolders, overCap, planSync, type SubtreeHolder } from "./subtree";
 import {
   accessOf,
   createFolder as ensCreateFolder,
@@ -85,10 +121,12 @@ import {
   findRegistry,
   getCloakKey,
   grantRoleUntil,
+  isCloakroomUserName,
   isLabelAvailable,
   labelId,
   listChildren,
   mountFolder,
+  nameController,
   randomLabel,
   revokeAccess,
   roleOf,
@@ -101,6 +139,7 @@ import {
   chainHead,
   deriveEpochKey,
   epochAt,
+  epochEnd,
   epochKeyFor,
   epochSecondsFor,
   isExhausted,
@@ -138,6 +177,7 @@ import {
   type FileMeta,
   type Roster,
   type RosterMember,
+  type SubtreeRuleData,
 } from "./records";
 import { createWelcome, openWelcome } from "./stealth";
 import { downloadEncrypted, downloadFolderBlobs, uploadEncrypted, type SwarmConfig } from "./swarm";
@@ -157,11 +197,28 @@ const MIN_ETH = parseEther("0.0003");
 const MIN_TGLM = parseEther("0.0003");
 /** How many weeks of welcome notes "Shared with me" scans on a first look. */
 const WELCOME_WEEKS = 8;
-const STORE = { seed: "seed", name: "name", shares: "shares", rooms: "rooms" } as const;
+const STORE = { seed: "seed", name: "name", shares: "shares", rooms: "rooms", device: "device", tofu: "tofu", synced: "subtree-sync" } as const;
+/** A device entry is renewed when it has less than this left (it lasts 90 days). */
+const DEVICE_RENEW_SECONDS = 30 * 86_400;
+/** How often "live" folders are re-read when no Swarm subscription is open. */
+const POLL_SECONDS = 30;
+/** Arkiv allows about this many creates per transaction comfortably within half a block's gas. */
+const OPS_PER_TX = 16;
 
 // ---------------------------------------------------------------- small helpers
 
 const now = () => Math.floor(Date.now() / 1000);
+const normName = (name: string) => normalize(name.trim().toLowerCase());
+
+/** "Chrome on macOS": a rough, local-only label for this device (sealed before it's stored). */
+function deviceLabel(): string {
+  const ua = (globalThis.navigator?.userAgent ?? "").toLowerCase();
+  if (!ua) return "Command line";
+  const browser = ua.includes("edg/") ? "Edge" : ua.includes("firefox") ? "Firefox" : ua.includes("chrome") ? "Chrome" : ua.includes("safari") ? "Safari" : "Browser";
+  const os = ua.includes("android") ? "Android" : ua.includes("iphone") || ua.includes("ipad") ? "iOS" : ua.includes("mac os") ? "macOS" : ua.includes("windows") ? "Windows" : ua.includes("linux") ? "Linux" : "";
+  const ext = typeof (globalThis as { chrome?: { runtime?: { id?: string } } }).chrome?.runtime?.id === "string" && !globalThis.document ? " (extension)" : "";
+  return `${browser}${os ? ` on ${os}` : ""}${ext}`;
+}
 const lower = (a: string) => a.toLowerCase();
 const json = (v: unknown) => utf8(JSON.stringify(v));
 const parse = <T>(b: Uint8Array | null): T | null => (b ? (JSON.parse(new TextDecoder().decode(b)) as T) : null);
@@ -231,7 +288,7 @@ function epochKeyFrom(copies: Map<number, KeyCopy>, version: number, epoch: numb
 
 // ---------------------------------------------------------------- the client
 
-class Client implements DriveClient {
+class Client implements CloakroomClient {
   private readonly receipts = new Receipts();
   private readonly clock: BlockClock;
   private keys: IdentityKeys | null = null;
@@ -242,8 +299,11 @@ class Client implements DriveClient {
   private readonly direct = new Set<string>();
   private apiInfo: ApiInfo | null = null;
   private childCache = new Map<string, { at: number; children: ChildName[] }>();
+  private readonly keyMemory: KeyMemory;
+  private readonly gsocKeys = new Map<string, GsocKey>();
 
   constructor(private readonly cfg: DriveConfig) {
+    this.keyMemory = new KeyMemory(cfg.storage);
     for (const [k, v] of Object.entries({
       appOrigin: cfg.appOrigin,
       apiUrl: cfg.apiUrl,
@@ -452,6 +512,10 @@ class Client implements DriveClient {
       this.holdings.clear();
       await this.cfg.storage.set(STORE.seed, encodeSeed(material));
       step({ kind: "check", label: "Keys made on this device", detail: this.ensName ? `matched to ${this.ensName}` : "no name claimed yet", ok: true });
+      if (this.ensName) {
+        await this.ensureOwnKeyLog(step).catch(() => undefined);
+        await this.ensureDevice(step).catch(() => undefined);
+      }
       return this.identity();
     });
   }
@@ -464,6 +528,16 @@ class Client implements DriveClient {
     this.ensName = parse<string | null>(await this.cfg.storage.get(STORE.name));
     if (this.ensName) this.driveRoot = await findRegistry(this.sepolia(), this.ensName).catch(() => null);
     else await this.loadName(keys).catch(() => undefined);
+    if (this.ensName) {
+      // A device the user revoked from another device signs itself out here (a copy of the seed taken elsewhere is
+      // not stopped by this; see the README).
+      const device = await this.ensureDevice().catch(() => "unknown" as const);
+      if (device === "revoked") {
+        await this.signOut();
+        return null;
+      }
+      void this.ensureOwnKeyLog().catch(() => undefined);
+    }
     return this.identity();
   }
 
@@ -512,6 +586,13 @@ class Client implements DriveClient {
       this.ensName = claimed.ensName;
       this.driveRoot = claimed.driveRoot;
       await this.cfg.storage.set(STORE.name, json(claimed.ensName));
+      // Add-on F1: seq 0 of the name's public key log, and this device. Relayed by the API, so no gas is needed.
+      try {
+        await this.ensureOwnKeyLog(step);
+      } catch (e) {
+        step({ kind: "check", label: "Public key log not written yet", detail: `${toDriveError(e).message}; retried when the app next opens`, ok: false });
+      }
+      await this.ensureDevice(step).catch(() => undefined);
       // Gas for K, so it can make folders. Batched by the API; not waited for here.
       await this.api<DripResponse>("/drip", { address: k.address, registry: claimed.driveRoot }, step).catch(() => undefined);
       return this.identity();
@@ -667,7 +748,7 @@ class Client implements DriveClient {
     h: Holding,
     p: { version: number; info: FolderInfo; roster: Roster; label: string },
     step: StepSink,
-  ) {
+  ): Promise<Hex[]> {
     const t0 = now();
     const schedule: EpochSchedule = { t0, epochSeconds: epochSecondsFor(this.cfg.demoMode) };
     const fs = randomBytes(32);
@@ -703,7 +784,7 @@ class Client implements DriveClient {
         keyCopyOp({ folder: h.folder, recipient: m.address, version: p.version, sealed: await sealKeyCopy(m.memberKey, h.folder, copy), until: m.until }),
       );
     }
-    await writeEntities(this.arkivWriter(h.key, step, h.address), ops, p.label, step);
+    return (await writeEntities(this.arkivWriter(h.key, step, h.address), ops, p.label, step)).keys;
   }
 
   private async latestRoster(folder: Address, fk: FolderKeys, h: Holding): Promise<{ roster: Roster; version: number } | null> {
@@ -935,6 +1016,7 @@ class Client implements DriveClient {
         "File entry",
         step,
       );
+      if (keys[0]) await this.ring(h, fk, { type: "file", arkivKey: keys[0] }, step);
       onProgress?.(1);
       return {
         fileId,
@@ -1002,38 +1084,243 @@ class Client implements DriveClient {
 
   // ------------------------------------------------------------ sharing
 
-  async lookupRecipient(ensName: string): Promise<{ ensName: string; canReceive: boolean }> {
-    const name = ensName.trim().toLowerCase();
-    const key = await getCloakKey(this.sepolia(), name).catch(() => null);
-    let valid = false;
-    if (key) {
-      try {
-        secp256k1.ProjectivePoint.fromHex(key.replace(/^0x/, ""));
-        valid = true;
-      } catch {
-        valid = false;
-      }
-    }
-    return { ensName: name, canReceive: valid };
+  async lookupRecipient(input: string): Promise<{ ensName: string; canReceive: boolean }> {
+    const name = normName(input);
+    const r = await this.readKeyLog(name).catch(() => null);
+    const canReceive = !!r && !r.checked.problem && !!r.current && ensAgreement(r.current, r.cloakKey) !== "mismatch";
+    return { ensName: name, canReceive };
   }
+
+  // ------------------------------------------------------------ F1: public key directory (keydir.ts)
+
+  /** A name's key log, checked: controller now, valid chain, ignored (forged) entries, and the cloak.key record. */
+  private async readKeyLog(name: string, step?: StepSink, isolationKey?: string) {
+    const sep = this.sepolia(step, isolationKey);
+    const [controller, page, cloakKey] = await Promise.all([
+      nameController(sep, name).catch(() => null),
+      listKeyLog(this.arkiv(step, isolationKey), name),
+      getCloakKey(sep, name).catch(() => null),
+    ]);
+    const checked = await checkKeyLog(page.records, controller);
+    return { name, controller, checked, cloakKey, current: currentKey(checked.chain) };
+  }
+
+  async lookupKey(name: string): Promise<KeyInfo> {
+    const r = await this.readKeyLog(normName(name));
+    const times = await this.clock.timesOf(r.checked.chain.map((e) => e.createdAtBlock));
+    const ensRecord = ensAgreement(r.current, r.cloakKey);
+    return {
+      ensName: r.name,
+      current: r.current,
+      fingerprint: r.current ? fingerprint(r.current) : [],
+      history: r.checked.chain.map((e) => ({
+        seq: e.seq,
+        kind: e.kind as KeyInfo["history"][number]["kind"],
+        spendingPublicKey: compressKey(e.spendingPublicKey),
+        at: times.get(e.createdAtBlock) ?? 0,
+        arkivKey: e.key,
+      })),
+      matchesEns: r.current !== null && ensRecord !== "mismatch",
+      changedSinceLastShare: await this.keyMemory.changed(r.name, r.current),
+      ensRecord,
+      ignored: r.checked.ignored.map((e) => ({ arkivKey: e.key, creator: e.creator, seq: e.seq })),
+      problem: r.checked.problem,
+      controller: r.controller,
+    };
+  }
+
+  async confirmKeyChange(name: string): Promise<void> {
+    const r = await this.readKeyLog(normName(name));
+    if (r.checked.problem) throw keyProblem(r.name, "broken", r.checked.problem);
+    if (!r.current) throw keyProblem(r.name, "missing");
+    if (ensAgreement(r.current, r.cloakKey) === "mismatch") throw keyProblem(r.name, "mismatch");
+    await this.keyMemory.remember(r.name, r.current, now());
+  }
+
+  /** Rules 1–3 before any share: a valid chain, agreement with cloak.key, and no unconfirmed change. */
+  private async requireTrustedKey(name: string, step?: StepSink, isolationKey?: string): Promise<Hex> {
+    const r = await this.readKeyLog(name, step, isolationKey);
+    if (r.checked.problem) throw keyProblem(r.name, "broken", r.checked.problem);
+    if (!r.current) throw keyProblem(r.name, "missing");
+    if (ensAgreement(r.current, r.cloakKey) === "mismatch") throw keyProblem(r.name, "mismatch");
+    if (await this.keyMemory.changed(r.name, r.current)) {
+      const last = r.checked.chain[r.checked.chain.length - 1];
+      const at = last ? await this.clock.timeOf(last.createdAtBlock).catch(() => 0) : 0;
+      throw keyProblem(r.name, "changed", at ? new Date(at * 1000).toLocaleDateString() : undefined);
+    }
+    step?.({ kind: "check", label: "Recipient's key matches its public log", detail: fingerprintText(r.current), ok: true });
+    return r.current;
+  }
+
+  private async relayKeyLog(request: KeyLogRelayRequest, label: string, step?: StepSink): Promise<KeyLogRelayResponse> {
+    const out = await this.api<KeyLogRelayResponse>("/keylog", request, step);
+    step?.({ kind: "arkiv-tx", label, hash: out.txHash, explorerUrl: `${EXPLORERS.arkiv}/tx/${out.txHash}`, ok: true });
+    return out;
+  }
+
+  /** Publishes (or rotates to) this identity's key on its own name's log, if the log doesn't already say so. */
+  private async ensureOwnKeyLog(step?: StepSink): Promise<void> {
+    const keys = this.requireKeys();
+    if (!this.ensName) return;
+    const r = await this.readKeyLog(this.ensName, step);
+    if (r.checked.problem) {
+      step?.({ kind: "check", label: "Your public key log is broken", detail: r.checked.problem, ok: false });
+      return;
+    }
+    if (r.current && sameKey(r.current, keys.spendingPublicKey)) return;
+    const entry = nextEntry(r.checked.chain, {
+      ensName: this.ensName,
+      kind: r.current ? "rotate" : "publish",
+      spendingPublicKey: keys.spendingPublicKey,
+    });
+    const sig = await privateKeyToAccount(keys.driveKey).signTypedData(keyLogTypedData(entry));
+    await this.relayKeyLog({ type: "entry", entry, sig }, `Public key log: seq ${entry.seq} (${entry.kind})`, step);
+  }
+
+  /** A random key per sign-in on this device, kept in local storage (deleted on sign out). */
+  private async deviceKey(): Promise<Hex> {
+    const stored = await this.cfg.storage.get(STORE.device);
+    if (stored && stored.length === 32) return toHex(stored);
+    const key = toPrivateKey(randomBytes(32));
+    await this.cfg.storage.set(STORE.device, hexToBytes(key));
+    return key;
+  }
+
+  private async devicePublic(): Promise<{ pub: Hex; id: string }> {
+    const pub = compressKey(bytesToHex(secp256k1.getPublicKey(hexToBytes(await this.deviceKey()), true)));
+    return { pub, id: deviceIdOf(pub) };
+  }
+
+  /** This device's entry in cloak.device: written when missing or close to expiring. "revoked" when the log says so. */
+  private async ensureDevice(step?: StepSink): Promise<"ok" | "revoked"> {
+    const keys = this.requireKeys();
+    if (!this.ensName) return "ok";
+    const { pub, id } = await this.devicePublic();
+    const reader = this.arkiv(step);
+    const [r, entries, head] = await Promise.all([
+      this.readKeyLog(this.ensName, step),
+      listDeviceEntries(reader, this.ensName),
+      reader.getBlockNumber(),
+    ]);
+    const checks = await checkDevices(entries.records, r.controller, r.checked.chain, head);
+    const mine = checks.find((c) => c.record.deviceId === id);
+    if (mine?.why === "revoked") return "revoked";
+    if (mine?.trusted && Number(mine.record.expiresAtBlock - head) * 2 > DEVICE_RENEW_SECONDS) return "ok";
+    const label = bytesToHex(await sealDeviceLabel(keys.driveKey, id, deviceLabel()));
+    const device = { ensName: this.ensName, deviceId: id, devicePublicKey: pub, label };
+    const sig = await privateKeyToAccount(keys.driveKey).signTypedData(deviceTypedData(device));
+    await this.relayKeyLog({ type: "device", device, sig }, "This device, in your public device list", step);
+    return "ok";
+  }
+
+  async listDevices(): Promise<DeviceInfo[]> {
+    const keys = this.requireKeys();
+    if (!this.ensName) return [];
+    const { id: mine } = await this.devicePublic();
+    const reader = this.arkiv();
+    const [r, entries, head] = await Promise.all([this.readKeyLog(this.ensName), listDeviceEntries(reader, this.ensName), reader.getBlockNumber()]);
+    const checks = await checkDevices(entries.records, r.controller, r.checked.chain, head);
+    const t = now();
+    return Promise.all(
+      checks.map(async (c) => ({
+        deviceId: c.record.deviceId,
+        label: await openDeviceLabel(keys.driveKey, c.record.deviceId, c.record.label),
+        lastSeen: await this.clock.timeOf(c.record.createdAtBlock),
+        expiresAt: t + Number(c.record.expiresAtBlock - head) * 2,
+        thisDevice: c.record.deviceId === mine,
+        trusted: c.trusted,
+      })),
+    ).then((list) => list.sort((a, b) => b.lastSeen - a.lastSeen));
+  }
+
+  async revokeDevice(deviceId: string): Promise<void> {
+    const keys = this.requireKeys();
+    if (!this.ensName) throw new DriveError("NOT_SIGNED_IN", "Claim a name first.");
+    const name = this.ensName;
+    await this.receipts.run("Revoke a device", async (step) => {
+      const reader = this.arkiv(step);
+      const [r, entries, head] = await Promise.all([this.readKeyLog(name, step), listDeviceEntries(reader, name), reader.getBlockNumber()]);
+      if (r.checked.problem || !r.current) throw keyProblem(name, r.checked.problem ? "broken" : "missing", r.checked.problem ?? undefined);
+      const target = (await checkDevices(entries.records, r.controller, r.checked.chain, head)).find((c) => c.record.deviceId === deviceId);
+      if (!target) throw new DriveError("NOT_FOUND", "That device isn't in your list.");
+      if (target.why === "revoked") return;
+      const entry = nextEntry(r.checked.chain, {
+        ensName: name,
+        kind: "revoke-device",
+        spendingPublicKey: r.current,
+        devicePublicKey: target.record.devicePublicKey,
+      });
+      const sig = await privateKeyToAccount(keys.driveKey).signTypedData(keyLogTypedData(entry));
+      await this.relayKeyLog({ type: "entry", entry, sig }, `Public key log: seq ${entry.seq} (revoke device)`, step);
+    });
+  }
+
+  async linkName(name: string, signTypedData: SignTypedData): Promise<KeyInfo> {
+    const keys = this.requireKeys();
+    const n = normName(name);
+    if (isCloakroomUserName(n)) throw new DriveError("NOT_AUTHORIZED", "Names under cloakroom.eth are linked when they're claimed.");
+    await this.receipts.run(`Link ${n}`, async (step) => {
+      const r = await this.readKeyLog(n, step);
+      if (!r.controller) throw new DriveError("NOT_FOUND", `${n} isn't registered, or has expired.`);
+      if (r.checked.problem) throw keyProblem(n, "broken", r.checked.problem);
+      if (r.current && sameKey(r.current, keys.spendingPublicKey)) return;
+      const entry = nextEntry(r.checked.chain, { ensName: n, kind: r.current ? "rotate" : "publish", spendingPublicKey: keys.spendingPublicKey });
+      step({ kind: "check", label: "Sign with the wallet that owns the name", detail: r.controller, ok: true });
+      const sig = await signTypedData(keyLogTypedData(entry) as unknown as Parameters<SignTypedData>[0]);
+      await this.relayKeyLog({ type: "entry", entry, sig }, `Public key log for ${n}: seq ${entry.seq}`, step);
+    });
+    return this.lookupKey(n);
+  }
+
+  // ------------------------------------------------------------ sharing
 
   async share(folder: Address, recipient: string, opts: ShareOptions): Promise<Member> {
     const f = getAddress(folder);
     if (isAddress(recipient)) throw new DriveError("UNKNOWN", "Sharing with a group isn't available in this version yet.");
     if (opts.until !== null && opts.until <= now()) throw new DriveError("EXPIRED", "That end date has passed.");
-    return this.receipts.run(`Share with ${recipient}`, async (step) => {
+    const name = normName(recipient);
+    return this.receipts.run(`Share with ${name}`, async (step) => {
       const h = await this.holding(f);
       const fk = await this.readFolder(f, h, step);
       const current = await this.latestRoster(f, fk, h);
       if (!current) throw new DriveError("NOT_AUTHORIZED", "Only managers can share this folder.");
-      if (fk.reading.refreshOpen) throw new DriveError("REFRESH_PENDING");
-      const P = await getCloakKey(this.sepolia(step, h.address), recipient);
-      if (!P) throw new DriveError("NO_CLOAK_KEY");
-      const welcome = await createWelcome({ recipientSpendingPublicKey: P, folder: f });
-      const S = welcome.stealthAddress;
-      step({ kind: "check", label: "New private address for this member", detail: S, ok: true });
+      const P = await this.requireTrustedKey(name, step, h.address);
+      const { added, rosterKey } = await this.addMembers(f, h, fk, current, [{ name, key: P }], opts, step);
+      await this.keyMemory.remember(name, P, now());
+      if (rosterKey) await this.ring(h, fk, { type: "member", arkivKey: rosterKey }, step);
+      const m = added[0]!;
+      return { address: m.address, label: name, role: opts.role, until: opts.until, via: "direct", hiddenFromMembers: opts.hideFromMembers, needsGas: false };
+    });
+  }
 
-      await this.ensureGas(h, { sepolia: true, arkiv: true }, step);
+  /**
+   * Adds people to a folder: per person a fresh stealth address, the onchain grant, gas for writers, then welcome notes,
+   * key copies and the new roster on Arkiv (at most OPS_PER_TX creates per transaction; the roster goes last).
+   * `rosterEdit` changes the roster that gets written (e.g. adds a subtree rule).
+   */
+  private async addMembers(
+    f: Address,
+    h: Holding,
+    fk: FolderKeys,
+    current: { roster: Roster; version: number },
+    people: { name: string; key: Hex; rule?: string; holder?: Address }[],
+    opts: ShareOptions,
+    step: StepSink,
+    rosterEdit?: (r: Roster) => Roster,
+  ): Promise<{ added: RosterMember[]; rosterKey: Hex | null }> {
+    if (fk.reading.refreshOpen) throw new DriveError("REFRESH_PENDING");
+    if (opts.until !== null && opts.until <= now()) throw new DriveError("EXPIRED", "That end date has passed.");
+    const v = current.version;
+    const rotation = fk.reading.versions.get(v)!;
+    const fsCopy = fk.copies.get(v)!;
+    const head = chainHead(fsCopy.key);
+    const ops: CreateOp[] = [];
+    const added: RosterMember[] = [];
+    if (people.length) await this.ensureGas(h, { sepolia: true, arkiv: true }, step);
+    for (const p of people) {
+      const welcome = await createWelcome({ recipientSpendingPublicKey: p.key, folder: f });
+      const S = welcome.stealthAddress;
+      step({ kind: "check", label: `New private address for ${people.length > 1 ? p.name : "this member"}`, detail: S, ok: true });
       await grantRoleUntil(this.sepoliaWriter(h.key, step, h.address), f, S, opts.role, opts.until, step);
       if (opts.role !== "viewer") {
         await sendGlm(this.arkivWriter(h.key, step, h.address), S, MEMBER_TGLM, step, "Gas for the new member (tGLM, from this folder's key)");
@@ -1044,24 +1331,17 @@ class Client implements DriveClient {
         await w.public.waitForTransactionReceipt({ hash });
         step({ kind: "sepolia-tx", label: "Gas for the new manager (Sepolia ETH)", hash, explorerUrl: `${EXPLORERS.sepolia}/tx/${hash}`, ok: true });
       }
-
-      const member: RosterMember = {
+      added.push({
         address: S,
         memberKey: welcome.memberKey,
         role: opts.role,
         until: opts.until,
         hiddenFromMembers: opts.hideFromMembers,
-        label: recipient,
+        label: p.name,
         via: "direct",
-      };
-      const roster: Roster = {
-        managers: opts.role === "manager" ? [...current.roster.managers, member] : current.roster.managers,
-        members: opts.role === "manager" ? current.roster.members : [...current.roster.members, member],
-      };
-      const v = current.version;
-      const rotation = fk.reading.versions.get(v)!;
-      const fsCopy = fk.copies.get(v)!;
-      const head = chainHead(fsCopy.key);
+        ...(p.rule ? { rule: p.rule } : {}),
+        ...(p.holder ? { holder: p.holder } : {}),
+      });
       const copy: KeyCopy | null =
         opts.role === "manager"
           ? { kind: "secret", version: v, key: fsCopy.key }
@@ -1069,7 +1349,7 @@ class Client implements DriveClient {
               const e = epochKeyFor(head, scheduleOf(rotation), opts.until);
               return e ? { kind: "epoch" as const, version: v, ...e } : null;
             })();
-      const ops: CreateOp[] = [
+      ops.push(
         welcomeOp({
           folder: f,
           bucket: weekBucket(now()),
@@ -1077,15 +1357,43 @@ class Client implements DriveClient {
           sealedMemberKey: welcome.note.sealedMemberKey,
           until: opts.until,
         }),
-        rosterOp({ folder: f, version: v, ...(await sealRoster(rosterKey(fsCopy.key), f, v, roster)) }),
-      ];
+      );
       if (copy) ops.push(keyCopyOp({ folder: f, recipient: S, version: v, sealed: await sealKeyCopy(welcome.memberKey, f, copy), until: opts.until }));
-      await writeEntities(this.arkivWriter(h.key, step, h.address), ops, "Welcome note, key copy and roster", step);
-      return { address: S, label: recipient, role: opts.role, until: opts.until, via: "direct", hiddenFromMembers: opts.hideFromMembers, needsGas: false };
-    });
+    }
+    const managers = added.filter((m) => m.role === "manager");
+    const members = added.filter((m) => m.role !== "manager");
+    let roster: Roster = { ...current.roster, managers: [...current.roster.managers, ...managers], members: [...current.roster.members, ...members] };
+    if (rosterEdit) roster = rosterEdit(roster);
+    ops.push(rosterOp({ folder: f, version: v, ...(await sealRoster(rosterKey(fsCopy.key), f, v, roster)) }));
+    let last: Hex[] = [];
+    for (let i = 0; i < ops.length; i += OPS_PER_TX) {
+      const chunk = ops.slice(i, i + OPS_PER_TX);
+      const final = i + OPS_PER_TX >= ops.length;
+      last = (
+        await writeEntities(
+          this.arkivWriter(h.key, step, h.address),
+          chunk,
+          people.length === 0 ? "Roster" : final ? "Welcome notes, key copies and roster" : "Welcome notes and key copies",
+          step,
+        )
+      ).keys;
+    }
+    return { added, rosterKey: last[last.length - 1] ?? null };
   }
 
-  async listMembers(folder: Address): Promise<Member[]> {
+  /** Rewrites the roster of the current version (no new keys): for rule changes that remove nobody. */
+  private async writeRoster(h: Holding, fk: FolderKeys, current: { roster: Roster; version: number }, roster: Roster, step: StepSink) {
+    const fsCopy = fk.copies.get(current.version)!;
+    await this.ensureGas(h, { arkiv: true }, step);
+    await writeEntities(
+      this.arkivWriter(h.key, step, h.address),
+      [rosterOp({ folder: h.folder, version: current.version, ...(await sealRoster(rosterKey(fsCopy.key), h.folder, current.version, roster)) })],
+      "Roster",
+      step,
+    );
+  }
+
+  async listMembers(folder: Address): Promise<(Member & { rule?: string })[]> {
     const f = getAddress(folder);
     const h = await this.holding(f);
     const fk = await this.readFolder(f, h);
@@ -1102,6 +1410,7 @@ class Client implements DriveClient {
           via: m.via,
           hiddenFromMembers: m.hiddenFromMembers,
           needsGas: m.role !== "viewer" && (m.until === null || m.until > now()) && (await reader.getBalance({ address: m.address })) < LOW_TGLM,
+          ...(m.rule ? { rule: m.rule } : {}),
         })),
       );
     }
@@ -1138,7 +1447,31 @@ class Client implements DriveClient {
   /** A new version for everyone left in the roster: what removal and an open refresh request both need. */
   private async refresh(f: Address, h: Holding, fk: FolderKeys, roster: Roster, step: StepSink) {
     const info: FolderInfo = fk.info ?? { d: fk.displayName, e: h.ensName ?? "", p: null };
-    await this.writeVersion(h, { version: fk.reading.latestVersion + 1, info, roster, label: `Refresh keys: version ${fk.reading.latestVersion + 1}` }, step);
+    const keys = await this.writeVersion(h, { version: fk.reading.latestVersion + 1, info, roster, label: `Refresh keys: version ${fk.reading.latestVersion + 1}` }, step);
+    // Rung on the OLD topic: that's the one current members are listening to.
+    if (keys[0]) await this.ring(h, fk, { type: "rotation", arkivKey: keys[0] }, step);
+  }
+
+  /** Revokes each address onchain, then ONE new key version for everyone left (with `rosterEdit` applied). */
+  private async removeMembers(
+    f: Address,
+    h: Holding,
+    fk: FolderKeys,
+    current: { roster: Roster; version: number },
+    addresses: Address[],
+    step: StepSink,
+    rosterEdit?: (r: Roster) => Roster,
+  ) {
+    await this.ensureGas(h, { sepolia: true, arkiv: true }, step);
+    for (const a of addresses) {
+      const access = await accessOf(this.sepolia(step, h.address), f, a);
+      if (access.roles !== 0n) await revokeAccess(this.sepoliaWriter(h.key, step, h.address), f, a, step);
+    }
+    const gone = new Set(addresses.map(lower));
+    const keep = (m: RosterMember) => !gone.has(lower(m.address));
+    let roster: Roster = { ...current.roster, managers: current.roster.managers.filter(keep), members: current.roster.members.filter(keep) };
+    if (rosterEdit) roster = rosterEdit(roster);
+    await this.refresh(f, h, fk, roster, step);
   }
 
   async removeMember(folder: Address, member: Address): Promise<void> {
@@ -1148,11 +1481,369 @@ class Client implements DriveClient {
       const fk = await this.readFolder(f, h, step);
       const current = await this.latestRoster(f, fk, h);
       if (!current) throw new DriveError("NOT_AUTHORIZED", "Only managers can remove people.");
-      await this.ensureGas(h, { sepolia: true, arkiv: true }, step);
-      await revokeAccess(this.sepoliaWriter(h.key, step, h.address), f, getAddress(member), step);
-      const keep = (m: RosterMember) => !isAddressEqual(m.address, member);
-      await this.refresh(f, h, fk, { managers: current.roster.managers.filter(keep), members: current.roster.members.filter(keep) }, step);
+      await this.removeMembers(f, h, fk, current, [getAddress(member)], step);
     });
+  }
+
+  // ------------------------------------------------------------ F2: private ENS subtree sharing (subtree.ts)
+
+  /** A name's usable key for a subtree share, or why not. Never throws. */
+  private async keyForName(name: string, isolationKey?: string): Promise<{ key: Hex | null; why?: string }> {
+    const r = await this.readKeyLog(name, undefined, isolationKey);
+    if (r.checked.problem) return { key: null, why: "its public key log is broken" };
+    if (!r.current) return { key: null, why: "no Cloakroom key yet" };
+    if (ensAgreement(r.current, r.cloakKey) === "mismatch") return { key: null, why: "its key doesn't match its cloak.key record" };
+    return { key: r.current };
+  }
+
+  private holdersOf(parent: string, isolationKey?: string, step?: StepSink): Promise<SubtreeHolder[]> {
+    return listSubtreeHolders(this.sepolia(step, isolationKey), parent, (n) => this.keyForName(n, isolationKey));
+  }
+
+  async previewSubtree(parentEnsName: string): Promise<SubtreePreview> {
+    const parent = normName(parentEnsName);
+    const holders = await this.holdersOf(parent);
+    return {
+      parent,
+      ready: holders.filter((x) => x.key).map((x) => x.name),
+      noKey: holders.filter((x) => !x.key).map((x) => ({ name: x.name, why: x.why ?? "no Cloakroom key yet" })),
+    };
+  }
+
+  private async syncedAt(folder: Address): Promise<Record<string, number>> {
+    const all = parse<Record<string, Record<string, number>>>(await this.cfg.storage.get(STORE.synced)) ?? {};
+    return all[lower(folder)] ?? {};
+  }
+
+  private async markSynced(folder: Address, parents: string[]) {
+    const all = parse<Record<string, Record<string, number>>>(await this.cfg.storage.get(STORE.synced)) ?? {};
+    const mine = (all[lower(folder)] ??= {});
+    for (const p of parents) mine[p] = now();
+    await this.cfg.storage.set(STORE.synced, json(all));
+  }
+
+  private toRule(rule: SubtreeRuleData, roster: Roster, synced: Record<string, number>): SubtreeRule {
+    return {
+      parent: rule.parent,
+      role: rule.role,
+      until: rule.until,
+      excluded: rule.excluded,
+      memberCount: [...roster.managers, ...roster.members].filter((m) => m.rule === rule.parent).length,
+      lastSyncedAt: Math.max(synced[rule.parent] ?? 0, rule.syncedAt),
+    };
+  }
+
+  private async managed(f: Address, step?: StepSink) {
+    const h = await this.holding(f);
+    const fk = await this.readFolder(f, h, step);
+    const current = await this.latestRoster(f, fk, h);
+    if (!current) throw new DriveError("NOT_AUTHORIZED", "Only managers can change who has access.");
+    return { h, fk, current };
+  }
+
+  async shareWithSubtree(folder: Address, parentEnsName: string, opts: ShareOptions): Promise<SubtreeRule> {
+    const f = getAddress(folder);
+    const parent = normName(parentEnsName);
+    return this.receipts.run(`Share with everyone at ${parent}`, async (step) => {
+      const { h, fk, current } = await this.managed(f, step);
+      if (current.roster.subtrees?.some((r) => r.parent === parent)) throw new DriveError("UNKNOWN", `This folder is already shared with ${parent}.`);
+      const holders = await this.holdersOf(parent, h.address, step);
+      const ready = holders.filter((x) => x.key);
+      step({ kind: "check", label: `Names under ${parent}`, detail: `${ready.length} found with a Cloakroom key, ${holders.length - ready.length} without`, ok: true });
+      const rule: SubtreeRuleData = { parent, role: opts.role, until: opts.until, excluded: [], hideFromMembers: opts.hideFromMembers, syncedAt: now() };
+      const everyone = [...current.roster.managers, ...current.roster.members];
+      const plan = planSync(rule, everyone, holders);
+      if (overCap(everyone, plan.remove, plan.add.length)) {
+        throw new DriveError("RATE_LIMITED", `That would give more than 14 people access to one folder. Use several rooms, or split the team.`);
+      }
+      const { added } = await this.addMembers(
+        f,
+        h,
+        fk,
+        current,
+        plan.add.map((x) => ({ name: x.name, key: x.key!, rule: parent, holder: x.controller })),
+        opts,
+        step,
+        (r) => ({ ...r, subtrees: [...(r.subtrees ?? []), rule] }),
+      );
+      for (const x of plan.add) await this.keyMemory.remember(x.name, x.key!, now());
+      await this.markSynced(f, [parent]);
+      step({ kind: "check", label: "What the chain sees", detail: `${added.length} random addresses; nothing links them to ${parent}`, ok: true });
+      return { parent, role: rule.role, until: rule.until, excluded: [], memberCount: added.length, lastSyncedAt: now() };
+    });
+  }
+
+  async listSubtreeRules(folder: Address): Promise<SubtreeRule[]> {
+    const f = getAddress(folder);
+    const h = await this.holding(f);
+    const fk = await this.readFolder(f, h);
+    const current = await this.latestRoster(f, fk, h);
+    if (!current) return [];
+    const synced = await this.syncedAt(f);
+    return (current.roster.subtrees ?? []).map((r) => this.toRule(r, current.roster, synced));
+  }
+
+  /**
+   * One sync of every subtree rule on a folder: removals first (revoke, then one key refresh, so a removed holder can't
+   * read anything written afterwards), then new holders as ordinary stealth shares. Returns whether it changed anything.
+   */
+  private async syncFolder(f: Address, step: StepSink | null): Promise<boolean> {
+    const { h, fk, current } = await this.managed(f, step ?? undefined);
+    const rules = current.roster.subtrees ?? [];
+    if (!rules.length) return false;
+    const everyone = [...current.roster.managers, ...current.roster.members];
+    const remove: RosterMember[] = [];
+    const add: { rule: SubtreeRuleData; holders: SubtreeHolder[] }[] = [];
+    for (const rule of rules) {
+      const plan = planSync(rule, everyone, await this.holdersOf(rule.parent, h.address));
+      remove.push(...plan.remove);
+      if (plan.add.length) add.push({ rule, holders: plan.add });
+    }
+    let room = 0;
+    {
+      const removed = new Set(remove.map((m) => lower(m.address)));
+      const staying = everyone.filter((m) => (m.until === null || m.until > now()) && !removed.has(lower(m.address))).length;
+      room = Math.max(0, 14 - staying);
+    }
+    await this.markSynced(f, rules.map((r) => r.parent));
+    if (!remove.length && !add.length) return false;
+    const run = step ? null : this.receipts.start("Team sync");
+    const sink = step ?? run!.step;
+    try {
+      if (remove.length) {
+        sink({ kind: "check", label: "Names gone, excluded or transferred", detail: `${remove.length} to remove`, ok: true });
+        await this.removeMembers(f, h, fk, current, remove.map((m) => m.address), sink);
+      }
+      if (add.length) {
+        let state = remove.length ? await this.managed(f, sink) : { h, fk, current };
+        for (const { rule, holders } of add) {
+          const fit = holders.slice(0, room);
+          room -= fit.length;
+          if (fit.length < holders.length) {
+            sink({ kind: "check", label: `Over the 14-person limit for ${rule.parent}`, detail: `${holders.length - fit.length} not added`, ok: false });
+          }
+          if (!fit.length) continue;
+          await this.addMembers(
+            f,
+            state.h,
+            state.fk,
+            state.current,
+            fit.map((x) => ({ name: x.name, key: x.key!, rule: rule.parent, holder: x.controller })),
+            { role: rule.role, until: rule.until, hideFromMembers: rule.hideFromMembers },
+            sink,
+          );
+          for (const x of fit) await this.keyMemory.remember(x.name, x.key!, now());
+          state = await this.managed(f, sink);
+        }
+      }
+      run?.finish();
+      return true;
+    } catch (e) {
+      run?.finish(e);
+      throw e;
+    }
+  }
+
+  async syncSubtrees(folder: Address): Promise<void> {
+    const f = getAddress(folder);
+    await this.receipts.run("Team sync", async (step) => {
+      const changed = await this.syncFolder(f, step);
+      if (!changed) step({ kind: "check", label: "Team sync", detail: "everyone is up to date", ok: true });
+    });
+  }
+
+  async excludeFromSubtree(folder: Address, parentEnsName: string, memberEnsName: string): Promise<void> {
+    const f = getAddress(folder);
+    const parent = normName(parentEnsName);
+    const member = normName(memberEnsName);
+    await this.receipts.run(`Exclude ${member}`, async (step) => {
+      const { h, fk, current } = await this.managed(f, step);
+      if (!current.roster.subtrees?.some((r) => r.parent === parent)) throw new DriveError("NOT_FOUND", `This folder isn't shared with ${parent}.`);
+      const edit = (r: Roster): Roster => ({
+        ...r,
+        subtrees: (r.subtrees ?? []).map((x) => (x.parent === parent && !x.excluded.includes(member) ? { ...x, excluded: [...x.excluded, member] } : x)),
+      });
+      const gone = [...current.roster.managers, ...current.roster.members].filter((m) => m.rule === parent && m.label === member);
+      if (gone.length) await this.removeMembers(f, h, fk, current, gone.map((m) => m.address), step, edit);
+      else await this.writeRoster(h, fk, current, edit(current.roster), step);
+    });
+  }
+
+  async removeSubtreeRule(folder: Address, parentEnsName: string): Promise<void> {
+    const f = getAddress(folder);
+    const parent = normName(parentEnsName);
+    await this.receipts.run(`Stop sharing with ${parent}`, async (step) => {
+      const { h, fk, current } = await this.managed(f, step);
+      const edit = (r: Roster): Roster => ({ ...r, subtrees: (r.subtrees ?? []).filter((x) => x.parent !== parent) });
+      const gone = [...current.roster.managers, ...current.roster.members].filter((m) => m.rule === parent);
+      if (gone.length) await this.removeMembers(f, h, fk, current, gone.map((m) => m.address), step, edit);
+      else await this.writeRoster(h, fk, current, edit(current.roster), step);
+    });
+  }
+
+  // ------------------------------------------------------------ F4: live updates (doorbell.ts)
+
+  private async doorbellConfig(): Promise<DoorbellConfig | null> {
+    try {
+      return (await this.info()).doorbell ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  private gsocFor(folder: Address, epochKey: Uint8Array, config: DoorbellConfig): { topic: Uint8Array; key: GsocKey } {
+    const topic = doorbellTopic(epochKey, folder);
+    const id = `${toHex(topic)}/${config.overlay}/${config.proximity}`;
+    let key = this.gsocKeys.get(id);
+    if (!key) {
+      key = mineGsocKey(topic, config);
+      this.gsocKeys.set(id, key);
+    }
+    return { topic, key };
+  }
+
+  /** Rings the folder's doorbell for the current epoch. Best effort: Arkiv stays the source of truth. */
+  private async ring(h: Holding, fk: FolderKeys, event: DoorbellEvent, step?: StepSink): Promise<void> {
+    try {
+      const config = await this.doorbellConfig();
+      if (!config) return;
+      const v = fk.reading.latestVersion;
+      const rotation = fk.reading.versions.get(v);
+      if (!rotation) return;
+      const key = epochKeyFrom(fk.copies, v, epochAt(scheduleOf(rotation), now()));
+      if (!key) return;
+      const { topic, key: g } = this.gsocFor(h.folder, key, config);
+      const ring = await signRing(g, await sealDoorbell(topic, g.address, event));
+      await this.api("/doorbell", ring, step);
+    } catch (e) {
+      step?.({ kind: "check", label: "Live update not sent", detail: `members see it on their next refresh (${toDriveError(e).message})`, ok: false });
+    }
+  }
+
+  subscribe(folders: Address[], listener: (e: LiveEvent) => void, onStatus?: (s: LiveStatus) => void): () => void {
+    let stopped = false;
+    const stops: (() => void)[] = [];
+    const wsBase = this.cfg.apiUrl.replace(/\/+$/, "").replace(/^http/, "ws");
+
+    const watch = async (f: Address) => {
+      let known: Set<string> | null = null;
+      let refreshWasOpen = false;
+      let pollTimer: ReturnType<typeof setInterval> | null = null;
+      let epochTimer: ReturnType<typeof setTimeout> | null = null;
+      let retryTimer: ReturnType<typeof setTimeout> | null = null;
+      let sockets: WebSocket[] = [];
+
+      const snapshot = async () => {
+        const h = await this.holding(f);
+        const fk = await this.readFolder(f, h);
+        const keys = new Set<string>([...fk.reading.files.map((x) => lower(x.key)), ...[...fk.reading.versions.values()].map((r) => lower(r.key))]);
+        return { h, fk, keys };
+      };
+      const emit = (type: LiveEvent["type"], arkivKey: Hex) => listener({ folder: f, type, arkivKey, receivedAt: now() });
+
+      /** Re-reads the folder and reports what's new. With `expect`, only an event the validator accepted is reported. */
+      const check = async (expect?: DoorbellEvent) => {
+        const s = await snapshot();
+        if (expect) {
+          let valid = s.keys.has(lower(expect.arkivKey)) || (expect.type === "refresh" && s.fk.reading.refreshOpen);
+          if (!valid && expect.type === "member") {
+            const rosters = await listRosters(this.arkiv(undefined, s.h.address), f);
+            valid = (await this.validator(undefined, s.h.address).shareRecords(rosters.records)).valid.some((r) => lower(r.key) === lower(expect.arkivKey));
+          }
+          if (valid) emit(expect.type, expect.arkivKey);
+        } else if (known) {
+          for (const x of s.fk.reading.files) if (!known.has(lower(x.key))) emit("file", x.key);
+          for (const r of s.fk.reading.versions.values()) if (!known.has(lower(r.key))) emit("rotation", r.key);
+          if (s.fk.reading.refreshOpen && !refreshWasOpen) emit("refresh", "0x0000000000000000000000000000000000000000000000000000000000000000");
+        }
+        known = s.keys;
+        refreshWasOpen = s.fk.reading.refreshOpen;
+        return s;
+      };
+
+      const closeSockets = () => {
+        const old = sockets;
+        sockets = [];
+        for (const ws of old) {
+          ws.onclose = null;
+          ws.onerror = null;
+          ws.close();
+        }
+      };
+
+      const startPolling = (detail: string) => {
+        closeSockets();
+        if (stopped || pollTimer) return;
+        onStatus?.({ folder: f, mode: "polling", detail });
+        pollTimer = setInterval(() => void check().catch(() => undefined), POLL_SECONDS * 1000);
+      };
+
+      const goLive = async () => {
+        if (stopped) return;
+        if (epochTimer) clearTimeout(epochTimer);
+        epochTimer = null;
+        closeSockets();
+        const s = await check();
+        const config = await this.doorbellConfig();
+        if (!config) return startPolling("live updates are off on this server");
+        if (typeof WebSocket === "undefined") return startPolling("this runtime has no WebSocket");
+        const v = s.fk.reading.latestVersion;
+        const rotation = s.fk.reading.versions.get(v);
+        if (!rotation) return startPolling("no keys yet");
+        const schedule = scheduleOf(rotation);
+        const e = epochAt(schedule, now());
+        const topics = [e, e + 1]
+          .map((i) => epochKeyFrom(s.fk.copies, v, i))
+          .filter((k): k is Uint8Array => k !== null)
+          .map((k) => this.gsocFor(f, k, config));
+        if (!topics.length) return startPolling("your access has ended");
+        this.direct.add("Swarm doorbell subscription (WebSocket to the Cloakroom API)");
+        let failed = false;
+        for (const { topic, key } of topics) {
+          const ws = new WebSocket(`${wsBase}/doorbell/subscribe/${key.address.slice(2)}`);
+          ws.binaryType = "arraybuffer";
+          ws.onmessage = (m) => {
+            const data = m.data instanceof ArrayBuffer ? new Uint8Array(m.data) : typeof m.data === "string" ? hexToBytes(m.data as Hex) : null;
+            if (!data) return;
+            void openDoorbell(topic, key.address, data).then((event) => (event ? check(event) : undefined)).catch(() => undefined);
+          };
+          ws.onerror = ws.onclose = () => {
+            if (stopped || failed) return;
+            failed = true;
+            startPolling("the live connection dropped");
+            retryTimer = setTimeout(() => {
+              if (pollTimer) clearInterval(pollTimer);
+              pollTimer = null;
+              void goLive().catch(() => startPolling("couldn't reconnect"));
+            }, 60_000);
+          };
+          sockets.push(ws);
+        }
+        if (pollTimer) clearInterval(pollTimer);
+        pollTimer = null;
+        onStatus?.({ folder: f, mode: "live" });
+        // New topic at the next epoch boundary.
+        epochTimer = setTimeout(() => void goLive().catch(() => startPolling("couldn't move to the next epoch")), Math.max(1, epochEnd(schedule, e) - now() + 1) * 1000);
+      };
+
+      stops.push(() => {
+        closeSockets();
+        if (pollTimer) clearInterval(pollTimer);
+        if (epochTimer) clearTimeout(epochTimer);
+        if (retryTimer) clearTimeout(retryTimer);
+      });
+      try {
+        await goLive();
+      } catch (e) {
+        startPolling(toDriveError(e).message);
+      }
+    };
+
+    for (const folder of folders) void watch(getAddress(folder));
+    return () => {
+      stopped = true;
+      for (const stop of stops) stop();
+    };
   }
 
   async sharedWithMe(opts?: { since?: Timestamp }): Promise<IncomingShare[]> {
@@ -1222,6 +1913,16 @@ class Client implements DriveClient {
       for (const m of [...current.roster.managers, ...current.roster.members]) {
         if (m.role === "viewer" || (m.until !== null && m.until <= now())) continue;
         if ((await reader.getBalance({ address: m.address })) < LOW_TGLM) low.push(m);
+      }
+      // Add-on F2: subtree rules turn into shares and removals here (on open in the web app, every 15 minutes in the
+      // extension).
+      if (current.roster.subtrees?.length) {
+        try {
+          await this.syncFolder(folder.registry, null);
+        } catch (e) {
+          const run = this.receipts.start(`Team sync: ${folder.displayName}`);
+          done.push(run.finish(toDriveError(e)));
+        }
       }
       if (!fk.reading.refreshOpen && low.length === 0) continue;
       const run = this.receipts.start(`Housekeeping: ${folder.displayName}`);
@@ -1406,7 +2107,7 @@ class Client implements DriveClient {
 }
 
 /** The one DriveClient. Every value it returns is read live from Sepolia, Arkiv and Swarm. */
-export function createDriveClient(config: DriveConfig): DriveClient {
+export function createDriveClient(config: DriveConfig): CloakroomClient {
   return new Client(config);
 }
 

@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
 
 import { createApi, readEnv } from "./app";
+import { attachDoorbellProxy } from "./ws";
 
 // apps/api/.env for local runs; on Fly the same names come from `fly secrets set`.
 const envFile = resolve(dirname(fileURLToPath(import.meta.url)), "../.env");
@@ -16,7 +17,8 @@ if (existsSync(envFile)) {
 }
 
 const env = readEnv(process.env);
-const { app, relayer } = createApi(env);
+const { app, relayer, doorbellsOn } = createApi(env);
 const port = Number(process.env.PORT);
 if (!port) throw new Error("PORT is not set");
-serve({ fetch: app.fetch, port }, () => console.log(`Cloakroom API on :${port}, relayer ${relayer}`));
+const server = serve({ fetch: app.fetch, port }, () => console.log(`Cloakroom API on :${port}, relayer ${relayer}`));
+if (doorbellsOn) attachDoorbellProxy(server as unknown as import("node:http").Server, env.BEE_URL);

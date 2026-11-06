@@ -19,7 +19,7 @@ import {
   type WalletArkivClient,
 } from "@arkiv-network/sdk";
 import { rabdi } from "@arkiv-network/sdk/chains";
-import { and, asc, eq, type Expression } from "@arkiv-network/sdk/query";
+import { and, asc, eq, exists, type Expression } from "@arkiv-network/sdk/query";
 import { addr, bytes, defineSchema, str, u64, type Schema } from "@arkiv-network/sdk/schema";
 import { DriveError, type AnonFetch, type Address, type Hex } from "@cloakroom/types";
 import { type Account, type Chain, getAddress, hexToBytes, isHex, type Transport } from "viem";
@@ -90,6 +90,59 @@ export const TombSchema = defineSchema("cloak.tomb", {
   fileId: str().indexed(),
 });
 
+// ---- public schemas (add-ons F1 and F3). Unlike the ones above these hold no secrets: they are meant to be read by
+// anyone. Each entry carries an EIP-712 signature, and readers go by that signature, never by $creator or $owner, so
+// any account may relay an entry (our API does, so users need no tGLM) and a forged one is simply ignored.
+
+/** One step of a name's public key history: seq 0, 1, 2…, each pointing at the previous entry's Arkiv key. */
+export const KeyLogSchema = defineSchema("cloak.keylog", {
+  ensName: str().indexed(),
+  seq: u64().indexed(),
+  kind: str().indexed(),
+  /** Compressed secp256k1 point (0x + 66 hex), so it fits a 128-byte str. */
+  spendingPublicKey: str(),
+  /** For "revoke-device": the device key being revoked; otherwise NONE. */
+  devicePublicKey: str(),
+  /** The previous entry's Arkiv key, or NONE for seq 0. */
+  prevEntryKey: str(),
+  sig: bytes(),
+});
+
+/** A device signed in to a name. Expires after 90 days unless the device keeps using it. */
+export const DeviceSchema = defineSchema("cloak.device", {
+  ensName: str().indexed(),
+  deviceId: str().indexed(),
+  devicePublicKey: str(),
+  /** The device's label, sealed to the user (HKDF(K, "device-label")). */
+  label: bytes(),
+  sig: bytes(),
+});
+
+/** A published website release (F3): the sha256 of its file manifest, signed by the release key R. */
+export const ReleaseSchema = defineSchema("cloak.release", {
+  version: str().indexed(),
+  rootHash: str().indexed(),
+  gitCommit: str(),
+  manifestSwarmRef: str(),
+  siteSwarmRef: str(),
+  sig: bytes(),
+});
+
+/** A release R has withdrawn: the extension treats it as bad. */
+export const UnreleaseSchema = defineSchema("cloak.unrelease", {
+  rootHash: str().indexed(),
+  sig: bytes(),
+});
+
+/** Anyone who rebuilt a release from its commit says whether they got the same root hash. */
+export const RebuildSchema = defineSchema("cloak.rebuild", {
+  rootHash: str().indexed(),
+  matched: u64(),
+});
+
+/** Written instead of an empty string (Arkiv attributes are either set or absent). */
+export const NONE = "none";
+
 export const SCHEMA_NAMES = [
   "cloak.file",
   "cloak.welcome",
@@ -99,6 +152,11 @@ export const SCHEMA_NAMES = [
   "cloak.refresh",
   "cloak.link",
   "cloak.tomb",
+  "cloak.keylog",
+  "cloak.device",
+  "cloak.release",
+  "cloak.unrelease",
+  "cloak.rebuild",
 ] as const;
 export type SchemaName = (typeof SCHEMA_NAMES)[number];
 
@@ -214,6 +272,43 @@ export interface LinkRecord extends EntityInfo {
 export interface TombRecord extends EntityInfo {
   folder: Address;
   fileId: string;
+}
+
+export interface KeyLogRecord extends EntityInfo {
+  ensName: string;
+  seq: number;
+  kind: string;
+  spendingPublicKey: Hex;
+  devicePublicKey: string;
+  prevEntryKey: string;
+  sig: Hex;
+}
+
+export interface DeviceRecord extends EntityInfo {
+  ensName: string;
+  deviceId: string;
+  devicePublicKey: Hex;
+  label: Uint8Array;
+  sig: Hex;
+}
+
+export interface ReleaseRecord extends EntityInfo {
+  version: string;
+  rootHash: Hex;
+  gitCommit: string;
+  manifestSwarmRef: Hex;
+  siteSwarmRef: string;
+  sig: Hex;
+}
+
+export interface UnreleaseRecord extends EntityInfo {
+  rootHash: Hex;
+  sig: Hex;
+}
+
+export interface RebuildRecord extends EntityInfo {
+  rootHash: Hex;
+  matched: boolean;
 }
 
 /** A query's rows plus how many matching entities didn't fit the schema (planted junk counts as hidden). */
@@ -362,6 +457,89 @@ export function tombOp(v: { folder: Address; fileId: string }): CreateOp {
   return {
     schema: TombSchema,
     values: { folder: addr(v.folder), fileId: str(v.fileId) },
+    expiration: ExpirationTime.max(),
+    flags: RENEWED,
+  };
+}
+
+export function keyLogOp(v: {
+  ensName: string;
+  seq: number;
+  kind: string;
+  spendingPublicKey: string;
+  devicePublicKey: string;
+  prevEntryKey: string;
+  sig: Hex;
+}): CreateOp {
+  return {
+    schema: KeyLogSchema,
+    values: {
+      ensName: str(v.ensName),
+      seq: u64(v.seq),
+      kind: str(v.kind),
+      spendingPublicKey: str(v.spendingPublicKey),
+      devicePublicKey: str(v.devicePublicKey),
+      prevEntryKey: str(v.prevEntryKey),
+      sig: hexToBytes(v.sig),
+    },
+    expiration: ExpirationTime.max(),
+    flags: RENEWED,
+  };
+}
+
+export const DEVICE_DAYS = 90;
+
+export function deviceOp(v: { ensName: string; deviceId: string; devicePublicKey: string; label: Uint8Array; sig: Hex }): CreateOp {
+  return {
+    schema: DeviceSchema,
+    values: {
+      ensName: str(v.ensName),
+      deviceId: str(v.deviceId),
+      devicePublicKey: str(v.devicePublicKey),
+      label: v.label,
+      sig: hexToBytes(v.sig),
+    },
+    expiration: ExpirationTime.fromDays(DEVICE_DAYS),
+    flags: FIXED,
+  };
+}
+
+export function releaseOp(v: {
+  version: string;
+  rootHash: Hex;
+  gitCommit: string;
+  manifestSwarmRef: Hex;
+  siteSwarmRef: string;
+  sig: Hex;
+}): CreateOp {
+  return {
+    schema: ReleaseSchema,
+    values: {
+      version: str(v.version),
+      rootHash: str(v.rootHash),
+      gitCommit: str(v.gitCommit),
+      manifestSwarmRef: str(v.manifestSwarmRef),
+      siteSwarmRef: str(v.siteSwarmRef),
+      sig: hexToBytes(v.sig),
+    },
+    expiration: ExpirationTime.max(),
+    flags: RENEWED,
+  };
+}
+
+export function unreleaseOp(v: { rootHash: Hex; sig: Hex }): CreateOp {
+  return {
+    schema: UnreleaseSchema,
+    values: { rootHash: str(v.rootHash), sig: hexToBytes(v.sig) },
+    expiration: ExpirationTime.max(),
+    flags: RENEWED,
+  };
+}
+
+export function rebuildOp(v: { rootHash: Hex; matched: boolean }): CreateOp {
+  return {
+    schema: RebuildSchema,
+    values: { rootHash: str(v.rootHash), matched: u64(v.matched ? 1 : 0) },
     expiration: ExpirationTime.max(),
     flags: RENEWED,
   };
@@ -619,6 +797,59 @@ export function listTombs(reader: ArkivReader, folder: Address): Promise<Page<To
     ...info(r),
     folder: address(r.folder!),
     fileId: text(r.fileId!),
+  }));
+}
+
+/** Every key-log entry claiming to be about `ensName` (forged ones included: keydir.ts sorts them out). */
+export function listKeyLog(reader: ArkivReader, ensName: string): Promise<Page<KeyLogRecord>> {
+  return fetchAll(reader, KeyLogSchema, eq("ensName", str(ensName)), (r) => ({
+    ...info(r),
+    ensName: text(r.ensName!),
+    seq: num(r.seq!),
+    kind: text(r.kind!),
+    spendingPublicKey: hex(r.spendingPublicKey!),
+    devicePublicKey: text(r.devicePublicKey!),
+    prevEntryKey: text(r.prevEntryKey!),
+    sig: hex(r.sig!),
+  }));
+}
+
+export function listDeviceEntries(reader: ArkivReader, ensName: string): Promise<Page<DeviceRecord>> {
+  return fetchAll(reader, DeviceSchema, eq("ensName", str(ensName)), (r) => ({
+    ...info(r),
+    ensName: text(r.ensName!),
+    deviceId: text(r.deviceId!),
+    devicePublicKey: hex(r.devicePublicKey!),
+    label: blob(r.label!),
+    sig: hex(r.sig!),
+  }));
+}
+
+export function listReleases(reader: ArkivReader): Promise<Page<ReleaseRecord>> {
+  return fetchAll(reader, ReleaseSchema, exists("rootHash"), (r) => ({
+    ...info(r),
+    version: text(r.version!),
+    rootHash: hex(r.rootHash!),
+    gitCommit: text(r.gitCommit!),
+    manifestSwarmRef: hex(r.manifestSwarmRef!),
+    siteSwarmRef: text(r.siteSwarmRef!),
+    sig: hex(r.sig!),
+  }));
+}
+
+export function listUnreleases(reader: ArkivReader): Promise<Page<UnreleaseRecord>> {
+  return fetchAll(reader, UnreleaseSchema, exists("rootHash"), (r) => ({
+    ...info(r),
+    rootHash: hex(r.rootHash!),
+    sig: hex(r.sig!),
+  }));
+}
+
+export function listRebuilds(reader: ArkivReader, rootHash: Hex): Promise<Page<RebuildRecord>> {
+  return fetchAll(reader, RebuildSchema, eq("rootHash", str(rootHash)), (r) => ({
+    ...info(r),
+    rootHash: hex(r.rootHash!),
+    matched: num(r.matched!) === 1,
   }));
 }
 

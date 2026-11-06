@@ -102,11 +102,27 @@ export interface RosterMember {
   /** The ENS name the sharer typed. Only managers can read it. */
   label: string | null;
   via: "direct" | "group";
+  /** Add-on F2: the ENS parent whose subtree rule added this member ("acme.eth"). Managers only. */
+  rule?: string;
+  /** Add-on F2: who controlled the member's ENS name when they were added (a transfer means re-share). */
+  holder?: Address;
+}
+
+/** Add-on F2: "share with everyone under <parent>". Lives only inside the sealed roster, never onchain. */
+export interface SubtreeRuleData {
+  parent: string;
+  role: Role;
+  until: number | null;
+  excluded: string[];
+  hideFromMembers: boolean;
+  syncedAt: number;
 }
 
 export interface Roster {
   managers: RosterMember[];
   members: RosterMember[];
+  /** Add-on F2. Sealed with the managers part, so only managers can read it. */
+  subtrees?: SubtreeRuleData[];
 }
 
 const rosterAad = (part: "managers" | "members", folder: Address, version: number) =>
@@ -121,7 +137,30 @@ function encodeMembers(list: RosterMember[]) {
     h: m.hiddenFromMembers,
     l: m.label,
     v: m.via,
+    ...(m.rule ? { g: m.rule } : {}),
+    ...(m.holder ? { o: getAddress(m.holder) } : {}),
   }));
+}
+
+function encodeRules(list: SubtreeRuleData[]) {
+  return list.map((r) => ({ p: r.parent, r: r.role, u: r.until, x: r.excluded, h: r.hideFromMembers, t: r.syncedAt }));
+}
+
+function decodeRules(value: unknown): SubtreeRuleData[] {
+  if (!Array.isArray(value)) throw new Error("malformed roster");
+  return value.map((r: Record<string, unknown>) => {
+    if (!isText(r.p, 255) || !["viewer", "editor", "manager"].includes(r.r as string)) throw new Error("malformed roster");
+    if (r.u !== null && (typeof r.u !== "number" || !Number.isSafeInteger(r.u))) throw new Error("malformed roster");
+    if (!Array.isArray(r.x) || !r.x.every((x) => isText(x, 255))) throw new Error("malformed roster");
+    return {
+      parent: r.p,
+      role: r.r as Role,
+      until: r.u as number | null,
+      excluded: r.x as string[],
+      hideFromMembers: r.h === true,
+      syncedAt: typeof r.t === "number" ? r.t : 0,
+    };
+  });
 }
 
 function decodeMembers(value: unknown): RosterMember[] {
@@ -140,13 +179,20 @@ function decodeMembers(value: unknown): RosterMember[] {
       hiddenFromMembers: m.h === true,
       label: m.l as string | null,
       via: m.v === "group" ? "group" : "direct",
+      ...(isText(m.g, 255) ? { rule: m.g } : {}),
+      ...(typeof m.o === "string" ? { holder: getAddress(m.o) } : {}),
     };
   });
 }
 
 export async function sealRoster(rosterKey: Uint8Array, folder: Address, version: number, roster: Roster) {
   return {
-    managers: await sealJson(rosterKey, encodeMembers(roster.managers), rosterAad("managers", folder, version)),
+    // The managers part carries the subtree rules too, so a rule's existence isn't visible from entity sizes alone.
+    managers: await sealJson(
+      rosterKey,
+      roster.subtrees?.length ? { m: encodeMembers(roster.managers), s: encodeRules(roster.subtrees) } : encodeMembers(roster.managers),
+      rosterAad("managers", folder, version),
+    ),
     members: await sealJson(rosterKey, encodeMembers(roster.members), rosterAad("members", folder, version)),
   };
 }
@@ -157,10 +203,11 @@ export async function openRoster(
   version: number,
   sealed: { managers: Uint8Array; members: Uint8Array },
 ): Promise<Roster> {
-  return {
-    managers: decodeMembers(await openJson(rosterKey, sealed.managers, rosterAad("managers", folder, version))),
-    members: decodeMembers(await openJson(rosterKey, sealed.members, rosterAad("members", folder, version))),
-  };
+  const managers = await openJson(rosterKey, sealed.managers, rosterAad("managers", folder, version));
+  const members = decodeMembers(await openJson(rosterKey, sealed.members, rosterAad("members", folder, version)));
+  if (Array.isArray(managers)) return { managers: decodeMembers(managers), members };
+  const m = managers as { m?: unknown; s?: unknown };
+  return { managers: decodeMembers(m.m), members, subtrees: decodeRules(m.s) };
 }
 
 // ---------------------------------------------------------------- link bundle

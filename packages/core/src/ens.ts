@@ -287,6 +287,88 @@ export async function getSubregistry(client: SepoliaReader, registry: Address, l
   }
 }
 
+// ---------------------------------------------------------------- who controls a name (add-ons F1, F2)
+
+/** "priya.acme.eth" → { label: "priya", parent: "acme.eth" }; null for a top-level name. */
+export function splitName(name: string): { label: string; parent: string } | null {
+  const i = name.indexOf(".");
+  if (i <= 0 || i === name.length - 1) return null;
+  return { label: name.slice(0, i), parent: name.slice(i + 1) };
+}
+
+/** A user name we issue: <label>.cloakroom.eth (exactly three labels). */
+export function isCloakroomUserName(name: string): boolean {
+  const parts = name.split(".");
+  return parts.length === 3 && parts[1] === "cloakroom" && parts[2] === "eth" && parts[0] !== "rooms";
+}
+
+export interface NameHolding {
+  /** The token owner now; null when the name is unregistered or expired. */
+  owner: Address | null;
+  expiry: number;
+}
+
+const REGISTERED = 2; // IPermissionedRegistry.Status: AVAILABLE 0, RESERVED 1, REGISTERED 2
+
+/** Who holds `label` in `registry` right now (live: status, expiry and ownerOf). */
+export async function holderIn(client: SepoliaReader, registry: Address, label: string): Promise<NameHolding> {
+  const id = labelId(label);
+  try {
+    const [status, expiry, tokenId] = await Promise.all([
+      client.readContract({ address: registry, abi: driveRegistryAbi, functionName: "getStatus", args: [id] }),
+      client.readContract({ address: registry, abi: driveRegistryAbi, functionName: "getExpiry", args: [id] }),
+      client.readContract({ address: registry, abi: driveRegistryAbi, functionName: "getTokenId", args: [id] }),
+    ]);
+    const live = status === REGISTERED && Number(expiry) > Math.floor(Date.now() / 1000);
+    if (!live) return { owner: null, expiry: Number(expiry) };
+    const owner = await client.readContract({ address: registry, abi: driveRegistryAbi, functionName: "ownerOf", args: [tokenId] });
+    return { owner: isAddressEqual(owner, zeroAddress) ? null : getAddress(owner), expiry: Number(expiry) };
+  } catch (error) {
+    throw toDriveError(error, `holder of ${label}`);
+  }
+}
+
+/**
+ * The account whose signature counts for a name's public key log:
+ *   <label>.cloakroom.eth → the drive key K that owns its drive root (the key the user's app holds);
+ *   any other ENSv2 name  → its current token owner in the parent's registry (a wallet).
+ * null when the name doesn't exist or has expired.
+ */
+export async function nameController(client: SepoliaReader, name: string): Promise<Address | null> {
+  const n = normalize(name);
+  if (isCloakroomUserName(n)) {
+    const root = await findRegistry(client, n);
+    return root ? driveOwner(client, root) : null;
+  }
+  const split = splitName(n);
+  if (!split) return null;
+  const parentRegistry = await findRegistry(client, split.parent);
+  if (!parentRegistry) return null;
+  return (await holderIn(client, parentRegistry, split.label)).owner;
+}
+
+/**
+ * The block a contract was deployed in, by binary search over eth_getCode (needs a provider that serves past state,
+ * as Alchemy and Infura do). Used to start a log scan of someone else's registry at its first block.
+ */
+export async function creationBlock(client: SepoliaReader, address: Address): Promise<bigint> {
+  let hi = await client.getBlockNumber();
+  const code = await client.getCode({ address, blockNumber: hi });
+  if (!code || code === "0x") throw new DriveError("NOT_FOUND", `no contract at ${address}`);
+  let lo = 0n;
+  try {
+    while (lo < hi) {
+      const mid = (lo + hi) / 2n;
+      const at = await client.getCode({ address, blockNumber: mid });
+      if (at && at !== "0x") hi = mid;
+      else lo = mid + 1n;
+    }
+  } catch (error) {
+    throw toDriveError(error, "finding when a registry was created (the Sepolia RPC must serve past state)");
+  }
+  return lo;
+}
+
 export interface ChildName {
   label: string;
   /** The registry the label points to now, or null (expired, unregistered, or not a folder, e.g. a link). */

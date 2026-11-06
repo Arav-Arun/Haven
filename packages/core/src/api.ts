@@ -138,4 +138,6 @@ export interface ApiInfo {
   relayer: Address;
   roomPowDifficulty: number;
   dripBatchSeconds: number;
+  /** Add-on F4: our Bee node's overlay and the proximity GSOC keys are mined to; null when doorbells are off. */
+  doorbell: { overlay: Hex; proximity: number } | null;
 }

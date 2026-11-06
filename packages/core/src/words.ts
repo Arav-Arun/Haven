@@ -1,0 +1,38 @@
+// The fixed, public word list for key fingerprints (keydir.ts): 256 short, distinct, easy-to-say English words, one per
+// byte value. Two people compare the same eight words in person. Changing this list changes every fingerprint, so it
+// is frozen.
+
+export const FINGERPRINT_WORDS: readonly string[] = [
+  "acorn", "adobe", "agent", "album", "alley", "amber", "anchor", "angle",
+  "ankle", "apple", "apron", "arch", "arena", "arrow", "aspen", "atlas",
+  "attic", "audio", "autumn", "avenue", "badge", "bagel", "baker", "bamboo",
+  "banjo", "barn", "basil", "basket", "beach", "beacon", "bear", "bell",
+  "bench", "berry", "bicycle", "birch", "biscuit", "blanket", "blossom", "boat",
+  "bonnet", "bottle", "branch", "bread", "brick", "bridge", "brook", "brush",
+  "bucket", "buffalo", "bugle", "butter", "button", "cabin", "cactus", "camel",
+  "camera", "candle", "canoe", "canyon", "carpet", "carrot", "castle", "cedar",
+  "cello", "chalk", "cherry", "chess", "chimney", "cider", "circle", "citrus",
+  "cliff", "clock", "cloud", "clover", "cobalt", "coconut", "comet", "compass",
+  "copper", "coral", "cotton", "cougar", "crane", "crayon", "cricket", "crown",
+  "crystal", "cumin", "cypress", "daisy", "dancer", "delta", "desert", "diamond",
+  "dolphin", "donkey", "dragon", "drum", "eagle", "easel", "echo", "elbow",
+  "elder", "ember", "engine", "falcon", "feather", "fender", "fern", "ferry",
+  "fiddle", "field", "finch", "flute", "forest", "fossil", "fountain", "fox",
+  "garden", "garlic", "gecko", "ginger", "glacier", "globe", "goose", "granite",
+  "grape", "gravel", "guitar", "hammer", "harbor", "harp", "hazel", "helmet",
+  "heron", "hickory", "honey", "horizon", "husky", "igloo", "indigo", "island",
+  "ivory", "jacket", "jaguar", "jasmine", "jelly", "jungle", "juniper", "kayak",
+  "kettle", "kitten", "koala", "ladder", "lagoon", "lantern", "laurel", "lemon",
+  "lily", "linen", "lizard", "lobster", "locket", "lotus", "magnet", "mango",
+  "maple", "marble", "meadow", "melon", "mirror", "mitten", "monkey", "mosaic",
+  "muffin", "nectar", "needle", "nickel", "noodle", "nutmeg", "oasis", "ocean",
+  "olive", "onion", "orange", "orchid", "otter", "oyster", "paddle", "panda",
+  "papaya", "parrot", "peach", "pebble", "pelican", "pepper", "piano", "pickle",
+  "pillow", "pine", "planet", "plum", "pocket", "pony", "poppy", "potato",
+  "prairie", "pretzel", "puffin", "pumpkin", "quartz", "quill", "rabbit", "radish",
+  "raven", "reef", "ribbon", "river", "robin", "rocket", "saddle", "saffron",
+  "salmon", "sandal", "satin", "scarf", "shell", "silver", "sparrow", "spinach",
+  "spruce", "squash", "summit", "sunset", "swan", "tango", "teapot", "thistle",
+  "thunder", "tiger", "timber", "tomato", "topaz", "trumpet", "tulip", "turtle",
+  "umbrella", "valley", "velvet", "violin", "walnut", "whistle", "willow", "zebra",
+];

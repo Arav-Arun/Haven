@@ -5,13 +5,33 @@
 //   POST /arkiv-rpc   JSON-RPC pass-through to Arkiv that adds the access key server-side
 //   POST /upload      signed by a key with WRITE now; streams padded ciphertext to Bee
 //   GET  /bytes/:ref  read-only Swarm gateway (the Bee node itself stays private)
+//   POST /keylog      add-on F1: relays a signed public key-log or device entry to Arkiv (the signature is checked)
+//   POST /doorbell    add-on F4: stamps a signed GSOC chunk and hands it to Bee (main.ts proxies the subscriptions)
 //   GET  /config, /health
 // It logs nothing about users: only in-memory rate-limit counters, reset daily.
 
 import {
   accessOf,
   arkivEndpoint,
+  arkivReader,
   arkivWriter,
+  checkDevices,
+  checkKeyLog,
+  checkRing,
+  compressKey,
+  deviceIdOf,
+  deviceOp,
+  deviceTypedData,
+  keyLogOp,
+  keyLogTypedData,
+  listDeviceEntries,
+  listKeyLog,
+  nameController,
+  NONE,
+  writeEntities,
+  type DoorbellRing,
+  type KeyLogRelayRequest,
+  type KeyLogRelayResponse,
   checkRoomPow,
   checkUserLabel,
   claimName,
@@ -41,7 +61,21 @@ import {
 import { DriveError, type Address, type Hex } from "@cloakroom/types";
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
-import { createPublicClient, createWalletClient, getAddress, http, isAddress, isAddressEqual, type Chain, type PublicClient, type Transport } from "viem";
+import {
+  createPublicClient,
+  createWalletClient,
+  getAddress,
+  hexToBytes,
+  http,
+  isAddress,
+  isAddressEqual,
+  isHex,
+  recoverTypedDataAddress,
+  type Chain,
+  type PublicClient,
+  type Transport,
+} from "viem";
+import { normalize } from "viem/ens";
 import { privateKeyToAccount } from "viem/accounts";
 import { sepolia } from "viem/chains";
 
@@ -56,6 +90,8 @@ export interface ApiEnv {
   DRIP_SEPOLIA_WEI: bigint;
   DRIP_ARKIV_WEI: bigint;
   DRIP_BATCH_SECONDS: number;
+  /** Add-on F4: leading bits a doorbell's chunk address must share with our Bee node's overlay; null turns doorbells off. */
+  DOORBELL_PROXIMITY: number | null;
 }
 
 /** Reads every setting; a missing one stops the server instead of falling back to a guess. */
@@ -78,6 +114,8 @@ export function readEnv(source: Record<string, string | undefined>): ApiEnv {
     DRIP_SEPOLIA_WEI: BigInt(need("DRIP_SEPOLIA_WEI")),
     DRIP_ARKIV_WEI: BigInt(need("DRIP_ARKIV_WEI")),
     DRIP_BATCH_SECONDS: Number(need("DRIP_BATCH_SECONDS")),
+    // Optional on purpose: empty means "no live updates", and clients fall back to re-reading Arkiv every 30 s.
+    DOORBELL_PROXIMITY: source.DOORBELL_PROXIMITY ? Number(source.DOORBELL_PROXIMITY) : null,
   };
 }
 
@@ -102,7 +140,16 @@ export const ARKIV_METHODS = new Set([
 ]);
 
 const DAY = 86_400;
-const LIMITS = { claimsPerDay: 300, roomsPerDay: 300, uploadBytesPerKeyPerDay: 512 * 1024 * 1024, arkivCallsPerMinute: 600 };
+const LIMITS = {
+  claimsPerDay: 300,
+  roomsPerDay: 300,
+  uploadBytesPerKeyPerDay: 512 * 1024 * 1024,
+  arkivCallsPerMinute: 600,
+  keylogPerNamePerDay: 30,
+  keylogPerDay: 3000,
+  ringsPerAddressPerHour: 240,
+  ringsPerDay: 50_000,
+};
 
 /** In-memory counters that reset on their own: the only state the API keeps. */
 class Counters {
@@ -132,7 +179,8 @@ class Queue {
 
 function fail(c: Context, e: unknown) {
   const code = e instanceof DriveError ? e.code : "UNKNOWN";
-  const status = { NOT_AUTHORIZED: 403, NAME_TAKEN: 409, RATE_LIMITED: 429, TOO_LARGE: 413, NOT_FOUND: 404, EXPIRED: 410 }[code as string] ?? 500;
+  const status =
+    { NOT_AUTHORIZED: 403, NAME_TAKEN: 409, RATE_LIMITED: 429, TOO_LARGE: 413, NOT_FOUND: 404, EXPIRED: 410, KEY_MISMATCH: 409 }[code as string] ?? 500;
   const message = e instanceof Error ? e.message : String(e);
   if (status === 500) console.error(`[api] ${c.req.path}: ${message}`);
   return c.json({ error: { code, message } }, status as 403);
@@ -151,6 +199,7 @@ export function createApi(env: ApiEnv) {
     env.RELAYER_PRIVATE_KEY,
   );
   const arkivUrl = arkivEndpoint(env.ARKIV_RPC_URL, env.ARKIV_ACCESS_KEY);
+  const arkiv = arkivReader({ rpcUrl: env.ARKIV_RPC_URL, accessKey: env.ARKIV_ACCESS_KEY, anon: passthroughAnon() });
   const counters = new Counters();
   const queue = new Queue();
 
@@ -195,9 +244,98 @@ export function createApi(env: ApiEnv) {
 
   app.get("/health", (c) => c.json({ ok: true }));
 
-  app.get("/config", (c) =>
-    c.json<ApiInfo>({ relayer: relayer.address, roomPowDifficulty: env.ROOM_POW_DIFFICULTY, dripBatchSeconds: env.DRIP_BATCH_SECONDS }),
+  // Our Bee node's overlay, read from Bee itself the first time a client asks (so doorbell keys are mined towards it).
+  let overlay: Hex | null = null;
+  const doorbell = async (): Promise<ApiInfo["doorbell"]> => {
+    if (env.DOORBELL_PROXIMITY === null) return null;
+    if (!overlay) {
+      try {
+        const res = await fetch(`${env.BEE_URL.replace(/\/+$/, "")}/addresses`, { signal: AbortSignal.timeout(5000) });
+        const body = (await res.json()) as { overlay?: string };
+        if (res.ok && body.overlay && /^[0-9a-f]{64}$/i.test(body.overlay)) overlay = `0x${body.overlay.toLowerCase()}`;
+      } catch {
+        // Bee unreachable: report doorbells as off rather than guess an overlay
+      }
+    }
+    return overlay ? { overlay, proximity: env.DOORBELL_PROXIMITY } : null;
+  };
+
+  app.get("/config", async (c) =>
+    c.json<ApiInfo>({
+      relayer: relayer.address,
+      roomPowDifficulty: env.ROOM_POW_DIFFICULTY,
+      dripBatchSeconds: env.DRIP_BATCH_SECONDS,
+      doorbell: await doorbell(),
+    }),
   );
+
+  // ---------------- add-on F1: public key log relay. The entry's EIP-712 signature is what makes it valid, so relaying
+  // adds no trust in us: we only refuse what readers would ignore anyway, so the log stays clean.
+  app.post("/keylog", async (c) => {
+    try {
+      const r = (await c.req.json()) as KeyLogRelayRequest;
+      const name = r?.type === "entry" ? r.entry?.ensName : r?.type === "device" ? r.device?.ensName : undefined;
+      if (typeof name !== "string" || name.length > 100 || normalize(name) !== name) throw new DriveError("NOT_AUTHORIZED", "malformed name");
+      if (!isHex(r.sig) || hexToBytes(r.sig).length !== 65) throw new DriveError("NOT_AUTHORIZED", "malformed signature");
+      if (!counters.hit(`keylog:${name}`, 1, LIMITS.keylogPerNamePerDay, DAY)) throw new DriveError("RATE_LIMITED", "too many entries for this name today");
+      if (!counters.hit("keylog", 1, LIMITS.keylogPerDay, DAY)) throw new DriveError("RATE_LIMITED", "daily cap reached");
+      const controller = await nameController(sepoliaClient, name);
+      if (!controller) throw new DriveError("NOT_FOUND", `${name} isn't registered`);
+      const [page, head] = await Promise.all([listKeyLog(arkiv, name), arkiv.getBlockNumber()]);
+      const checked = await checkKeyLog(page.records, controller);
+      if (checked.problem) throw new DriveError("KEY_MISMATCH", `the log for ${name} is broken: ${checked.problem}`);
+      let op;
+      if (r.type === "entry") {
+        const e = r.entry;
+        if (!["publish", "rotate", "revoke-device"].includes(e.kind) || !Number.isSafeInteger(e.seq)) throw new DriveError("NOT_AUTHORIZED", "malformed entry");
+        if (compressKey(e.spendingPublicKey) !== e.spendingPublicKey) throw new DriveError("NOT_AUTHORIZED", "spendingPublicKey must be compressed");
+        if (e.devicePublicKey !== NONE && compressKey(e.devicePublicKey) !== e.devicePublicKey) throw new DriveError("NOT_AUTHORIZED", "devicePublicKey must be compressed");
+        const signer = await recoverTypedDataAddress({ ...keyLogTypedData(e), signature: r.sig });
+        if (!isAddressEqual(signer, controller)) throw new DriveError("NOT_AUTHORIZED", "not signed by the name's controller");
+        const last = checked.chain[checked.chain.length - 1];
+        if (e.seq !== checked.chain.length || e.prevEntryKey.toLowerCase() !== (last ? last.key.toLowerCase() : NONE)) {
+          throw new DriveError("KEY_MISMATCH", `the next entry for ${name} is seq ${checked.chain.length}`);
+        }
+        if (e.seq === 0 && e.kind !== "publish") throw new DriveError("NOT_AUTHORIZED", "seq 0 must be a publish");
+        op = keyLogOp({ ...e, sig: r.sig });
+      } else {
+        const d = r.device;
+        if (d.deviceId !== deviceIdOf(d.devicePublicKey) || compressKey(d.devicePublicKey) !== d.devicePublicKey) throw new DriveError("NOT_AUTHORIZED", "malformed device");
+        if (!isHex(d.label) || hexToBytes(d.label).length > 256) throw new DriveError("NOT_AUTHORIZED", "label too long");
+        const signer = await recoverTypedDataAddress({ ...deviceTypedData(d), signature: r.sig });
+        if (!isAddressEqual(signer, controller)) throw new DriveError("NOT_AUTHORIZED", "not signed by the name's controller");
+        const devices = await checkDevices((await listDeviceEntries(arkiv, name)).records, controller, checked.chain, head);
+        if (devices.some((x) => x.record.deviceId === d.deviceId && x.why === "revoked")) throw new DriveError("NOT_AUTHORIZED", "that device was revoked");
+        op = deviceOp({ ...d, label: hexToBytes(d.label), sig: r.sig });
+      }
+      const { txHash, keys } = await queue.run(() => writeEntities(arkivRelayer, [op], "Key log entry"));
+      return c.json<KeyLogRelayResponse>({ entityKey: keys[0]!, txHash });
+    } catch (e) {
+      return fail(c, e);
+    }
+  });
+
+  // ---------------- add-on F4: doorbells. The ring is a signed SOC of exactly 8 + 256 bytes; we can't tell which folder
+  // it's for (that's the point), so it is rate-limited by chunk owner and stamped with our batch.
+  app.post("/doorbell", async (c) => {
+    try {
+      if (env.DOORBELL_PROXIMITY === null) throw new DriveError("NOT_FOUND", "live updates are off on this server");
+      const ring = (await c.req.json()) as DoorbellRing;
+      if (!(await checkRing(ring))) throw new DriveError("NOT_AUTHORIZED", "malformed or unsigned doorbell");
+      if (!counters.hit(`ring:${ring.owner.toLowerCase()}`, 1, LIMITS.ringsPerAddressPerHour, 3600)) throw new DriveError("RATE_LIMITED");
+      if (!counters.hit("rings", 1, LIMITS.ringsPerDay, DAY)) throw new DriveError("RATE_LIMITED", "daily cap reached");
+      const url = `${env.BEE_URL.replace(/\/+$/, "")}/soc/${ring.owner.slice(2).toLowerCase()}/${ring.id.slice(2).toLowerCase()}?sig=${ring.sig.slice(2)}`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/octet-stream", "swarm-postage-batch-id": env.POSTAGE_BATCH_ID },
+        body: new Uint8Array(hexToBytes(ring.data)),
+      });
+      if (!res.ok) throw new DriveError("NETWORK", `Bee refused the doorbell: HTTP ${res.status}`);
+      return c.json({ ok: true });
+    } catch (e) {
+      return fail(c, e);
+    }
+  });
 
   app.post("/claim", async (c) => {
     try {
@@ -318,5 +456,5 @@ export function createApi(env: ApiEnv) {
     }
   });
 
-  return { app, relayer: relayer.address, close: () => clearInterval(timer), sendBatch, deployment: cloakroom };
+  return { app, relayer: relayer.address, close: () => clearInterval(timer), sendBatch, deployment: cloakroom, doorbellsOn: env.DOORBELL_PROXIMITY !== null };
 }
