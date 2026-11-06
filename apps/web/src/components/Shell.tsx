@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { config } from "@/lib/config";
 import { PERSONA, useDrive } from "@/lib/drive";
+import { NetworkBadge } from "./NetworkBadge";
 
 const NAV: Omit<NavItem, "active">[] = [
   { href: "/drive", label: "My drive", icon: <HardDrive size={20} aria-hidden />, primary: true },
@@ -45,18 +46,17 @@ export function Shell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const now = useNow(5000);
   const pending = receipts.some((r) => !r.done);
+  const who = identity && (
+    <span className="truncate font-medium" title={identity.driveKey}>
+      {identity.ensName ?? "No name yet"}
+    </span>
+  );
   return (
     <AppShell
       nav={NAV.map((n) => ({ ...n, active: path === n.href || path.startsWith(`${n.href}/`) }))}
       Link={Link}
-      status={null}
-      account={
-        identity && (
-          <span className="truncate" title={identity.driveKey}>
-            {identity.ensName ?? "No name yet"}
-          </span>
-        )
-      }
+      status={<NetworkBadge compact />}
+      account={who}
       actions={
         <button
           onClick={() => setOpen(true)}
@@ -76,7 +76,18 @@ export function Shell({ children }: { children: ReactNode }) {
       )}
       <PersonaBar />
       {children}
-      <ReceiptsDrawer open={open} onClose={() => setOpen(false)} receipts={receipts} now={now} />
+      <ReceiptsDrawer
+        open={open}
+        onClose={() => setOpen(false)}
+        receipts={receipts}
+        now={now}
+        footer={
+          <>
+            {who}
+            <NetworkBadge compact />
+          </>
+        }
+      />
     </AppShell>
   );
 }
