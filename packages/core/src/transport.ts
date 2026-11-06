@@ -86,7 +86,7 @@ export function anonTransport(options: AnonTransportOptions): CustomTransport {
 }
 
 /** AnonFetch that is plain fetch (network "off"). Routes show as "direct". For the Node e2e script and tests. */
-export function passthroughAnon(fetchImpl: typeof fetch = globalThis.fetch): AnonFetch {
+export function passthroughAnon(fetchImpl: typeof fetch = globalThis.fetch.bind(globalThis)): AnonFetch {
   const status: AnonStatus = { network: "off", state: "off" };
   return {
     fetch: fetchImpl,

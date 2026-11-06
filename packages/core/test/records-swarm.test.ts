@@ -230,6 +230,25 @@ describe("swarm client", () => {
     expect(progress.at(-1)).toBe(1);
   });
 
+  it("direct calls use the browser's fetch bound to the window (else: Illegal invocation, nothing sent)", async () => {
+    // Browsers throw when fetch is called as a method of another object; Node doesn't, so model the browser here.
+    const real = globalThis.fetch;
+    const strict = function (this: unknown, input: string | URL | Request, init?: RequestInit) {
+      if (this !== undefined && this !== globalThis) throw new TypeError("Failed to execute 'fetch': Illegal invocation");
+      return real(input, init);
+    } as typeof fetch;
+    globalThis.fetch = strict;
+    try {
+      const writer = privateKeyToAccount(generatePrivateKey());
+      const blob = await encryptPadded(randomBytes(32), randomBytes(100));
+      const config = { apiUrl: base, beeUrl: base, anon: anon(false) };
+      const ref = await uploadEncrypted(config, writer, folder, blob);
+      expect(await downloadEncrypted(config, ref)).toEqual(blob);
+    } finally {
+      globalThis.fetch = real;
+    }
+  });
+
   it("refuses unpadded uploads, odd-sized downloads, missing blobs and unauthorised uploads", async () => {
     const writer = privateKeyToAccount(generatePrivateKey());
     const config = { apiUrl: base, beeUrl: base, anon: anon(true) };

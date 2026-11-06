@@ -120,7 +120,9 @@ function httpsRoute(config: SwarmConfig, label: string, isolationKey?: string) {
     };
   }
   return {
-    fetch: config.directFetch ?? globalThis.fetch,
+    // Called as route.fetch(...), so the browser's fetch must be bound: unbound, it throws "Illegal invocation" and
+    // no request is sent at all.
+    fetch: config.directFetch ?? globalThis.fetch.bind(globalThis),
     step: { kind: "route" as const, label, route: "direct" as const, network: status.network },
   };
 }
