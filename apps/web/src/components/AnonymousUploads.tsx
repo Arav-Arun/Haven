@@ -7,67 +7,71 @@ import type { FileProof, HavenClient } from "@haven/core";
 import type { Address, FileEntry } from "@haven/types";
 import { Button, Dialog, ErrorNote, Skeleton } from "@haven/ui";
 import { ShieldCheck } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLoad } from "@/lib/drive";
 
+/**
+ * On by default: a writer joins the folder's writer group by itself the first time it opens the folder (relayed, no
+ * gas), and uploads are anonymous once there are enough writers to hide among. Until then they're signed, and this
+ * says so. `onReady` reports whether the next upload can be anonymous.
+ */
 export function AnonymousUploads({
   client,
   folder,
   on,
   onChange,
+  onReady,
 }: {
   client: HavenClient;
   folder: Address;
   on: boolean;
   onChange: (on: boolean) => void;
+  onReady: (ready: boolean) => void;
 }) {
   const state = useLoad((c) => c.anonymousWriters(folder), [folder]);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<unknown>(null);
+  const tried = useRef<string | null>(null);
   const s = state.data;
-  if (!s || !s.canJoin) return null;
-  const ready = s.joined && s.writers >= s.minimum;
+  const ready = !!s && s.canJoin && s.joined && s.writers >= s.minimum;
 
+  useEffect(() => onReady(ready), [ready, onReady]);
+
+  // Join once per folder, without asking: it's what "on by default" means.
+  useEffect(() => {
+    if (!s || !s.canJoin || s.joined || tried.current === folder) return;
+    tried.current = folder;
+    setJoining(true);
+    client
+      .joinAnonymousWriters(folder)
+      .then(() => state.reload(), setError)
+      .finally(() => setJoining(false));
+  }, [s, folder, client, state]);
+
+  if (!s || !s.canJoin) return null;
   return (
-    <section className="flex flex-col gap-2 rounded-lg border border-line bg-card p-4">
+    <section className="flex flex-col gap-2 rounded-2xl border border-line bg-card px-4 py-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
-          <ShieldCheck size={20} className="mt-0.5 shrink-0 text-ink/70" aria-hidden />
+          <ShieldCheck size={20} className={`mt-0.5 shrink-0 ${ready && on ? "text-private" : "text-ink/60"}`} aria-hidden />
           <div className="min-w-0">
-            <h2 className="font-medium">Anonymous uploads</h2>
+            <h2 className="text-sm font-semibold">{ready && on ? "Anonymous uploads are on" : "Anonymous uploads"}</h2>
             <p className="text-sm text-muted">
-              {!s.joined &&
-                "Upload files that prove they came from one of this folder's writers, without showing which one. Haven relays them, so no gas is needed."}
-              {s.joined &&
+              {joining && "Joining this folder's writer group (no gas needed)…"}
+              {!joining && !s.joined && "Couldn't join the writer group yet; uploads are signed for now."}
+              {!joining &&
+                s.joined &&
                 !ready &&
-                `You're in. Anonymous uploads start once at least ${s.minimum} writers have turned this on (${s.writers} so far).`}
-              {ready && `Your upload could be from any of the ${s.writers} writers who turned this on. Nobody can tell which, not even the owner or Haven.`}
+                `On. Uploads are signed until ${s.minimum} writers have joined (${s.writers} so far), so there's someone to hide among.`}
+              {ready && on && `Your uploads could be from any of the ${s.writers} writers. Nobody can tell which, not even the owner or Haven.`}
+              {ready && !on && "Off. Your uploads are signed by your member address."}
             </p>
           </div>
         </div>
-        {!s.joined && (
-          <Button
-            pending={joining}
-            onClick={async () => {
-              setJoining(true);
-              setError(null);
-              try {
-                await client.joinAnonymousWriters(folder);
-                state.reload();
-              } catch (e) {
-                setError(e);
-              } finally {
-                setJoining(false);
-              }
-            }}
-          >
-            Turn on
-          </Button>
-        )}
         {ready && (
           <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium">
             <input type="checkbox" className="size-4 accent-current" checked={on} onChange={(e) => onChange(e.target.checked)} />
-            Upload anonymously
+            Anonymous
           </label>
         )}
       </div>

@@ -40,7 +40,7 @@ export function Ticket({
           target="_blank"
           rel="noreferrer noopener"
           title={`${address}: view on Etherscan`}
-          className="group flex w-[88px] shrink-0 flex-col items-center justify-center gap-1 px-1.5 text-stamp"
+          className="group flex w-(--stub) shrink-0 flex-col items-center justify-center gap-1 px-1.5 text-stamp"
         >
           <span className="text-[10px] font-medium uppercase leading-none tracking-[0.08em] opacity-70">No.</span>
           <span className="font-display text-[18px] font-bold leading-none tracking-[0.01em] [font-variant-numeric:tabular-nums] group-hover:underline">
@@ -49,7 +49,7 @@ export function Ticket({
           <span className="text-[10px] leading-none underline decoration-stamp/40 underline-offset-2">Etherscan</span>
         </a>
       ) : (
-        <div className="flex w-[88px] shrink-0 flex-col items-center justify-center gap-1 px-1.5 text-stamp" title={address}>
+        <div className="flex w-(--stub) shrink-0 flex-col items-center justify-center gap-1 px-1.5 text-stamp" title={address}>
           <span className="text-[10px] font-medium uppercase leading-none tracking-[0.08em] opacity-70">No.</span>
           <span className="font-display text-[18px] font-bold leading-none tracking-[0.01em] [font-variant-numeric:tabular-nums]">
             {ticketSerial(address)}

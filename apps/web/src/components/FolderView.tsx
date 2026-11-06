@@ -203,7 +203,9 @@ export function FolderView({ client, folder }: { client: HavenClient; folder: Ad
   const [zipProgress, setZipProgress] = useState<number | null>(null);
   const [zipError, setZipError] = useState<unknown>(null);
   const [fileError, setFileError] = useState<unknown>(null);
-  const [anonymous, setAnonymous] = useState(false);
+  // Anonymous uploads are on by default; they apply once the folder has enough writers to hide among.
+  const [anonymous, setAnonymous] = useState(true);
+  const [anonReady, setAnonReady] = useState(false);
   const [proofOf, setProofOf] = useState<FileEntry | null>(null);
   // Anonymous files (add-on Z1): read from the entries the client already checked, so no extra network calls.
   const proved = useLoad(
@@ -218,7 +220,7 @@ export function FolderView({ client, folder }: { client: HavenClient; folder: Ad
         setUploads((u) => [{ id, name: file.name, size: file.size, fraction: 0, state: "uploading" }, ...u]);
         try {
           const progress = (fraction: number) => setUploads((u) => u.map((x) => (x.id === id ? { ...x, fraction } : x)));
-          const entry = anonymous ? await client.uploadAnonymously(folder, file, file.name, progress) : await client.upload(folder, file, file.name, progress);
+          const entry = anonymous && anonReady ? await client.uploadAnonymously(folder, file, file.name, progress) : await client.upload(folder, file, file.name, progress);
           setUploads((u) => u.map((x) => (x.id === id ? { ...x, fraction: 1, state: "done", ref: entry.swarmRef } : x)));
           files.reload();
         } catch (error) {
@@ -226,7 +228,7 @@ export function FolderView({ client, folder }: { client: HavenClient; folder: Ad
         }
       }
     },
-    [client, folder, files, anonymous],
+    [client, folder, files, anonymous, anonReady],
   );
 
   const open = async (file: FileEntry) => {
@@ -304,7 +306,7 @@ export function FolderView({ client, folder }: { client: HavenClient; folder: Ad
 
       {f.refreshPending && <RefreshPendingBanner />}
 
-      {canWrite && f.kind !== "group" && <AnonymousUploads client={client} folder={folder} on={anonymous} onChange={setAnonymous} />}
+      {canWrite && f.kind !== "group" && <AnonymousUploads client={client} folder={folder} on={anonymous} onChange={setAnonymous} onReady={setAnonReady} />}
 
       {canWrite && f.kind !== "group" && (
         <UploadDropzone

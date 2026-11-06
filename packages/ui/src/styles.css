@@ -200,23 +200,25 @@
 
   /* A claim stub: pale blue stock, a perforated tear line on the left, notches top and bottom. */
   .ticket {
+    /* The stub's width: the stub, the two notches and the dotted tear line all use it, so they always line up. */
+    --stub: 96px;
     position: relative;
     background: linear-gradient(155deg, #ffffff, var(--color-ticket) 60%, #edf3ff);
     border: 1px solid var(--color-ticket-edge);
     border-radius: 14px;
     -webkit-mask:
-      radial-gradient(circle 7px at 72px 0, #0000 98%, #000) top / 100% 51% no-repeat,
-      radial-gradient(circle 7px at 72px 100%, #0000 98%, #000) bottom / 100% 51% no-repeat;
+      radial-gradient(circle 7px at var(--stub) 0, #0000 98%, #000) top / 100% 51% no-repeat,
+      radial-gradient(circle 7px at var(--stub) 100%, #0000 98%, #000) bottom / 100% 51% no-repeat;
     mask:
-      radial-gradient(circle 7px at 72px 0, #0000 98%, #000) top / 100% 51% no-repeat,
-      radial-gradient(circle 7px at 72px 100%, #0000 98%, #000) bottom / 100% 51% no-repeat;
+      radial-gradient(circle 7px at var(--stub) 0, #0000 98%, #000) top / 100% 51% no-repeat,
+      radial-gradient(circle 7px at var(--stub) 100%, #0000 98%, #000) bottom / 100% 51% no-repeat;
   }
   .ticket::before {
     content: "";
     position: absolute;
     top: 10px;
     bottom: 10px;
-    left: 71px;
+    left: calc(var(--stub) - 1px);
     border-left: 2px dotted var(--color-ticket-edge);
   }
   .ticket-ended {
