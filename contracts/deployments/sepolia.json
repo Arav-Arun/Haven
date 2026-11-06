@@ -1,0 +1,16 @@
+{
+  "chainId": 11155111,
+  "ensv2": {
+    "_source": "CLOAKROOM_PLAN.md section 6 (docs.ens.domains/learn/deployments, checked 2026-11-06); ensdomains/contracts-v2@48b3e2d. Must be re-checked onchain before deploying: test/DriveRegistry.fork.t.sol checks code and constructor wiring.",
+    "ETHRegistrar": "0xf633e7fc17e2bbe0d0965d18ec1821dcb754a3d3",
+    "ETHRegistry": "0xd4ebcbbdf463c9c45784603db0ddd499bc44a8b4",
+    "RootRegistry": "0xb458d6a3a77919449d03e7a6903c26827c1ec43f",
+    "UserRegistryImpl": "0x9bd8a88719068d09ecee662f36c0e3856708366a",
+    "PermissionedResolverImpl": "0x115eb53f0c60696633855f90b138178fb40b2b2c",
+    "VerifiableFactory": "0xda70306c98e97ece36f997a21368e53298572991",
+    "UniversalResolverV2": "0x24e1d8e068620b647ca097f961a61055f4f42d72",
+    "LabelStore": "0xed8246ff02203a4d4cb262bd78beaa7408a57cae",
+    "ContractNamer": "0x606f2453484f4fa85b6e5fdb0e0bf777064bf9f3"
+  },
+  "cloakroom": {}
+}

@@ -1,6 +1,7 @@
-# Person A: first-hour checks (A1)
+# Person A: checks and "Done when" results
 
-Checks 1, 2, 3, 4, 5, 8 and 9 from `docs/plan/CLOAKROOM_PLAN.md` section 17. ENSv2 source:
+Each Plan A step's "Done when" result, starting with the A1 first-hour checks (1, 2, 3, 4, 5, 8 and 9 from
+`docs/plan/CLOAKROOM_PLAN.md` section 17). A2 is at the end. ENSv2 source:
 `ensdomains/contracts-v2@48b3e2d39513b9dd32ef1850877a29009bc807b9` ("Post Audit Changes (#301)", 2026-07-03), vendored
 as the submodule `contracts/lib/contracts-v2`. Toolchain: Foundry 1.8.7, solc 0.8.28, EVM `cancun`, Node 22.23.4.
 
@@ -96,3 +97,61 @@ throwaway keys only and makes no network calls.
   but that wasn't tested here.
 - **Dependencies:** the kit pins its own `viem` 2.7.9 and `@noble/secp256k1` 1.7.1 internally. Core itself uses
   `viem` 2.57.16.
+
+---
+
+## A2: `DriveRegistry`, part 1
+
+Code: `contracts/src/DriveRegistry.sol`. Tests: `contracts/test/DriveRegistry.t.sol` (unit and fuzz),
+`DriveRegistry.invariant.t.sol` and `DriveRegistry.fork.t.sol`. Run with `cd contracts && forge test`. The ABI and
+addresses go to `packages/core/src/generated.ts` via `pnpm --filter @cloakroom/core gen`. Addresses are kept only in
+`contracts/deployments/sepolia.json`, which was extracted from the plan's section 6 table.
+
+| Done when | Status |
+|---|---|
+| `forge test` passes, including invariants and the fork test | **Partly.** 33 pass: 26 unit/fuzz (1,024 fuzz runs each), the invariant suite (256 runs × 64 calls, 0 unexpected reverts), and the 6 check-2 tests. The **2 fork tests are skipped**: they need `SEPOLIA_RPC_URL` and a pinned `SEPOLIA_FORK_BLOCK` |
+| Implementation verified on Etherscan | Pending: needs Sepolia ETH on the deployer and `ETHERSCAN_API_KEY`. The script is ready: `script/DeployDriveRegistry.s.sol` |
+| Demo proxy on Sepolia: grant → `wasAllowed` true → time passes → false, with the interval still readable | Pending deployment. Shown locally by `test_viewerAccessEndsExactlyAtUntil_andHistoryStaysReadable` and by the fork lifecycle test |
+| `upgradeToAndCall` reverts when called by K | Shown in tests (`test_upgradeReverts_forOwnerAndWallet_withAnyTarget`, a fuzz over any caller, and invariants); onchain demo pending |
+
+### What the contract does beyond the plan, and why
+- **History lives in `_grantRoles` / `_revokeRoles`**, not in the hooks (check 2c).
+- **Managers use ENSv2's own admin bits.** A manager is the three drive roles plus their admin bits, so stock checks
+  decide who may grant.
+- **Owner protection (a plan gap).** In stock ENSv2, an admin of a role can revoke it from *anyone*, so a stealth
+  manager could have locked the owner out of their folder. Now only the owner can revoke or time-limit the owner's
+  drive roles.
+- **A grant never outlives the grantor,** so a manager can't extend its own access or hand out access longer than
+  its own.
+- **Expired roles never revive.** Re-granting an expired account clears its stale roles first; otherwise an old
+  WRITE bit would come back with a new viewer grant.
+- **All drive roles carry an end date.** They go only through `grantRolesUntil`; stock `grantRootRoles` refuses
+  them, and they're refused on token resources.
+- **The freeze has three layers:** the plan's strip in `_getRoles`, an `upgradeToAndCall` that always reverts, and
+  `canUpgradeFrom → false`, so no existing proxy can be upgraded into a DriveRegistry.
+- **History is a ring of 8 intervals per account.** Older intervals are overwritten (the events keep everything),
+  and `wasAllowed` fails closed for those times. Each share uses a fresh stealth address, so real accounts stay well
+  under 8.
+- **`wasAllowedMany`** is a batch view for the validator, so one Anon-RPC round trip checks many entries.
+- **Interface change:** `grantRolesUntil(roleBitmap, account, until)` and `sweep(account)` drop the plan's `resource`
+  argument, because drive roles exist only on the root resource.
+
+### Evidence the tests can fail
+- **Mutation check:** `contracts/test/mutation/mutate.sh` applies 19 mutants, each breaking one rule (the upgrade
+  strip, expiry, stale-role clearing, owner protection, the grantor bound, caller checks, end-boundary
+  off-by-ones, early-end handling, history recording, packing, and so on). The full suite **kills all 19**. The
+  invariant suite alone kills 12, including every history and expiry mutant. Its survivors are either
+  defence-in-depth layers (removing one freeze layer leaves the other two holding) or paths the honest handler never
+  takes; the unit tests cover each of those.
+- **Independent invariant oracle:** after every handler step, the live permission check is recorded. At the end of
+  each run, `wasAllowed` must agree with every past observation. The handler also asserts that a grant or revoke
+  changes live roles by exactly the named roles, and it runs attack moves (a manager on the owner, a grant past the
+  grantor's end, outsider and editor grants) that must all revert.
+
+### Static analysis and size
+- **Slither** (`uvx --python 3.12 --from slither-analyzer slither . --filter-paths "lib/|test/|script/"
+  --exclude-informational --exclude-optimization`): no high or medium findings. There are 5 low results, all the
+  `timestamp` detector. That's expected: access ends by time, and validators can shift timestamps by seconds while
+  access windows are minutes to days.
+- **Runtime size:** 19,847 bytes, a 4,729-byte margin under EIP-170. A7 (inheritance) and A9 (groups) add code, so
+  watch it.

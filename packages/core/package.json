@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "check8": "tsx scripts/check8-fluidkey.ts"
+    "check8": "tsx scripts/check8-fluidkey.ts",
+    "gen": "tsx scripts/gen.ts"
   },
   "dependencies": {
     "@fluidkey/stealth-account-kit": "1.1.1",
