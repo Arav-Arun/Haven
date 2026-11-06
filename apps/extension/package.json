@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@anon-rpc/browser-extension-harness": "0.4.0",
+    "@cloakroom/core": "workspace:*",
     "@cloakroom/platform": "workspace:*",
     "@cloakroom/types": "workspace:*",
     "@cloakroom/ui": "workspace:*",

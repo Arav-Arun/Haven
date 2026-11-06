@@ -1,7 +1,9 @@
 import { addToInbox, readInbox } from "@cloakroom/platform";
 import { describeError } from "@cloakroom/ui/errors";
 import { makeClient, setPersist } from "@/lib/client";
-import { LAST_CHECK_KEY, NEW_SHARES_KEY, type ExtMessage, type PairReply } from "@/lib/messages";
+import { config } from "@/lib/config";
+import { LAST_CHECK_KEY, NEW_SHARES_KEY, type ExtMessage, type KeysReply, type PairReply } from "@/lib/messages";
+import { showOnTab, verifyPage } from "@/lib/verify";
 
 const CHECK_ALARM = "cloakroom-check";
 const MENU_ID = "save-to-cloakroom";
@@ -54,6 +56,33 @@ async function pair(seed: number[], persist: boolean): Promise<PairReply> {
   }
 }
 
+/**
+ * Add-on F3, key custody: the website gets this account's keys only if the code it is running right now matches a
+ * published release. The check runs again at the moment of the request, over everything the page has loaded by then.
+ */
+async function releaseKeys(tabId: number, urls: string[]): Promise<KeysReply> {
+  const result = await verifyPage(urls);
+  await showOnTab(tabId, result);
+  if (result.status !== "verified") {
+    return {
+      ok: false,
+      error:
+        result.status === "mismatch"
+          ? "This page's code doesn't match any published Cloakroom release, so the extension won't give it your keys."
+          : `The page couldn't be checked (${result.reason ?? "unknown reason"}), so the extension won't give it your keys.`,
+      result,
+    };
+  }
+  const client = await makeClient();
+  if (!client) return { ok: false, error: "The Cloakroom client isn't in this build of the extension yet." };
+  const me = await client.restore();
+  if (!me) return { ok: false, error: "The extension isn't signed in. Connect it from the website's Settings first." };
+  const seed = await client.exportSeed();
+  const out = Array.from(seed);
+  seed.fill(0);
+  return { ok: true, seed: out, ensName: me.ensName };
+}
+
 function fileName(url: URL, type: string): string {
   const last = decodeURIComponent(url.pathname.split("/").filter(Boolean).pop() ?? "");
   if (last && /\.[a-z0-9]{2,5}$/i.test(last)) return last;
@@ -92,6 +121,22 @@ export default defineBackground(() => {
     }
     if (msg.type === "seen") {
       chrome.storage.local.set({ [NEW_SHARES_KEY]: 0 }).then(updateBadge).then(() => reply({ ok: true }));
+      return true;
+    }
+    // Add-on F3: only the content script on the configured Cloakroom origin may ask these.
+    const tabId = sender.tab?.id;
+    const fromApp = tabId !== undefined && !!sender.url && new URL(sender.url).origin === config.appOrigin;
+    if (msg.type === "verify-page" && fromApp) {
+      verifyPage(msg.urls)
+        .then(async (result) => {
+          await showOnTab(tabId, result);
+          reply(result);
+        })
+        .catch((e) => reply({ status: "unknown", reason: describeError(e).title }));
+      return true;
+    }
+    if (msg.type === "release-keys" && fromApp) {
+      releaseKeys(tabId, msg.urls).then(reply, (e) => reply({ ok: false, error: describeError(e).title } satisfies KeysReply));
       return true;
     }
     return false;

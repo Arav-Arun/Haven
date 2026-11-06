@@ -4,4 +4,6 @@ export { NETWORKS, networkInfo } from "./networks";
 export type { NetworkInfo } from "./networks";
 export { createExtensionStorage, createMemoryStorage, createWebStorage } from "./storage";
 export { addToInbox, readInbox, removeFromInbox } from "./inbox";
+export { detectExtension, onPageVerification, requestVerifiedKeys } from "./extension";
+export type { PageVerification, VerifiedKeys } from "./extension";
 export type { InboxFile } from "./inbox";

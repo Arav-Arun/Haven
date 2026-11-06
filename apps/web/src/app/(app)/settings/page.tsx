@@ -6,6 +6,7 @@ import { Button, ErrorNote, shortAddress } from "@cloakroom/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useExtensionCheck, VerificationLine } from "@/components/ExtensionKeys";
 import { MyDevices } from "@/components/MyDevices";
 import { chooseNetwork, getAnon, selectedNetwork, unavailableReason } from "@/lib/anon";
 import { config } from "@/lib/config";
@@ -19,6 +20,7 @@ import { useInstall } from "@/lib/pwa";
  */
 function ConnectExtension() {
   const { client, identity } = useDrive();
+  const { verification } = useExtensionCheck();
   const [present, setPresent] = useState(false);
   const [persist, setPersist] = useState(false);
   const [pending, setPending] = useState(false);
@@ -45,6 +47,11 @@ function ConnectExtension() {
   return (
     <section className="rounded-lg border border-line bg-card p-5 text-sm">
       <h2 className="font-medium">Browser extension</h2>
+      {present && (
+        <div className="mt-1">
+          <VerificationLine verification={verification} />
+        </div>
+      )}
       {!present ? (
         <p className="mt-1 text-muted">
           Install the Cloakroom extension for Chrome, then reload this page. It adds right-click &quot;Save to Cloakroom&quot;, and

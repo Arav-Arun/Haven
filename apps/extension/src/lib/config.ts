@@ -12,6 +12,7 @@ const raw = {
   WXT_ARKIV_RPC_URL: import.meta.env.WXT_ARKIV_RPC_URL as string | undefined,
   WXT_PRIVATE_NETWORK: import.meta.env.WXT_PRIVATE_NETWORK as string | undefined,
   WXT_DEMO_MODE: import.meta.env.WXT_DEMO_MODE as string | undefined,
+  WXT_RELEASE_SIGNER: import.meta.env.WXT_RELEASE_SIGNER as string | undefined,
 };
 
 export function missingConfig(): string[] {
@@ -31,4 +32,9 @@ export const config = {
   arkivRpcUrl: raw.WXT_ARKIV_RPC_URL ?? "",
   network: (raw.WXT_PRIVATE_NETWORK ?? "off") as PrivateNetwork,
   demoMode: raw.WXT_DEMO_MODE === "true",
+  /**
+   * The release key R's address (add-on F3): only releases it signed count. Without it every page is "unknown" and
+   * keys are never handed to a page.
+   */
+  releaseSigner: /^0x[0-9a-fA-F]{40}$/.test(raw.WXT_RELEASE_SIGNER ?? "") ? (raw.WXT_RELEASE_SIGNER as `0x${string}`) : null,
 };
