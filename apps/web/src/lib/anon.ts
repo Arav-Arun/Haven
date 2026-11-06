@@ -40,7 +40,9 @@ export function getAnon(): AnonFetch {
     platform: "web",
     network: n,
     bootstrapRpcUrl,
-    iframeUrl: "/anon-rpc-iframe.html",
+    // Versioned: browsers that loaded this page before 7 Nov kept it with headers that forbade framing it, and a
+    // revalidation doesn't replace them. A new URL skips those copies; the page is now served no-store.
+    iframeUrl: "/anon-rpc-iframe.html?v=2",
     probeUrl: config.beeUrl ? `${config.beeUrl.replace(/\/$/, "")}/health` : undefined,
     torGateways: config.torGateways,
   });
