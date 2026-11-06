@@ -120,3 +120,18 @@ human in Chrome.
 - Side panel and Firefox: not built (Should and Stretch).
 - Not checked yet, needs Chrome: whether the popup and the background can each start a worker (an extension may
   have only one offscreen document), and whether `permissions.request` from the context-menu click shows its prompt.
+
+## Plan A steps A5 and A6, done on plan-b
+
+At the owner's request, after merging `plan-a` (A1–A4), Plan A's API and client were written here.
+- `packages/core/src/client.ts`: `createDriveClient`, every `DriveClient` method, built on A's library and following
+  the A4 live run. `api.ts`: the signed claim request and the room proof-of-work. Tests: 2 new (claim signatures,
+  proof-of-work); core's 43 non-chain tests pass. The two anvil test files need `forge build` (the ENS submodule).
+- `apps/api` (Hono): `/claim`, `/room`, `/drip`, `/arkiv-rpc`, `/upload`, `/bytes/:ref`, `/config`, `/health`.
+  7 tests: refusals before any network call (unsigned claims, no proof-of-work, disallowed Arkiv methods, unsigned
+  uploads, bad references), config, CORS.
+- `scripts/bootstrap.ts` (implementation, `cloakroom.eth`, `rooms.cloakroom.eth`, relayer registrar) and
+  `scripts/e2e.ts` (the demo story with three random identities; writes `docs/evidence.md`).
+- Both apps now use the real client. The website and extension build with it.
+- **Not run live yet:** needs funded keys, the Arkiv access key, a Bee node or batch, and the deployed API. The order:
+  `bootstrap` → start the API → `e2e`. Until then nothing has been checked against Sepolia, Arkiv or Swarm.
