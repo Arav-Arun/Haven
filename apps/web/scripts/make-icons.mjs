@@ -1,24 +1,16 @@
-// Draws the app icon (a coat-check ticket on spruce) as SVG and as PNGs for the PWA and iOS.
-// Run: node apps/web/scripts/make-icons.mjs. Outputs go to apps/web/public and are committed.
+// Draws Haven's app icon (an arched doorway with a keyhole, on a blue tile) as SVG and as PNGs for the PWA, iOS and
+// the extension. Same shapes as components/landing/Logo.tsx. Run: node apps/web/scripts/make-icons.mjs. Outputs are committed.
 import { writeFileSync } from "node:fs";
 import { crc32, deflateSync } from "node:zlib";
 
 const out = new URL("../public/", import.meta.url);
-const INK = [0x16, 0x30, 0x2a];
-const TICKET = [0xf3, 0xdd, 0xb0];
-const EDGE = [0xd8, 0xb9, 0x7f];
-const STAMP = [0x9c, 0x2b, 0x21];
+const TOP = [0x5b, 0x93, 0xff];
+const BOTTOM = [0x1f, 0x4f, 0xd1];
+const WHITE = [0xff, 0xff, 0xff];
 
-// Geometry on a 512 grid. The ticket fits inside the maskable safe zone (a circle of radius 204.8).
-const T = { x0: 96, y0: 160, x1: 416, y1: 352, r: 18 };
-const NOTCH_X = 192;
-const NOTCH_R = 22;
-const DOTS = Array.from({ length: 6 }, (_, i) => 200 + i * 22);
-const BARS = [
-  { x0: 232, y0: 206, x1: 384, y1: 236, c: STAMP },
-  { x0: 232, y0: 258, x1: 360, y1: 272, c: INK },
-  { x0: 232, y0: 290, x1: 330, y1: 304, c: INK },
-];
+// Geometry on the logo's 64 grid.
+const ARCH = { left: 17, right: 47, cx: 32, cy: 30, r: 15, foot: 50, half: 3.25 };
+const HOLE = { cx: 32, cy: 32, r: 5, top: 34.5, bottom: 44, topHalf: 2.4, bottomHalf: 4 };
 
 function inRoundRect(x, y, { x0, y0, x1, y1, r }) {
   if (x < x0 || x > x1 || y < y0 || y > y1) return false;
@@ -27,15 +19,28 @@ function inRoundRect(x, y, { x0, y0, x1, y1, r }) {
   return (x - cx) ** 2 + (y - cy) ** 2 <= r * r;
 }
 
-function paint(x, y, maskable) {
-  if (!maskable && !inRoundRect(x, y, { x0: 0, y0: 0, x1: 512, y1: 512, r: 112 })) return null;
-  let c = INK;
-  if (inRoundRect(x, y, T) && (x - NOTCH_X) ** 2 + (y - T.y0) ** 2 > NOTCH_R ** 2 && (x - NOTCH_X) ** 2 + (y - T.y1) ** 2 > NOTCH_R ** 2) {
-    c = TICKET;
-    if (DOTS.some((dy) => (x - NOTCH_X) ** 2 + (y - dy) ** 2 <= 25)) c = EDGE;
-    for (const b of BARS) if (inRoundRect(x, y, { ...b, r: 4 })) c = b.c;
+function onMark(x, y) {
+  const d = (ax, ay) => Math.hypot(x - ax, y - ay);
+  const nearLeg = (lx) => (y >= ARCH.cy && y <= ARCH.foot ? Math.abs(x - lx) : Math.min(d(lx, ARCH.cy), d(lx, ARCH.foot)));
+  const nearCurve = y <= ARCH.cy ? Math.abs(d(ARCH.cx, ARCH.cy) - ARCH.r) : Infinity;
+  if (Math.min(nearLeg(ARCH.left), nearLeg(ARCH.right), nearCurve) <= ARCH.half) return true;
+  if (d(HOLE.cx, HOLE.cy) <= HOLE.r) return true;
+  if (y >= HOLE.top && y <= HOLE.bottom) {
+    const t = (y - HOLE.top) / (HOLE.bottom - HOLE.top);
+    return Math.abs(x - HOLE.cx) <= HOLE.topHalf + t * (HOLE.bottomHalf - HOLE.topHalf);
   }
-  return c;
+  return false;
+}
+
+/** Colour at (x, y) on a 512 grid. Maskable icons fill the square and shrink the mark into the safe zone. */
+function paint(x, y, maskable) {
+  if (!maskable && !inRoundRect(x, y, { x0: 0, y0: 0, x1: 512, y1: 512, r: 144 })) return null;
+  const t = y / 512;
+  const bg = TOP.map((v, i) => Math.round(v + (BOTTOM[i] - v) * t));
+  const k = maskable ? 0.78 : 1;
+  const gx = ((x - 256) / k + 256) / 8;
+  const gy = ((y - 256) / k + 256) / 8;
+  return onMark(gx, gy) ? WHITE : bg;
 }
 
 function png(size, maskable) {
@@ -80,14 +85,11 @@ function png(size, maskable) {
   ]);
 }
 
-const hex = (c) => `#${c.map((v) => v.toString(16).padStart(2, "0")).join("")}`;
-const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="${hex(INK)}"/>
-  <mask id="m"><rect x="${T.x0}" y="${T.y0}" width="${T.x1 - T.x0}" height="${T.y1 - T.y0}" rx="${T.r}" fill="#fff"/>
-    <circle cx="${NOTCH_X}" cy="${T.y0}" r="${NOTCH_R}"/><circle cx="${NOTCH_X}" cy="${T.y1}" r="${NOTCH_R}"/></mask>
-  <rect x="${T.x0}" y="${T.y0}" width="${T.x1 - T.x0}" height="${T.y1 - T.y0}" fill="${hex(TICKET)}" mask="url(#m)"/>
-  ${DOTS.map((y) => `<circle cx="${NOTCH_X}" cy="${y}" r="5" fill="${hex(EDGE)}"/>`).join("")}
-  ${BARS.map((b) => `<rect x="${b.x0}" y="${b.y0}" width="${b.x1 - b.x0}" height="${b.y1 - b.y0}" rx="4" fill="${hex(b.c)}"/>`).join("")}
+const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5b93ff"/><stop offset="1" stop-color="#1f4fd1"/></linearGradient></defs>
+  <rect width="64" height="64" rx="18" fill="url(#g)"/>
+  <path d="M17 50V30a15 15 0 0 1 30 0v20" fill="none" stroke="#fff" stroke-width="6.5" stroke-linecap="round"/>
+  <circle cx="32" cy="32" r="5" fill="#fff"/><path d="M29.6 34.5h4.8l1.6 9.5h-8z" fill="#fff"/>
 </svg>
 `;
 
