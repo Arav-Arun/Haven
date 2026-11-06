@@ -2,7 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { connectorsForWallets, RainbowKitProvider } from "@rainbow-me/rainbowkit";
-import { injectedWallet, rainbowWallet, walletConnectWallet } from "@rainbow-me/rainbowkit/wallets";
+import { injectedWallet, metaMaskWallet, phantomWallet, rabbyWallet, rainbowWallet, walletConnectWallet } from "@rainbow-me/rainbowkit/wallets";
 import { useEffect, useState, type ReactNode } from "react";
 import { custom } from "viem";
 import { sepolia } from "viem/chains";
@@ -14,9 +14,16 @@ import { registerServiceWorker } from "@/lib/pwa";
 
 function connectors() {
   return connectorsForWallets(
-    [{ groupName: "Wallets", wallets: config.walletConnectProjectId
-      ? [rainbowWallet, injectedWallet, walletConnectWallet]
-      : [injectedWallet] }],
+    [
+      {
+        groupName: "Popular",
+        // Without a WalletConnect project id only wallets in this browser can connect (no QR codes).
+        wallets: config.walletConnectProjectId
+          ? [metaMaskWallet, phantomWallet, rainbowWallet, rabbyWallet]
+          : [metaMaskWallet, phantomWallet, rabbyWallet],
+      },
+      { groupName: "More", wallets: config.walletConnectProjectId ? [injectedWallet, walletConnectWallet] : [injectedWallet] },
+    ],
     {
       projectId: config.walletConnectProjectId,
       appName: "Haven",

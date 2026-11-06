@@ -2,55 +2,48 @@
 // Every sentence describes what the code does today.
 
 import Link from "next/link";
+import { FileJourney } from "./FileJourney";
 import Image from "next/image";
-import { FrontClouds } from "./Sky";
 import type { ComponentType, ReactNode, SVGProps } from "react";
 import {
   Arrow,
   Check,
-  Clock,
-  Doc,
   Eye,
   EyeOff,
   Hanger,
   Hexagon,
-  Key,
   Layers,
-  Lock,
   Monitor,
   Net,
   Phone,
   Puzzle,
-  Shuffle,
   Tag,
 } from "./icons";
 
 type Icon = ComponentType<SVGProps<SVGSVGElement>>;
 
 const TRACKS = [
-  { name: "ENS", track: "Best Use of ENSv2", feature: "Names & expiring access", logo: "/ens.webp" },
-  { name: "Arkiv", track: "Build on Arkiv", feature: "Encrypted, queryable file records", logo: "/arkive.png" },
-  { name: "Swarm", track: "Arkiv + Swarm bonus", feature: "Storage for encrypted files", logo: "/swarm.png" },
-  { name: "Ethereum Foundation", track: "Best Use of Anon-RPC", feature: "Private network lookups", logo: "/eth.png" },
+  { name: "ENS", feature: "Names & expiring access", logo: "/ens.webp" },
+  { name: "Arkiv", feature: "Encrypted, queryable file records", logo: "/arkive.png" },
+  { name: "Swarm", feature: "Storage for encrypted files", logo: "/swarm.png" },
+  { name: "Ethereum Foundation", feature: "Private network lookups", logo: "/eth.png" },
 ];
 
 export function BuiltOn() {
   return (
     <section aria-labelledby="tracks-heading" className="relative z-10 mx-auto max-w-6xl px-5 pb-10 sm:px-8 sm:pb-14">
       <div className="mb-5 flex flex-col gap-1 text-center">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#4b70ad]">Built for ETHGlobal Mumbai</p>
         <h2 id="tracks-heading" className="text-lg font-semibold tracking-tight text-[#0d1b33]">The technology behind Haven</h2>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {TRACKS.map(({ name, track, feature, logo }) => (
-          <article key={name} className="flex min-h-[120px] items-start gap-3.5 rounded-2xl border border-white/90 bg-white/75 p-4 shadow-[0_8px_24px_-14px_rgb(28_64_140_/_0.22)] backdrop-blur-sm">
+        {TRACKS.map(({ name, feature, logo }) => (
+          <article key={name} className="flex min-h-[120px] items-start gap-3.5 rounded-2xl border border-[#d4dfed] bg-white p-4">
             <div className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[#0d1b33]/5 bg-white">
               <Image src={logo} width={44} height={44} alt="" className="size-full object-contain" />
             </div>
             <div className="min-w-0">
-              <h3 className="text-sm font-semibold leading-snug text-[#0d1b33]">{name}</h3>
-              <p className="mt-0.5 text-[11px] font-medium leading-snug text-[#4772ba]">{track}</p>
-              <p className="mt-2 text-xs leading-relaxed text-[#0d1b33]/60">{feature}</p>
+              <h3 className="text-base font-semibold leading-snug text-[#0d1b33]">{name}</h3>
+              <p className="mt-1 text-sm leading-relaxed text-[#0d1b33]/65">{feature}</p>
             </div>
           </article>
         ))}
@@ -59,92 +52,24 @@ export function BuiltOn() {
   );
 }
 
-function SectionHead({ id, kicker, title, children }: { id: string; kicker: string; title: ReactNode; children?: ReactNode }) {
+function SectionHead({ id, kicker, title, children }: { id: string; kicker?: string; title: ReactNode; children?: ReactNode }) {
   return (
     <div id={id} className="scroll-mt-24">
-      <p className="text-sm font-medium text-[#2563eb]">{kicker}</p>
-      <h2 className="headline mt-3 text-5xl text-[#0d1b33] sm:text-6xl">{title}</h2>
+      {kicker && <p className="text-sm font-medium text-[#2563eb]">{kicker}</p>}
+      <h2 className={`headline text-5xl text-[#0d1b33] sm:text-6xl${kicker ? " mt-3" : ""}`}>{title}</h2>
       {children && <p className="mt-5 max-w-[34rem] text-[17px] leading-relaxed text-[#0d1b33]/70">{children}</p>}
     </div>
   );
 }
 
-const STEPS: { icon: Icon; title: string; body: string; tech: string }[] = [
-  {
-    icon: Key,
-    title: "Sign in once",
-    body: "Your wallet signs one message and your keys are made from it, on your device. No wallet? Try it with a random key.",
-    tech: "On your device",
-  },
-  {
-    icon: Tag,
-    title: "Claim your name",
-    body: "You get yourname.cloakroom.eth. It publishes your public key and points to your drive: an ENS registry only your key controls.",
-    tech: "ENSv2",
-  },
-  {
-    icon: Lock,
-    title: "Encrypt before upload",
-    body: "Each file gets its own AES-256 key and is padded to a fixed size, so even its real size stays private.",
-    tech: "On your device",
-  },
-  {
-    icon: Hexagon,
-    title: "Store the ciphertext",
-    body: "Only padded ciphertext leaves your device. It lives on Swarm, which never sees a name or a key.",
-    tech: "Swarm",
-  },
-  {
-    icon: Layers,
-    title: "Record it",
-    body: "A small entry holds where the file is, with its name and key sealed. Apps count it only if its writer had access at that moment, checked against the chain.",
-    tech: "Arkiv",
-  },
-  {
-    icon: Shuffle,
-    title: "Share with an ENS name",
-    body: "Type investor.eth. Haven makes a new random address for them, gives it access until the date you pick, and leaves a sealed note only they can open.",
-    tech: "ENSv2 + Arkiv",
-  },
-  {
-    icon: Clock,
-    title: "Access ends on its own",
-    body: "Folder keys move forward every hour. Theirs stop at the end date, so new files lock for them with no transaction to send.",
-    tech: "Key chain",
-  },
-];
-
 export function HowItWorks() {
   return (
-    <section className="mx-auto grid max-w-6xl gap-12 px-5 py-24 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-20 lg:py-32">
-      <div className="lg:sticky lg:top-24 lg:self-start">
-        <SectionHead id="how" kicker="How it works" title="How a file travels">
-          From your device to the person you chose, and out of their reach when their time is up. Nothing in between can
-          read it, and nothing on the chain says who it went to.
-        </SectionHead>
+    <section className="mx-auto max-w-6xl px-5 py-24 lg:py-32">
+      <div className="mb-10 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+        <SectionHead id="how" title="How a file travels" />
+        <p className="max-w-sm text-[16px] leading-relaxed text-[#0d1b33]/65">One file. Encrypted on your device, shared with the person you choose.</p>
       </div>
-      <ol className="relative flex flex-col gap-4">
-        <span aria-hidden className="absolute bottom-8 left-[33px] top-8 w-px bg-gradient-to-b from-[#2563eb]/40 via-[#2563eb]/20 to-transparent" />
-        {STEPS.map(({ icon: I, title, body, tech }, i) => (
-          <li key={title} className="glass-soft relative flex gap-5 rounded-[22px] p-5 sm:p-6">
-            <div className="relative flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-b from-[#4a8bff] to-[#2563eb] text-white shadow-[inset_0_1px_0_rgb(255_255_255_/_0.4),0_8px_18px_-8px_rgb(37_99_235_/_0.7)]">
-              <I width={21} height={21} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <h3 className="text-[17px] font-semibold tracking-tight">
-                  <span className="mr-2 tabular-nums text-[#0d1b33]/35">{i + 1}</span>
-                  {title}
-                </h3>
-                <span className="rounded-full border border-[#2563eb]/15 bg-[#2563eb]/[0.06] px-2.5 py-0.5 text-xs font-medium text-[#2563eb]">
-                  {tech}
-                </span>
-              </div>
-              <p className="mt-1.5 text-[15px] leading-relaxed text-[#0d1b33]/65">{body}</p>
-            </div>
-          </li>
-        ))}
-      </ol>
+      <FileJourney />
     </section>
   );
 }
@@ -164,9 +89,8 @@ const UNSEEN = [
 export function Privacy() {
   return (
     <section className="relative overflow-hidden">
-      <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-transparent via-[#dce8fb] to-transparent" />
       <div className="relative mx-auto max-w-6xl px-5 py-24 lg:py-32">
-        <SectionHead id="privacy" kicker="Privacy" title={<>What the world sees, and what it doesn&apos;t</>}>
+        <SectionHead id="privacy" title={<>What the world sees, and what it doesn&apos;t</>}>
           Everything Haven writes is public, so we designed what that public record says. Every folder has a Public view
           that shows exactly this, read live from the chain.
         </SectionHead>
@@ -187,7 +111,7 @@ export function Privacy() {
               ))}
             </ul>
           </div>
-          <div className="relative overflow-hidden rounded-[26px] bg-gradient-to-br from-[#2b62d9] via-[#3a74ea] to-[#5d95f3] p-7 text-white shadow-[0_30px_60px_-28px_rgb(37_99_235_/_0.8)] sm:p-8">
+          <div className="relative overflow-hidden rounded-[26px] border border-[#2563eb] bg-[#2563eb] p-7 text-white sm:p-8">
             <div aria-hidden className="absolute -right-16 -top-16 size-56 rounded-full bg-white/15 blur-2xl" />
             <div className="relative flex items-center gap-3">
               <span className="flex size-10 items-center justify-center rounded-full bg-white/20">
@@ -240,7 +164,7 @@ const TECH: { icon: Icon; name: string; what: string; points: string[] }[] = [
 export function Technology() {
   return (
     <section className="mx-auto max-w-6xl px-5 py-24 lg:py-32">
-      <SectionHead id="tech" kicker="Technology" title="Four open networks, no server that knows">
+      <SectionHead id="tech" title="Four open networks, no server that knows">
         Our API only pays gas and registers names. It never sees a file, a key or who you shared with, and the app shows
         a receipt for every step it takes.
       </SectionHead>
@@ -276,7 +200,7 @@ const APPS: { icon: Icon; name: string; body: string }[] = [
 export function Apps() {
   return (
     <section className="mx-auto max-w-6xl px-5 pb-24 lg:pb-32">
-      <SectionHead id="apps" kicker="Apps" title="Wherever you are" />
+      <SectionHead id="apps" title="Wherever you are" />
       <div className="mt-12 grid gap-5 md:grid-cols-3">
         {APPS.map(({ icon: I, name, body }) => (
           <div key={name} className="glass-soft flex items-start gap-4 rounded-[24px] p-6">
@@ -297,13 +221,12 @@ export function Apps() {
 export function FinalCall({ href, label }: { href: string; label: string }) {
   return (
     <section className="px-2 pb-2 sm:px-4 sm:pb-4">
-      <div className="relative overflow-hidden rounded-[28px] bg-gradient-to-b from-[#3f78e3] via-[#5b8eec] to-[#8fb5f2] px-6 pb-24 pt-14 text-center sm:pb-28 sm:pt-16">
-        <FrontClouds />
+      <div className="relative overflow-hidden rounded-[28px] border border-[#2563eb] bg-[#2563eb] px-6 pb-16 pt-14 text-center sm:pb-20 sm:pt-16">
         <div className="relative z-30 mx-auto max-w-3xl">
-          <h2 className="headline text-5xl text-white drop-shadow-[0_2px_20px_rgb(20_60_150_/_0.35)] sm:text-7xl lg:text-[84px]">
+          <h2 className="headline text-5xl text-white sm:text-7xl lg:text-[84px]">
             Hand over a file. Keep the names to yourself.
           </h2>
-          <Link href={href} className="pill-action mt-8 inline-flex items-center gap-2.5 rounded-full px-7 py-3.5 text-[15px] font-medium">
+          <Link href={href} className="final-action mt-8 inline-flex items-center gap-2.5 rounded-full border border-white bg-white px-7 py-3.5 text-[15px] font-medium text-[#2563eb] transition-colors hover:bg-[#edf4fd]">
             {label}
             <Arrow width={18} height={18} />
           </Link>
