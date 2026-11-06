@@ -47,6 +47,23 @@
     background: rgb(13 27 51 / 0.35);
     backdrop-filter: blur(4px);
   }
+  /* A dialog that arrives out of cloud (CloudSummon): a pale sky behind it, blurring in as the clouds gather. */
+  dialog[data-summon]::backdrop {
+    background: rgb(142 159 192 / 0.42);
+    backdrop-filter: blur(8px);
+    animation: summon-sky 676ms ease-out both;
+  }
+  @keyframes summon-sky {
+    from {
+      background: rgb(142 159 192 / 0);
+      backdrop-filter: blur(0);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    dialog[data-summon]::backdrop {
+      animation: none;
+    }
+  }
 }
 
 @layer components {

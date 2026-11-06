@@ -1,7 +1,8 @@
 "use client";
 
 import { LoaderCircle, TriangleAlert, X } from "lucide-react";
-import { useEffect, useId, useRef, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { CloudSummon, prepareSummon } from "./CloudSummon";
 import { SkyTile } from "./Clouds";
 import { describeError } from "./errors";
 import { cx } from "./format";
@@ -70,34 +71,48 @@ export function Dialog({
   title,
   children,
   wide = false,
+  summon = false,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
   wide?: boolean;
+  /** Arrive out of cloud (CloudSummon) instead of just appearing. */
+  summon?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const body = useRef<HTMLDivElement>(null);
   const titleId = useId();
+  const [clouds, setClouds] = useState(false);
   useEffect(() => {
     const d = ref.current;
     if (!d) return;
-    if (open && !d.open) d.showModal();
+    if (open && !d.open) {
+      const play = summon && !matchMedia("(prefers-reduced-motion: reduce)").matches;
+      // Hide the surface and the form before the first frame shows, so only the clouds appear.
+      if (play) prepareSummon(d, body.current);
+      d.showModal();
+      setClouds(play);
+    }
     if (!open && d.open) d.close();
-  }, [open]);
+    if (!open) setClouds(false);
+  }, [open, summon]);
   return (
     <dialog
       ref={ref}
       onClose={onClose}
       onClick={(e) => e.target === ref.current && onClose()}
       aria-labelledby={titleId}
+      data-summon={summon ? "" : undefined}
       className={cx(
         "m-auto w-[calc(100%-2rem)] rounded-3xl border border-white bg-card p-0 text-ink shadow-[0_30px_70px_-24px_rgb(13_27_51/0.5)]",
         wide ? "max-w-3xl" : "max-w-lg",
       )}
     >
+      {open && clouds && <CloudSummon dialog={ref} content={body} onDone={() => setClouds(false)} />}
       {open && (
-        <div className="flex flex-col gap-4 p-6">
+        <div ref={body} className="relative flex flex-col gap-4 p-6">
           <div className="flex items-start justify-between gap-4">
             <h2 id={titleId} className="text-xl font-bold tracking-[-0.02em]">
               {title}

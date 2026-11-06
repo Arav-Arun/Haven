@@ -71,7 +71,7 @@ export function NewFolderDialog({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} title={parent ? `New folder in ${parent.displayName}` : "New folder"}>
+    <Dialog open={open} onClose={onClose} summon title={parent ? `New folder in ${parent.displayName}` : "New folder"}>
       <form
         className="flex flex-col gap-4"
         onSubmit={(e) => {
