@@ -9,6 +9,9 @@
     "check8": "tsx scripts/check8-fluidkey.ts",
     "gen": "tsx scripts/gen.ts",
     "a4": "tsx scripts/a4-live.ts",
+    "bootstrap": "tsx scripts/bootstrap-sepolia.ts",
+    "a1": "tsx scripts/a1-checks.ts",
+    "rehearse": "tsx scripts/rehearse.ts",
     "test": "vitest run"
   },
   "dependencies": {

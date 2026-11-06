@@ -108,8 +108,8 @@ export function labelId(label: string): bigint {
 
 const LABEL_ALPHABET = "abcdefghijklmnopqrstuvwxyz234567"; // 32 symbols, so each random byte maps without bias
 
-/** A random label such as "f-k2x9q7mz". Random so it reveals nothing and can't be guessed. */
-export function randomLabel(prefix: "f" | "r" | "l" | "g", length = 10): string {
+/** A random label such as "f-k2x9q7mz" (f folder, r room, l link, g group, m mount). Reveals nothing, can't be guessed. */
+export function randomLabel(prefix: "f" | "r" | "l" | "g" | "m", length = 10): string {
   const bytes = randomBytes(length);
   return `${prefix}-${Array.from(bytes, (b) => LABEL_ALPHABET[b & 31]).join("")}`;
 }
