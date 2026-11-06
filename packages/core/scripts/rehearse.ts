@@ -2,7 +2,7 @@
 // deployer and relayer ETH on the fork only, then runs the bootstrap and the A1 checks against a temporary copy of
 // contracts/deployments/sepolia.json (the real file and generated.ts are never touched). Run it before the live run.
 //
-// Run: pnpm --filter @cloakroom/core rehearse     (needs SEPOLIA_RPC_URL, ideally an archive-capable provider)
+// Run: pnpm --filter @haven/core rehearse     (needs SEPOLIA_RPC_URL, ideally an archive-capable provider)
 
 import { spawn, spawnSync } from "node:child_process";
 import { copyFileSync, mkdtempSync, rmSync } from "node:fs";
@@ -19,7 +19,7 @@ const forkUrl = `http://127.0.0.1:${port}`;
 const anvil = spawn("anvil", ["--fork-url", env("SEPOLIA_RPC_URL"), "--port", String(port), "--silent"], {
   stdio: "ignore",
 });
-const dir = mkdtempSync(join(tmpdir(), "cloakroom-rehearsal-"));
+const dir = mkdtempSync(join(tmpdir(), "haven-rehearsal-"));
 const deploymentFile = join(dir, "sepolia.json");
 copyFileSync(resolve(repoRoot, "contracts/deployments/sepolia.json"), deploymentFile);
 

@@ -1,12 +1,12 @@
 // What goes inside the sealed Arkiv attributes. Each sealed value is bound (AES-GCM associated data) to where it lives,
 // so a valid blob can't be copied into another folder, file, version or schema.
 //
-//   cloak.file.meta        { name, mime, size, fileKey }   sealed with E_v[epoch]
-//   cloak.rotation.name    display name                    sealed with E_v[0] (every reader of version v can derive it)
-//   cloak.roster.*         managers / members with MK_S    sealed with HKDF(FS_v, "managers")
-//   cloak.link.bundle      one file's key and pointer      sealed with the link secret from the URL fragment
+//   haven.file.meta        { name, mime, size, fileKey }   sealed with E_v[epoch]
+//   haven.rotation.name    display name                    sealed with E_v[0] (every reader of version v can derive it)
+//   haven.roster.*         managers / members with MK_S    sealed with HKDF(FS_v, "managers")
+//   haven.link.bundle      one file's key and pointer      sealed with the link secret from the URL fragment
 
-import type { Address, Hex, Role } from "@cloakroom/types";
+import type { Address, Hex, Role } from "@haven/types";
 import { getAddress, hexToBytes, isHex, toHex } from "viem";
 
 import { aesDecrypt, aesEncrypt, randomBytes, utf8 } from "./crypto";
@@ -56,7 +56,7 @@ export interface FilePlace {
   swarmRef: Hex;
 }
 
-const fileAad = (p: FilePlace) => aad("cloak.file", p.folder, p.fileId, p.version, p.epoch, p.swarmRef);
+const fileAad = (p: FilePlace) => aad("haven.file", p.folder, p.fileId, p.version, p.epoch, p.swarmRef);
 
 export function sealFileMeta(epochKey: Uint8Array, place: FilePlace, meta: FileMeta): Promise<Uint8Array> {
   if (meta.fileKey.length !== 32) throw new Error("file key must be 32 bytes");
@@ -78,7 +78,7 @@ export async function openFileMeta(epochKey: Uint8Array, place: FilePlace, seale
 
 // ---------------------------------------------------------------- folder name
 
-const nameAad = (folder: Address, version: number) => aad("cloak.rotation", folder, version);
+const nameAad = (folder: Address, version: number) => aad("haven.rotation", folder, version);
 
 export function sealFolderName(epochZeroKey: Uint8Array, folder: Address, version: number, name: string) {
   if (!isText(name, 256)) throw new Error("folder name too long");
@@ -128,7 +128,7 @@ export interface Roster {
 }
 
 const rosterAad = (part: "managers" | "members", folder: Address, version: number) =>
-  aad("cloak.roster", part, folder, version);
+  aad("haven.roster", part, folder, version);
 
 function encodeMembers(list: RosterMember[]) {
   return list.map((m) => ({
@@ -222,7 +222,7 @@ export interface LinkBundle extends FileMeta {
   swarmRef: Hex;
 }
 
-const linkAad = (link: string) => aad("cloak.link", link);
+const linkAad = (link: string) => aad("haven.link", link);
 
 export function sealLinkBundle(linkSecret: Uint8Array, link: string, bundle: LinkBundle) {
   return sealJson(

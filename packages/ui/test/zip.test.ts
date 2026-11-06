@@ -17,7 +17,7 @@ describe("zip", () => {
       ["notes ✓.txt", new Blob(["unicode name"])],
     ]);
     const zip = await makeZip(files);
-    const dir = mkdtempSync(join(tmpdir(), "cloak-zip-"));
+    const dir = mkdtempSync(join(tmpdir(), "haven-zip-"));
     const path = join(dir, "t.zip");
     writeFileSync(path, new Uint8Array(await zip.arrayBuffer()));
     const out = execFileSync("unzip", ["-t", path]).toString();

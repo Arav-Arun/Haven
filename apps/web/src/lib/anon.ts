@@ -1,10 +1,10 @@
 "use client";
 
-import { createAnonFetch, NETWORKS } from "@cloakroom/platform";
-import type { AnonFetch, PrivateNetwork } from "@cloakroom/types";
+import { createAnonFetch, NETWORKS } from "@haven/platform";
+import type { AnonFetch, PrivateNetwork } from "@haven/types";
 import { config } from "./config";
 
-const CHOICE_KEY = "cloakroom:network";
+const CHOICE_KEY = "haven:network";
 const ALL: PrivateNetwork[] = ["nox", "nym", "tor", "off"];
 
 /** Why a network can't be used with this deployment's configuration, or null if it can. */

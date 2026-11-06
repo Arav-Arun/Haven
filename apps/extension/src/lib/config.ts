@@ -1,4 +1,4 @@
-import type { PrivateNetwork } from "@cloakroom/types";
+import type { PrivateNetwork } from "@haven/types";
 
 /**
  * Settings, from WXT_* env at build time (see .env.example). Nothing has a built-in default; missing ones are listed

@@ -1,4 +1,4 @@
-import type { PrivateNetwork } from "@cloakroom/types";
+import type { PrivateNetwork } from "@haven/types";
 
 /**
  * Anon-RPC worker specifiers: protocol constants published in the anon-rpc repo's adopters.json5

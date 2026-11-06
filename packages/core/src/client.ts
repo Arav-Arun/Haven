@@ -27,7 +27,7 @@ import {
   type ShareOptions,
   type SignInSource,
   type Timestamp,
-} from "@cloakroom/types";
+} from "@haven/types";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import {
   bytesToHex,
@@ -45,7 +45,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { sepolia } from "viem/chains";
 import { normalize } from "viem/ens";
 
-import { EXPLORERS, requireDeployed, cloakroom } from "./addresses";
+import { EXPLORERS, requireDeployed, haven } from "./addresses";
 import { signClaim, solveRoomPow, type ApiInfo, type ClaimResponse, type DripResponse, type RoomResponse } from "./api";
 import {
   arkivReader,
@@ -83,7 +83,7 @@ import {
 import { randomBytes, toPrivateKey, utf8 } from "./crypto";
 import { doorbellTopic, mineGsocKey, openDoorbell, sealDoorbell, signRing, type DoorbellConfig, type DoorbellEvent, type GsocKey } from "./doorbell";
 import type {
-  CloakroomClient,
+  HavenClient,
   DeviceInfo,
   KeyInfo,
   LiveEvent,
@@ -119,9 +119,9 @@ import {
   createLinkName,
   driveOwner,
   findRegistry,
-  getCloakKey,
+  getHavenKey,
   grantRoleUntil,
-  isCloakroomUserName,
+  isHavenUserName,
   isLabelAvailable,
   labelId,
   listChildren,
@@ -227,15 +227,15 @@ function compressed(uncompressed: Hex): Hex {
   return bytesToHex(secp256k1.ProjectivePoint.fromHex(uncompressed.slice(2)).toRawBytes(true));
 }
 
-/** The registered owner name of a folder name: f-x.alice.cloakroom.eth → alice.cloakroom.eth. */
+/** The registered owner name of a folder name: f-x.alice.haven.eth → alice.haven.eth. */
 function ownerNameOf(ensName: string): string | null {
   const parts = ensName.split(".");
-  if (parts.length < 3 || ensName.endsWith(".rooms.cloakroom.eth")) return null;
+  if (parts.length < 3 || ensName.endsWith(".rooms.haven.eth")) return null;
   return parts.slice(-3).join(".");
 }
 
 function kindOf(ensName: string): FolderKind {
-  if (ensName.endsWith(".rooms.cloakroom.eth")) return "room";
+  if (ensName.endsWith(".rooms.haven.eth")) return "room";
   return ensName.startsWith("g-") ? "group" : "drive";
 }
 
@@ -294,7 +294,7 @@ function epochKeyFrom(copies: Map<number, KeyCopy>, version: number, epoch: numb
 
 // ---------------------------------------------------------------- the client
 
-class Client implements CloakroomClient {
+class Client implements HavenClient {
   private readonly receipts = new Receipts();
   private readonly clock: BlockClock;
   private keys: IdentityKeys | null = null;
@@ -465,24 +465,24 @@ class Client implements CloakroomClient {
     const hit = this.childCache.get(id);
     if (hit && !fresh && now() - hit.at < 30) return hit.children;
     const children = await listChildren(this.sepolia(), registry, {
-      fromBlock: BigInt(cloakroom.driveRegistryImplBlock ?? 0),
+      fromBlock: BigInt(haven.driveRegistryImplBlock ?? 0),
     });
     this.childCache.set(id, { at: now(), children });
     return children;
   }
 
-  /** The name a wallet (or a passkey/"Try it" drive key) claimed, found from cloakroom.eth's registrations. */
+  /** The name a wallet (or a passkey/"Try it" drive key) claimed, found from haven.eth's registrations. */
   private async nameOwnedBy(owner: Address): Promise<string | null> {
     const app = requireDeployed("appRegistry");
     const mine = (await this.children(app, true)).filter((c) => isAddressEqual(c.owner, owner) && c.registry);
     const last = mine.sort((a, b) => Number(b.blockNumber - a.blockNumber))[0];
-    return last ? `${last.label}.cloakroom.eth` : null;
+    return last ? `${last.label}.haven.eth` : null;
   }
 
   async needsSecondSignature(address: Address): Promise<boolean> {
     const name = await this.nameOwnedBy(getAddress(address));
     if (!name) return true;
-    return (await getCloakKey(this.sepolia(), name)) === null;
+    return (await getHavenKey(this.sepolia(), name)) === null;
   }
 
   private identity(): Identity {
@@ -498,7 +498,7 @@ class Client implements CloakroomClient {
   private async loadName(keys: IdentityKeys) {
     const name = await this.nameOwnedBy(keys.wallet ?? keys.driveAddress);
     if (name) {
-      assertMatchesPublished(keys, await getCloakKey(this.sepolia(), name));
+      assertMatchesPublished(keys, await getHavenKey(this.sepolia(), name));
       this.driveRoot = await findRegistry(this.sepolia(), name);
     }
     this.ensName = name;
@@ -571,7 +571,7 @@ class Client implements CloakroomClient {
 
   async claimName(label: string): Promise<Identity> {
     const keys = this.requireKeys();
-    return this.receipts.run(`Claim ${label}.cloakroom.eth`, async (step) => {
+    return this.receipts.run(`Claim ${label}.haven.eth`, async (step) => {
       checkUserLabel(label);
       const k = privateKeyToAccount(keys.driveKey);
       const request = await signClaim(k, {
@@ -588,7 +588,7 @@ class Client implements CloakroomClient {
         api: claimed.api,
         spendingPublicKey: keys.spendingPublicKey,
       });
-      step({ kind: "check", label: "The API kept no role, and cloak.key is your key", detail: claimed.ensName, ok: true });
+      step({ kind: "check", label: "The API kept no role, and haven.key is your key", detail: claimed.ensName, ok: true });
       this.ensName = claimed.ensName;
       this.driveRoot = claimed.driveRoot;
       await this.cfg.storage.set(STORE.name, json(claimed.ensName));
@@ -838,7 +838,7 @@ class Client implements CloakroomClient {
       for (let n = 0; ; n++) {
         const c = byOwner.get(lower(privateKeyToAccount(roomKey(keys, n)).address));
         if (!c) break;
-        found.push({ registry: c.registry!, holding: this.roomHolding(c.registry!, n, `${c.label}.rooms.cloakroom.eth`) });
+        found.push({ registry: c.registry!, holding: this.roomHolding(c.registry!, n, `${c.label}.rooms.haven.eth`) });
       }
       await this.cfg.storage.set(STORE.rooms, json(found.length));
     } else {
@@ -1119,28 +1119,28 @@ class Client implements CloakroomClient {
   async lookupRecipient(input: string): Promise<{ ensName: string; canReceive: boolean }> {
     const name = normName(input);
     const r = await this.readKeyLog(name).catch(() => null);
-    const canReceive = !!r && !r.checked.problem && !!r.current && ensAgreement(r.current, r.cloakKey) !== "mismatch";
+    const canReceive = !!r && !r.checked.problem && !!r.current && ensAgreement(r.current, r.havenKey) !== "mismatch";
     return { ensName: name, canReceive };
   }
 
   // ------------------------------------------------------------ F1: public key directory (keydir.ts)
 
-  /** A name's key log, checked: controller now, valid chain, ignored (forged) entries, and the cloak.key record. */
+  /** A name's key log, checked: controller now, valid chain, ignored (forged) entries, and the haven.key record. */
   private async readKeyLog(name: string, step?: StepSink, isolationKey?: string) {
     const sep = this.sepolia(step, isolationKey);
-    const [controller, page, cloakKey] = await Promise.all([
+    const [controller, page, havenKey] = await Promise.all([
       nameController(sep, name).catch(() => null),
       listKeyLog(this.arkiv(step, isolationKey), name),
-      getCloakKey(sep, name).catch(() => null),
+      getHavenKey(sep, name).catch(() => null),
     ]);
     const checked = await checkKeyLog(page.records, controller);
-    return { name, controller, checked, cloakKey, current: currentKey(checked.chain) };
+    return { name, controller, checked, havenKey, current: currentKey(checked.chain) };
   }
 
   async lookupKey(name: string): Promise<KeyInfo> {
     const r = await this.readKeyLog(normName(name));
     const times = await this.clock.timesOf(r.checked.chain.map((e) => e.createdAtBlock));
-    const ensRecord = ensAgreement(r.current, r.cloakKey);
+    const ensRecord = ensAgreement(r.current, r.havenKey);
     return {
       ensName: r.name,
       current: r.current,
@@ -1165,16 +1165,16 @@ class Client implements CloakroomClient {
     const r = await this.readKeyLog(normName(name));
     if (r.checked.problem) throw keyProblem(r.name, "broken", r.checked.problem);
     if (!r.current) throw keyProblem(r.name, "missing");
-    if (ensAgreement(r.current, r.cloakKey) === "mismatch") throw keyProblem(r.name, "mismatch");
+    if (ensAgreement(r.current, r.havenKey) === "mismatch") throw keyProblem(r.name, "mismatch");
     await this.keyMemory.remember(r.name, r.current, now());
   }
 
-  /** Rules 1–3 before any share: a valid chain, agreement with cloak.key, and no unconfirmed change. */
+  /** Rules 1–3 before any share: a valid chain, agreement with haven.key, and no unconfirmed change. */
   private async requireTrustedKey(name: string, step?: StepSink, isolationKey?: string): Promise<Hex> {
     const r = await this.readKeyLog(name, step, isolationKey);
     if (r.checked.problem) throw keyProblem(r.name, "broken", r.checked.problem);
     if (!r.current) throw keyProblem(r.name, "missing");
-    if (ensAgreement(r.current, r.cloakKey) === "mismatch") throw keyProblem(r.name, "mismatch");
+    if (ensAgreement(r.current, r.havenKey) === "mismatch") throw keyProblem(r.name, "mismatch");
     if (await this.keyMemory.changed(r.name, r.current)) {
       const last = r.checked.chain[r.checked.chain.length - 1];
       const at = last ? await this.clock.timeOf(last.createdAtBlock).catch(() => 0) : 0;
@@ -1223,7 +1223,7 @@ class Client implements CloakroomClient {
     return { pub, id: deviceIdOf(pub) };
   }
 
-  /** This device's entry in cloak.device: written when missing or close to expiring. "revoked" when the log says so. */
+  /** This device's entry in haven.device: written when missing or close to expiring. "revoked" when the log says so. */
   private async ensureDevice(step?: StepSink): Promise<"ok" | "revoked"> {
     const keys = this.requireKeys();
     if (!this.ensName) return "ok";
@@ -1290,7 +1290,7 @@ class Client implements CloakroomClient {
   async linkName(name: string, signTypedData: SignTypedData): Promise<KeyInfo> {
     const keys = this.requireKeys();
     const n = normName(name);
-    if (isCloakroomUserName(n)) throw new DriveError("NOT_AUTHORIZED", "Names under cloakroom.eth are linked when they're claimed.");
+    if (isHavenUserName(n)) throw new DriveError("NOT_AUTHORIZED", "Names under haven.eth are linked when they're claimed.");
     await this.receipts.run(`Link ${n}`, async (step) => {
       const r = await this.readKeyLog(n, step);
       if (!r.controller) throw new DriveError("NOT_FOUND", `${n} isn't registered, or has expired.`);
@@ -1470,7 +1470,7 @@ class Client implements CloakroomClient {
     const client = this.sepolia(step, isolationKey);
     const event = driveRegistryAbi.find((e) => e.type === "event" && e.name === "AccessGranted");
     if (!event || event.type !== "event") throw new Error("AccessGranted missing from the ABI");
-    const logs = await client.getLogs({ address: folder, event, fromBlock: BigInt(cloakroom.driveRegistryImplBlock ?? 0) });
+    const logs = await client.getLogs({ address: folder, event, fromBlock: BigInt(haven.driveRegistryImplBlock ?? 0) });
     const accounts = [...new Set(parseEventLogs({ abi: driveRegistryAbi, eventName: "AccessGranted", logs }).map((l) => getAddress(l.args.account)))];
     const out: { address: Address; roles: bigint; until: Timestamp | null }[] = [];
     for (const address of accounts) {
@@ -1610,7 +1610,7 @@ class Client implements CloakroomClient {
     const r = await this.readKeyLog(name, undefined, isolationKey);
     if (r.checked.problem) return { key: null, why: "its public key log is broken" };
     if (!r.current) return { key: null, why: "no Haven key yet" };
-    if (ensAgreement(r.current, r.cloakKey) === "mismatch") return { key: null, why: "its key doesn't match its cloak.key record" };
+    if (ensAgreement(r.current, r.havenKey) === "mismatch") return { key: null, why: "its key doesn't match its haven.key record" };
     return { key: r.current };
   }
 
@@ -2217,13 +2217,13 @@ class Client implements CloakroomClient {
     const bytesOf = (r: Record<string, unknown>) =>
       Object.values(r).reduce<number>((n, v) => n + (v instanceof Uint8Array ? v.length : 0), 0);
     const arkiv = [
-      ...rotations.records.map((r) => ({ r, schema: "cloak.rotation" })),
-      ...rosters.records.map((r) => ({ r, schema: "cloak.roster" })),
-      ...files.records.map((r) => ({ r, schema: "cloak.file" })),
-      ...tombs.records.map((r) => ({ r, schema: "cloak.tomb" })),
-      ...refreshes.records.map((r) => ({ r, schema: "cloak.refresh" })),
-      ...copies.records.map((r) => ({ r, schema: "cloak.keycopy" })),
-      ...welcomes.records.map((r) => ({ r, schema: "cloak.welcome" })),
+      ...rotations.records.map((r) => ({ r, schema: "haven.rotation" })),
+      ...rosters.records.map((r) => ({ r, schema: "haven.roster" })),
+      ...files.records.map((r) => ({ r, schema: "haven.file" })),
+      ...tombs.records.map((r) => ({ r, schema: "haven.tomb" })),
+      ...refreshes.records.map((r) => ({ r, schema: "haven.refresh" })),
+      ...copies.records.map((r) => ({ r, schema: "haven.keycopy" })),
+      ...welcomes.records.map((r) => ({ r, schema: "haven.welcome" })),
     ].map(({ r, schema }) => ({
       key: r.key,
       schema,
@@ -2284,7 +2284,7 @@ class Client implements CloakroomClient {
 }
 
 /** The one DriveClient. Every value it returns is read live from Sepolia, Arkiv and Swarm. */
-export function createDriveClient(config: DriveConfig): CloakroomClient {
+export function createDriveClient(config: DriveConfig): HavenClient {
   return new Client(config);
 }
 

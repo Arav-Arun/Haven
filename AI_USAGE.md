@@ -1,6 +1,6 @@
 # How AI was used
 
-Cloakroom was built by two people, each working with a Claude coding agent (Claude Code) on their own laptop, on
+Haven was built by two people, each working with a Claude coding agent (Claude Code) on their own laptop, on
 separate branches merged later.
 
 **Planning (both).** The design in `docs/plan/` was written with Claude from the prize briefs and the partners' docs.

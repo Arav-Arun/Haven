@@ -52,6 +52,6 @@ export function useInstall(): { state: InstallState; install: () => Promise<void
   };
 }
 
-// Files shared into the app from Android's share sheet are parked by sw.js in the inbox from @cloakroom/platform.
-export { readInbox as readSharedFiles, removeFromInbox as removeSharedFile } from "@cloakroom/platform";
-export type { InboxFile as SharedFile } from "@cloakroom/platform";
+// Files shared into the app from Android's share sheet are parked by sw.js in the inbox from @haven/platform.
+export { readInbox as readSharedFiles, removeFromInbox as removeSharedFile } from "@haven/platform";
+export type { InboxFile as SharedFile } from "@haven/platform";

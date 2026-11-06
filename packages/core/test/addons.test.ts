@@ -1,6 +1,6 @@
 // Add-ons F1–F4: the pure rules (no network). Live behaviour is covered by scripts/e2e.ts once deployed.
 
-import type { Address, Hex } from "@cloakroom/types";
+import type { Address, Hex } from "@haven/types";
 import { bytesToHex, hexToBytes, namehash, toHex } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { secp256k1 } from "@noble/curves/secp256k1";
@@ -70,7 +70,7 @@ describe("F1 key log", () => {
   const controller = privateKeyToAccount(K).address;
   const spend1 = pubOf(generatePrivateKey());
   const spend2 = pubOf(generatePrivateKey());
-  const name = "investor.cloakroom.eth";
+  const name = "investor.haven.eth";
 
   async function validChain() {
     const e0 = await entry(K, nextEntry([], { ensName: name, kind: "publish", spendingPublicKey: spend1 }));
@@ -131,7 +131,7 @@ describe("F1 key log", () => {
     expect((await checkKeyLog([e0!, e1!, fork], controller)).problem).toMatch(/two entries claim seq 1/);
   });
 
-  it("blocks sharing when the log doesn't match cloak.key", () => {
+  it("blocks sharing when the log doesn't match haven.key", () => {
     expect(ensAgreement(compressKey(spend1), spend1)).toBe("match");
     expect(ensAgreement(compressKey(spend1), spend2)).toBe("mismatch");
     expect(ensAgreement(compressKey(spend1), null)).toBe("none");
@@ -217,7 +217,7 @@ describe("F2 subtree sync", () => {
     expect(t.remove).toEqual([raj]);
     expect(t.add.map((h) => h.controller)).toEqual([newOwner]);
     // members added by hand or by another rule are left alone
-    expect(planSync(rule, [member("bob.cloakroom.eth", a1, "other.eth")], []).remove).toEqual([]);
+    expect(planSync(rule, [member("bob.haven.eth", a1, "other.eth")], []).remove).toEqual([]);
   });
 
   it("replaces a member's share when their public key changes, and keeps it while it doesn't", () => {
@@ -345,7 +345,7 @@ describe("F3 release manifests", () => {
   });
 
   it("maps page URLs to exported files", () => {
-    const o = "https://app.cloakroom.test";
+    const o = "https://app.haven.test";
     expect(manifestPath(`${o}/`, o)).toBe("index.html");
     expect(manifestPath(`${o}/drive/?x=1#y`, o)).toBe("drive/index.html");
     expect(manifestPath(`${o}/u`, o)).toBe("u/index.html");

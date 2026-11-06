@@ -1,11 +1,11 @@
-// Swarm (CLOAKROOM_PLAN.md section 11). Only padded ciphertext ever leaves the device.
+// Swarm (HAVEN_PLAN.md section 11). Only padded ciphertext ever leaves the device.
 //   upload:   device → apps/api POST /upload, signed by a key with WRITE on the folder → Bee → reference
 //   download: Bee GET /bytes/<ref>, through Anon-RPC when the worker forwards any HTTPS request, otherwise direct,
 //             and then the receipt says so ("direct" route).
 //   folder:   "download whole folder" fetches every file, so the node can't tell which one you wanted.
 // The signed-upload format lives here so the API (step A5) verifies exactly what the client signs.
 
-import { DriveError, type AnonFetch, type Address, type Hex } from "@cloakroom/types";
+import { DriveError, type AnonFetch, type Address, type Hex } from "@haven/types";
 import { getAddress, isAddress, isHex, type LocalAccount, recoverMessageAddress, toHex } from "viem";
 
 import { sha256 } from "./crypto";
@@ -16,10 +16,10 @@ import { isAnonymous } from "./transport";
 // ---------------------------------------------------------------- signed upload
 
 export const UPLOAD_HEADERS = {
-  folder: "x-cloak-folder",
-  signer: "x-cloak-signer",
-  time: "x-cloak-time",
-  signature: "x-cloak-signature",
+  folder: "x-haven-folder",
+  signer: "x-haven-signer",
+  time: "x-haven-time",
+  signature: "x-haven-signature",
 } as const;
 
 /** How far an upload's signed time may be from the API's clock. */
@@ -31,7 +31,7 @@ export const MAX_UPLOAD_BYTES = PAD_BUCKETS[PAD_BUCKETS.length - 1]!;
 /** The EIP-191 message a writer signs for one upload. It names the folder and the exact body (its SHA-256). */
 export function uploadMessage(p: { folder: Address; signer: Address; bodySha256: Hex; time: number }): string {
   return [
-    "Cloakroom upload v1",
+    "Haven upload v1",
     `folder: ${getAddress(p.folder)}`,
     `signer: ${getAddress(p.signer)}`,
     `sha256: ${p.bodySha256.toLowerCase()}`,
@@ -129,7 +129,7 @@ function trimSlash(url: string): string {
   return url.replace(/\/+$/, "");
 }
 
-/** A Bee reference as stored in cloak.file: 0x + 64 hex (or 128 for an encrypted reference). */
+/** A Bee reference as stored in haven.file: 0x + 64 hex (or 128 for an encrypted reference). */
 export function normalizeRef(reference: string): Hex {
   const hex = reference.toLowerCase().replace(/^0x/, "");
   if (!/^[0-9a-f]{64}([0-9a-f]{64})?$/.test(hex)) throw new DriveError("UNKNOWN", "not a Swarm reference");

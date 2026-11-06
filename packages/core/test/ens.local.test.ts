@@ -1,8 +1,8 @@
 // ens.ts against a real local chain running the compiled DriveRegistry, VerifiableFactory and LabelStore.
-// (Reads through UniversalResolverV2, cloak.key and the registry walk, need the full ENSv2 root, so they are covered
+// (Reads through UniversalResolverV2, haven.key and the registry walk, need the full ENSv2 root, so they are covered
 // by the live A4 script on Sepolia.)
 
-import type { ReceiptStep } from "@cloakroom/types";
+import type { ReceiptStep } from "@haven/types";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {

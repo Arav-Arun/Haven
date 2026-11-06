@@ -1,7 +1,7 @@
 "use client";
 
-import type { Address, DriveClient, Folder } from "@cloakroom/types";
-import { Button, Dialog, ErrorNote, formatBytes, inputClass } from "@cloakroom/ui";
+import type { Address, DriveClient, Folder } from "@haven/types";
+import { Button, Dialog, ErrorNote, formatBytes, inputClass } from "@haven/ui";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { readSharedFiles, removeSharedFile, type SharedFile } from "@/lib/pwa";

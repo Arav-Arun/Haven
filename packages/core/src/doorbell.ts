@@ -14,7 +14,7 @@
 // Payload: { type, arkivKey }, sealed with AES-256-GCM under HKDF(topic, "payload") and padded so the chunk payload is
 // always exactly 256 bytes: outsiders learn nothing from its size.
 
-import type { Address, Hex } from "@cloakroom/types";
+import type { Address, Hex } from "@haven/types";
 import { bytesToHex, concatBytes, hexToBytes, isAddress, isAddressEqual, keccak256, recoverMessageAddress } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 

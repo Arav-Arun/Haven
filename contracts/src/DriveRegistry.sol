@@ -9,7 +9,7 @@ import {ILabelStore} from "@ensv2/utils/interfaces/ILabelStore.sol";
 import {InvalidOwner} from "@ensv2/CommonErrors.sol";
 
 /// @title DriveRegistry
-/// @notice A Cloakroom folder or room: a stock ENSv2 `UserRegistry` (deployed as a proxy through `VerifiableFactory`)
+/// @notice A Haven folder or room: a stock ENSv2 `UserRegistry` (deployed as a proxy through `VerifiableFactory`)
 ///         that adds
 ///         - access that ends on its own (`grantRolesUntil`; `_getRoles` drops drive roles at the end date),
 ///         - an onchain access history, so `wasAllowed(account, roles, t)` answers for any past time t with a plain

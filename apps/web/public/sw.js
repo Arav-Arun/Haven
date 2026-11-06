@@ -2,8 +2,8 @@
 // It never touches cross-origin traffic (RPCs, Bee, our API), and it never sees keys or decrypted files except the
 // ones the user shares into the app, which it hands straight to the page through IndexedDB.
 const VERSION = "1";
-const SHELL = `cloakroom-shell-${VERSION}`;
-const ASSETS = `cloakroom-assets-${VERSION}`;
+const SHELL = `haven-shell-${VERSION}`;
+const ASSETS = `haven-assets-${VERSION}`;
 const PAGES = ["/", "/drive/", "/rooms/", "/shared/", "/groups/", "/settings/", "/onboarding/", "/try/", "/l/", "/public/"];
 const FILES = ["/manifest.webmanifest", "/icon.svg", "/icon-192.png", "/anon-rpc-iframe.html", "/anon-rpc-iframe.js"];
 
@@ -29,7 +29,7 @@ self.addEventListener("activate", (event) => {
 
 function openInbox() {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open("cloakroom-inbox", 1);
+    const req = indexedDB.open("haven-inbox", 1);
     req.onupgradeneeded = () => req.result.createObjectStore("files", { autoIncrement: true });
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);

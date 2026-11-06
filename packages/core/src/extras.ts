@@ -2,9 +2,9 @@
 //
 // packages/types/src/index.ts is frozen on our branches (CLAUDE.md), so these additions live here as an extension of
 // DriveClient. They are exactly the optional members the add-ons spec lists, plus a few fields the UI needed
-// (marked). docs/requests-b.md asks for them to be copied into @cloakroom/types on main once both people agree.
+// (marked). docs/requests-b.md asks for them to be copied into @haven/types on main once both people agree.
 
-import type { Address, DriveClient, Member, Hex, Role, ShareOptions, Timestamp } from "@cloakroom/types";
+import type { Address, DriveClient, Member, Hex, Role, ShareOptions, Timestamp } from "@haven/types";
 
 // ---------------------------------------------------------------- F1
 
@@ -24,13 +24,13 @@ export interface KeyInfo {
   history: KeyLogEntry[];
   matchesEns: boolean;
   changedSinceLastShare: boolean;
-  /** Added: the cloak.key record compared with the log ("none" for names without the record). */
+  /** Added: the haven.key record compared with the log ("none" for names without the record). */
   ensRecord: "match" | "mismatch" | "none";
   /** Added: entries written about this name by anyone other than its controller, ignored. */
   ignored: { arkivKey: Hex; creator: Address; seq: number }[];
   /** Added: why the chain is broken, or null. */
   problem: string | null;
-  /** Added: who must sign this name's entries (K for cloakroom.eth names, the owner wallet otherwise). */
+  /** Added: who must sign this name's entries (K for haven.eth names, the owner wallet otherwise). */
   controller: Address | null;
 }
 
@@ -90,7 +90,7 @@ export interface LiveStatus {
   detail?: string;
 }
 
-export interface CloakroomClient extends DriveClient {
+export interface HavenClient extends DriveClient {
   /** Adds who came in through a team rule ("Via acme.eth") and who follows a parent folder. */
   listMembers(folder: Address): Promise<(Member & { rule?: string; inherited?: boolean })[]>;
 

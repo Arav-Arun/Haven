@@ -1,6 +1,6 @@
 "use client";
 
-import type { Folder, Member, Role, ShareOptions, Timestamp } from "@cloakroom/types";
+import type { Folder, Member, Role, ShareOptions, Timestamp } from "@haven/types";
 import { Check, Fingerprint, LoaderCircle, ShieldAlert, TriangleAlert, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { describeError } from "./errors";

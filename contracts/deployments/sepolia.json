@@ -2,7 +2,7 @@
   "chainId": 11155111,
   "forkBlock": 12073875,
   "ensv2": {
-    "_source": "CLOAKROOM_PLAN.md section 6 = docs.ens.domains/learn/deployments (Sepolia ENSv2), read 2026-11-06. UniversalHelper (where the live deployment keeps the registry walk: findExactRegistry and friends) and the payment entries (StandardRentPriceOracle, MockUSDC, MockDAI) are from the same page. Checked onchain at block 12073875 by test/DriveRegistry.fork.t.sol: code at every address, ETHRegistrar.ETH_REGISTRY and rentPriceOracle match, UserRegistryImpl.LABEL_STORE matches, the oracle accepts both tokens. This deployment (2026-11-04) is ENS branch audit-results-19102026 at 6aac7c6 (its deployment records match every address here), 65 commits ahead of our pinned main@48b3e2d, built with solc 0.8.25 and 1,000 optimizer runs. DriveRegistry stays on 48b3e2d: role bits, the EAC hooks it overrides and IRegistry are identical in both; the fork test proves it works with the live contracts.",
+    "_source": "HAVEN_PLAN.md section 6 = docs.ens.domains/learn/deployments (Sepolia ENSv2), read 2026-11-06. UniversalHelper (where the live deployment keeps the registry walk: findExactRegistry and friends) and the payment entries (StandardRentPriceOracle, MockUSDC, MockDAI) are from the same page. Checked onchain at block 12073875 by test/DriveRegistry.fork.t.sol: code at every address, ETHRegistrar.ETH_REGISTRY and rentPriceOracle match, UserRegistryImpl.LABEL_STORE matches, the oracle accepts both tokens. This deployment (2026-11-04) is ENS branch audit-results-19102026 at 6aac7c6 (its deployment records match every address here), 65 commits ahead of our pinned main@48b3e2d, built with solc 0.8.25 and 1,000 optimizer runs. DriveRegistry stays on 48b3e2d: role bits, the EAC hooks it overrides and IRegistry are identical in both; the fork test proves it works with the live contracts.",
     "ETHRegistrar": "0xf633e7fc17e2bbe0d0965d18ec1821dcb754a3d3",
     "ETHRegistry": "0xd4ebcbbdf463c9c45784603db0ddd499bc44a8b4",
     "RootRegistry": "0xb458d6a3a77919449d03e7a6903c26827c1ec43f",
@@ -17,5 +17,5 @@
     "MockUSDC": "0x240b0316df57887dbbe58b586508b19e633a14aa",
     "MockDAI": "0xf6fac8a58a0be13b9197f27c41b73162fe32572b"
   },
-  "cloakroom": {}
+  "haven": {}
 }

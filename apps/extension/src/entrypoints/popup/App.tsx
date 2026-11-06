@@ -1,5 +1,5 @@
-import { readInbox, removeFromInbox, type InboxFile } from "@cloakroom/platform";
-import type { AnonStatus, Address, DriveClient, Folder, Identity, IncomingShare } from "@cloakroom/types";
+import { readInbox, removeFromInbox, type InboxFile } from "@haven/platform";
+import type { AnonStatus, Address, DriveClient, Folder, Identity, IncomingShare } from "@haven/types";
 import {
   Button,
   EmptyState,
@@ -13,8 +13,8 @@ import {
   inputClass,
   useNow,
   type UploadItem,
-} from "@cloakroom/ui";
-import type { VerificationResult } from "@cloakroom/core";
+} from "@haven/ui";
+import type { VerificationResult } from "@haven/core";
 import { ExternalLink, KeyRound, Plug, ShieldAlert, ShieldCheck, ShieldQuestion } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { getAnon, makeClient, unavailableReason } from "@/lib/client";

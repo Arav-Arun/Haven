@@ -1,4 +1,4 @@
-import { doorbellTopic, mineGsocKey, sealDoorbell, signRing } from "@cloakroom/core";
+import { doorbellTopic, mineGsocKey, sealDoorbell, signRing } from "@haven/core";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { afterAll, describe, expect, it } from "vitest";
 
@@ -55,9 +55,9 @@ describe("api", () => {
   });
 
   it("refuses malformed key-log entries before touching the network", async () => {
-    const entry = { ensName: "Alice.cloakroom.eth", seq: 0, kind: "publish", spendingPublicKey: "0x02", devicePublicKey: "none", prevEntryKey: "none" };
+    const entry = { ensName: "Alice.haven.eth", seq: 0, kind: "publish", spendingPublicKey: "0x02", devicePublicKey: "none", prevEntryKey: "none" };
     expect((await post("/keylog", { type: "entry", entry, sig: "0x00" })).status).toBe(403); // not a normalized name
-    expect((await post("/keylog", { type: "entry", entry: { ...entry, ensName: "alice.cloakroom.eth" }, sig: "0x00" })).status).toBe(403); // bad signature
+    expect((await post("/keylog", { type: "entry", entry: { ...entry, ensName: "alice.haven.eth" }, sig: "0x00" })).status).toBe(403); // bad signature
     expect((await post("/keylog", { type: "nonsense" })).status).toBe(403);
   });
 

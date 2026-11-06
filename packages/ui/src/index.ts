@@ -1,5 +1,5 @@
-// @cloakroom/ui: the screens' building blocks, shared by the website (and PWA) and the extension.
-// Components take data in the frozen @cloakroom/types shapes and callbacks; they never fetch on their own.
+// @haven/ui: the screens' building blocks, shared by the website (and PWA) and the extension.
+// Components take data in the frozen @haven/types shapes and callbacks; they never fetch on their own.
 export * from "./AppShell";
 export * from "./errors";
 export * from "./FileList";

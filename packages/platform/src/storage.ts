@@ -1,4 +1,4 @@
-import type { KeyValueStore } from "@cloakroom/types";
+import type { KeyValueStore } from "@haven/types";
 
 /** In-memory store, for tests and "Try it". */
 export function createMemoryStorage(): KeyValueStore {
@@ -32,7 +32,7 @@ function idbRequest<T>(req: IDBRequest<T>): Promise<T> {
  */
 export function createWebStorage(opts: { dbName?: string; idb?: IDBFactory } = {}): KeyValueStore {
   const factory = opts.idb ?? globalThis.indexedDB;
-  const dbName = opts.dbName ?? "cloakroom";
+  const dbName = opts.dbName ?? "haven";
   let dbPromise: Promise<IDBDatabase> | null = null;
   let keyPromise: Promise<CryptoKey> | null = null;
 
@@ -104,7 +104,7 @@ export function createExtensionStorage(opts: { persist?: boolean; area?: ChromeS
     .chrome;
   const area = opts.area ?? (opts.persist ? chromeGlobal?.storage.local : chromeGlobal?.storage.session);
   if (!area) throw new Error("chrome.storage is not available here");
-  const prefix = "cloak:";
+  const prefix = "haven:";
   return {
     async get(key) {
       const v = (await area.get(prefix + key))[prefix + key];

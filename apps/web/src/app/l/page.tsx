@@ -1,7 +1,7 @@
 "use client";
 
-import type { FileEntry } from "@cloakroom/types";
-import { ErrorNote, FilePreview, Skeleton, Wordmark, saveBlob } from "@cloakroom/ui";
+import type { FileEntry } from "@haven/types";
+import { ErrorNote, FilePreview, Skeleton, Wordmark, saveBlob } from "@haven/ui";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ClientUnavailable } from "@/components/Gate";

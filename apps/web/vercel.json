@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "pnpm --filter @cloakroom/web build",
+  "buildCommand": "pnpm --filter @haven/web build",
   "outputDirectory": "out",
   "installCommand": "pnpm install --frozen-lockfile",
   "trailingSlash": true,

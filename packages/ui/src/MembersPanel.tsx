@@ -1,6 +1,6 @@
 "use client";
 
-import type { IncomingShare, Member, Timestamp } from "@cloakroom/types";
+import type { IncomingShare, Member, Timestamp } from "@haven/types";
 import { AtSign, EyeOff, Fuel, RefreshCw, Users } from "lucide-react";
 import { useState } from "react";
 import { formatAgo } from "./format";

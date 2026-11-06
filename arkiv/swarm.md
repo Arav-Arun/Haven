@@ -3,7 +3,7 @@
 **What lives where.**
 - **Swarm:** file contents only, as padded ciphertext (exactly 64 KB, 256 KB, 1 MB, 4 MB, 16 MB or 32 MB, so real sizes
   don't show), encrypted on the device with a random AES-256-GCM key per file.
-- **Arkiv:** the `cloak.file` entity. Its `swarmRef` field holds the Swarm reference in the clear (it points at
+- **Arkiv:** the `haven.file` entity. Its `swarmRef` field holds the Swarm reference in the clear (it points at
   ciphertext). The file key, name, type and real size are in the sealed `meta` field, which only members holding that
   epoch's key can open.
 - We use plain (unencrypted) Swarm references on purpose. An encrypted Swarm reference contains its own key, and Arkiv
@@ -17,8 +17,8 @@
   gateway (our Bee node stays private, so no one else can spend the batch).
 - Arkiv side: `fileOp` in [`packages/core/src/arkiv.ts`](../packages/core/src/arkiv.ts).
 
-**Run one upload and one read.** With the API running (see the README): `pnpm --filter @cloakroom/core e2e` uploads
-files, writes their `cloak.file` entities, and reads them back as another identity. Expected: "PASS the deck decrypts
+**Run one upload and one read.** With the API running (see the README): `pnpm --filter @haven/core e2e` uploads
+files, writes their `haven.file` entities, and reads them back as another identity. Expected: "PASS the deck decrypts
 to what was uploaded", with the Swarm reference and padded size printed for each upload. You need the API's `.env`
 (Bee URL and postage batch) and a funded relayer.
 

@@ -1,8 +1,8 @@
 // Receipts: what each action did, step by step, for the receipts panel (DriveClient.onReceipt).
 // Writers in ens.ts, arkiv.ts and swarm.ts take a StepSink and report every transaction, upload, check and route.
 
-import type { DriveErrorCode, Receipt, ReceiptStep } from "@cloakroom/types";
-import { DriveError } from "@cloakroom/types";
+import type { DriveErrorCode, Receipt, ReceiptStep } from "@haven/types";
+import { DriveError } from "@haven/types";
 
 import { randomBytes } from "./crypto";
 

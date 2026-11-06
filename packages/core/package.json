@@ -1,5 +1,5 @@
 {
-  "name": "@cloakroom/core",
+  "name": "@haven/core",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@arkiv-network/sdk": "1.0.1",
-    "@cloakroom/types": "workspace:*",
+    "@haven/types": "workspace:*",
     "@fluidkey/stealth-account-kit": "1.1.1",
     "@noble/curves": "1.9.1",
     "@noble/hashes": "1.8.0",

@@ -1,4 +1,4 @@
-import type { VerificationResult } from "@cloakroom/core";
+import type { VerificationResult } from "@haven/core";
 import { config } from "@/lib/config";
 import { FROM_EXT, FROM_WEB, type KeysReply, type PairReply } from "@/lib/messages";
 import { verifiedCopyUrl } from "@/lib/verify";
@@ -21,9 +21,9 @@ function loadedUrls(): string[] {
 
 /** The red warning: this page's code isn't a published release, so the extension won't give it keys. */
 function showOverlay(result: VerificationResult) {
-  if (document.getElementById("cloakroom-verify-overlay")) return;
+  if (document.getElementById("haven-verify-overlay")) return;
   const host = document.createElement("div");
-  host.id = "cloakroom-verify-overlay";
+  host.id = "haven-verify-overlay";
   const root = host.attachShadow({ mode: "closed" });
   const copy = result.siteSwarmRef ? verifiedCopyUrl(result.siteSwarmRef) : null;
   const files = (result.mismatchedFiles ?? []).slice(0, 6);

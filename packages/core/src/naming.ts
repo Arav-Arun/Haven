@@ -1,9 +1,9 @@
-// Names on the live ENSv2 deployment (CLOAKROOM_PLAN.md sections 6, 9 and 15): the one-time app-name bootstrap
-// (cloakroom.eth, rooms.cloakroom.eth), and the two flows the API runs for users: claiming a name (POST /claim) and
+// Names on the live ENSv2 deployment (HAVEN_PLAN.md sections 6, 9 and 15): the one-time app-name bootstrap
+// (haven.eth, rooms.haven.eth), and the two flows the API runs for users: claiming a name (POST /claim) and
 // creating an unlinked room (POST /room). The same calls are rehearsed against live Sepolia in
 // contracts/test/DriveRegistry.fork.t.sol.
 
-import { DriveError, type Address, type Hex } from "@cloakroom/types";
+import { DriveError, type Address, type Hex } from "@haven/types";
 import { encodeFunctionData, keccak256, namehash, stringToBytes, toHex, zeroAddress } from "viem";
 import { getEnsText } from "viem/actions";
 import { normalize } from "viem/ens";
@@ -261,7 +261,7 @@ export function checkUserLabel(label: string): string {
 }
 
 export interface ClaimParams {
-  /** cloakroom.eth's registry (cloakroom.appRegistry). */
+  /** haven.eth's registry (haven.appRegistry). */
   appRegistry: Address;
   implementation: Address;
   label: string;
@@ -269,9 +269,9 @@ export interface ClaimParams {
   driveKey: Address;
   /** W: dangerous roles and the name itself; null for "Try it" identities (K then holds them). */
   mainWallet: Address | null;
-  /** The cloak.key text record. */
+  /** The haven.key text record. */
   spendingPublicKey: Hex;
-  /** Unix seconds: cloakroom.eth's own expiry, so a user name lives as long as the app name. */
+  /** Unix seconds: haven.eth's own expiry, so a user name lives as long as the app name. */
   expiry: bigint;
 }
 
@@ -283,7 +283,7 @@ export interface ClaimResult {
 }
 
 /**
- * POST /claim: the relayer deploys the user's resolver (with cloak.key) and drive root (K everyday, W dangerous),
+ * POST /claim: the relayer deploys the user's resolver (with haven.key) and drive root (K everyday, W dangerous),
  * then registers the name pointing at both. It holds no role on either afterwards (verifyClaim checks that).
  */
 export async function claimName(
@@ -292,11 +292,11 @@ export async function claimName(
   step: StepSink = ignoreSteps,
 ): Promise<ClaimResult> {
   const label = checkUserLabel(params.label);
-  const ensName = `${label}.cloakroom.eth`;
+  const ensName = `${label}.haven.eth`;
   const owner = params.mainWallet ?? params.driveKey;
   const resolver = await deployResolver(
     writer,
-    { name: ensName, admin: owner, texts: { "cloak.key": params.spendingPublicKey } },
+    { name: ensName, admin: owner, texts: { "haven.key": params.spendingPublicKey } },
     step,
   );
   const { registry: driveRoot, blockNumber } = await deployDrive(
@@ -321,7 +321,7 @@ export async function claimName(
 }
 
 export interface RoomParams {
-  /** rooms.cloakroom.eth's registry (cloakroom.roomsRegistry). */
+  /** rooms.haven.eth's registry (haven.roomsRegistry). */
   roomsRegistry: Address;
   implementation: Address;
   /** K_room: holds every role in the room; nothing links it to the owner's name. */
@@ -347,12 +347,12 @@ export async function createRoom(
     { parent: params.roomsRegistry, label, owner: params.roomKey, subregistry: registry, expiry: params.expiry },
     step,
   );
-  return { ensName: `${label}.rooms.cloakroom.eth`, registry, blockNumber };
+  return { ensName: `${label}.rooms.haven.eth`, registry, blockNumber };
 }
 
 /**
- * Client-side check after /claim (CLOAKROOM_PLAN.md section 13, step 2): the API account holds no role on the resolver
- * or the drive root, the name points at both, and cloak.key equals the user's own key.
+ * Client-side check after /claim (HAVEN_PLAN.md section 13, step 2): the API account holds no role on the resolver
+ * or the drive root, the name points at both, and haven.key equals the user's own key.
  */
 export async function verifyClaim(
   client: SepoliaReader,
@@ -365,15 +365,15 @@ export async function verifyClaim(
   if (onResolver !== 0n || onRoot !== 0n) throw new DriveError("NOT_AUTHORIZED", "the API kept a role after /claim");
   const published = await getEnsText(client, {
     name: normalize(params.ensName),
-    key: "cloak.key",
+    key: "haven.key",
     universalResolverAddress: ensv2.UniversalResolverV2,
   });
   if (!published || published.toLowerCase() !== params.spendingPublicKey.toLowerCase()) {
-    throw new DriveError("KEY_MISMATCH", "cloak.key on the new name isn't this key");
+    throw new DriveError("KEY_MISMATCH", "haven.key on the new name isn't this key");
   }
 }
 
-/** namehash of a name, for links (cloak.link is keyed by it). */
+/** namehash of a name, for links (haven.link is keyed by it). */
 export function nameNode(name: string): Hex {
   return namehash(normalize(name));
 }

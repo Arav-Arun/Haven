@@ -11,7 +11,7 @@ export interface InboxFile {
   at: number;
 }
 
-const DB = "cloakroom-inbox";
+const DB = "haven-inbox";
 const STORE = "files";
 
 function open(idb: IDBFactory = globalThis.indexedDB): Promise<IDBDatabase> {

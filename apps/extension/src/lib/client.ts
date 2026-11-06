@@ -1,13 +1,13 @@
 import { AnonRpcWorker } from "@anon-rpc/browser-extension-harness";
-import { createDriveClient, type CloakroomClient } from "@cloakroom/core";
-import { createAnonFetch, createExtensionStorage, type HarnessWorker } from "@cloakroom/platform";
-import type { AnonFetch } from "@cloakroom/types";
+import { createDriveClient, type HavenClient } from "@haven/core";
+import { createAnonFetch, createExtensionStorage, type HarnessWorker } from "@haven/platform";
+import type { AnonFetch } from "@haven/types";
 import { config, missingConfig } from "./config";
 
 
 
 /** Where the keys live: session storage (cleared when the browser closes) unless the user chose to stay signed in. */
-const AREA_KEY = "cloak:persist";
+const AREA_KEY = "haven:persist";
 
 export async function getPersist(): Promise<boolean> {
   return (await chrome.storage.local.get(AREA_KEY))[AREA_KEY] === true;
@@ -37,7 +37,7 @@ export function getAnon(): AnonFetch {
   }));
 }
 
-export async function makeClient(): Promise<CloakroomClient | null> {
+export async function makeClient(): Promise<HavenClient | null> {
   if (unavailableReason()) return null;
   return createDriveClient({
     anon: getAnon(),

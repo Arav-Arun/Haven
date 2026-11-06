@@ -1,7 +1,7 @@
 "use client";
 
-import type { Address } from "@cloakroom/types";
-import { EmptyState, ErrorNote, PublicViewPanel, Skeleton, useNow } from "@cloakroom/ui";
+import type { Address } from "@haven/types";
+import { EmptyState, ErrorNote, PublicViewPanel, Skeleton, useNow } from "@haven/ui";
 import { Eye } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";

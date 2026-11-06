@@ -1,11 +1,11 @@
 // Add-on F3, extension side: does the Haven tab run a published release?
 //
 // The page's scripts, styles and HTML are re-downloaded here (MV3 can't read response bodies directly), hashed, and
-// compared with the manifest of a cloak.release entity signed by the release key R (WXT_RELEASE_SIGNER) and not
+// compared with the manifest of a haven.release entity signed by the release key R (WXT_RELEASE_SIGNER) and not
 // revoked. This catches files swapped for everyone (the Bybit case); a host that serves bad code to one targeted visitor
 // only could still slip past a re-download, which is why the Swarm copy (fixed by its hash) is offered too.
 
-import type { Address } from "@cloakroom/types";
+import type { Address } from "@haven/types";
 import {
   arkivReader,
   compareWithManifest,
@@ -18,7 +18,7 @@ import {
   sha256Hex,
   trustedReleases,
   type VerificationResult,
-} from "@cloakroom/core";
+} from "@haven/core";
 
 import { getAnon } from "./client";
 import { config } from "./config";

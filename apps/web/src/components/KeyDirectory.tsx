@@ -1,8 +1,8 @@
 "use client";
 
-import type { DeviceInfo } from "@cloakroom/core";
-import { extensionPresent } from "@cloakroom/platform";
-import { Button, ErrorNote, FingerprintWords, Skeleton, formatAgo, formatDate, inputClass } from "@cloakroom/ui";
+import type { DeviceInfo } from "@haven/core";
+import { extensionPresent } from "@haven/platform";
+import { Button, ErrorNote, FingerprintWords, Skeleton, formatAgo, formatDate, inputClass } from "@haven/ui";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAccount, useSignTypedData } from "wagmi";

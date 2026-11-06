@@ -1,5 +1,5 @@
 {
-  "name": "@cloakroom/api",
+  "name": "@haven/api",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,8 +10,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@cloakroom/core": "workspace:*",
-    "@cloakroom/types": "workspace:*",
+    "@haven/core": "workspace:*",
+    "@haven/types": "workspace:*",
     "@hono/node-server": "^2.1.6",
     "hono": "^4.13.16",
     "tsx": "4.23.15",

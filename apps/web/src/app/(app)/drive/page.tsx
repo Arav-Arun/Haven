@@ -1,7 +1,7 @@
 "use client";
 
-import type { Address } from "@cloakroom/types";
-import { Skeleton } from "@cloakroom/ui";
+import type { Address } from "@haven/types";
+import { Skeleton } from "@haven/ui";
 import { HardDrive } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";

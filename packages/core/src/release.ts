@@ -4,12 +4,12 @@
 // Every release publishes:
 //   - manifest.json = { version, gitCommit, publicEnv, files: { "<path>": "<sha256 hex>" } } over every .html, .js and
 //     .css file of the static build; rootHash = sha256(canonical JSON of the manifest);
-//   - the manifest and the whole site on Swarm (cloakroom.eth's contenthash points at the site);
-//   - a cloak.release entity on Arkiv, signed (EIP-712) by the release key R.
-// The extension re-downloads every file a Cloakroom tab loaded, hashes it, and releases keys to the page only when every
+//   - the manifest and the whole site on Swarm (haven.eth's contenthash points at the site);
+//   - a haven.release entity on Arkiv, signed (EIP-712) by the release key R.
+// The extension re-downloads every file a Haven tab loaded, hashes it, and releases keys to the page only when every
 // hash is in a published, non-revoked manifest.
 
-import type { Address, Hex } from "@cloakroom/types";
+import type { Address, Hex } from "@haven/types";
 import { bytesToHex, isAddressEqual, recoverTypedDataAddress } from "viem";
 
 import type { RebuildRecord, ReleaseRecord, UnreleaseRecord } from "./arkiv";

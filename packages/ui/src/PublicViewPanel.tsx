@@ -1,6 +1,6 @@
 "use client";
 
-import type { FileEntry, Member, PublicView, Timestamp } from "@cloakroom/types";
+import type { FileEntry, Member, PublicView, Timestamp } from "@haven/types";
 import { ExternalLink, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { formatBytes, formatDate, formatUntil, ROLE_LABEL, shortAddress } from "./format";

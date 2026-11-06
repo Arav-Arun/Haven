@@ -1,6 +1,6 @@
 "use client";
 
-import type { Receipt, ReceiptStep, Timestamp } from "@cloakroom/types";
+import type { Receipt, ReceiptStep, Timestamp } from "@haven/types";
 import { Check, ExternalLink, LoaderCircle, ShieldCheck, ShieldOff, TriangleAlert, X } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { describeError } from "./errors";

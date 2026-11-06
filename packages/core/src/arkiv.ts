@@ -1,4 +1,4 @@
-// Arkiv (CLOAKROOM_PLAN.md section 10): the eight cloak.* schemas, writers, paged queries, renewals and the native
+// Arkiv (HAVEN_PLAN.md section 10): the eight haven.* schemas, writers, paged queries, renewals and the native
 // tGLM transfer that funds a stealth editor.
 //
 // Every entity is created READ-ONLY, so its attributes are exactly what its creator wrote at $createdAt; the validator
@@ -21,7 +21,7 @@ import {
 import { rabdi } from "@arkiv-network/sdk/chains";
 import { and, asc, eq, exists, type Expression } from "@arkiv-network/sdk/query";
 import { addr, bytes, defineSchema, str, u64, type Schema } from "@arkiv-network/sdk/schema";
-import { DriveError, type AnonFetch, type Address, type Hex } from "@cloakroom/types";
+import { DriveError, type AnonFetch, type Address, type Hex } from "@haven/types";
 import { type Account, type Chain, getAddress, hexToBytes, isHex, type Transport } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
@@ -33,7 +33,7 @@ import { anonTransport, type RouteStep } from "./transport";
 
 // ---------------------------------------------------------------- schemas (section 10)
 
-export const FileSchema = defineSchema("cloak.file", {
+export const FileSchema = defineSchema("haven.file", {
   folder: addr().indexed(),
   fileId: str().indexed(),
   version: u64().indexed(),
@@ -42,21 +42,21 @@ export const FileSchema = defineSchema("cloak.file", {
   meta: bytes(),
 });
 
-export const WelcomeSchema = defineSchema("cloak.welcome", {
+export const WelcomeSchema = defineSchema("haven.welcome", {
   folder: addr().indexed(),
   bucket: u64().indexed(),
   ephemeralPub: str(),
   sealedMemberKey: bytes(),
 });
 
-export const KeyCopySchema = defineSchema("cloak.keycopy", {
+export const KeyCopySchema = defineSchema("haven.keycopy", {
   folder: addr().indexed(),
   recipient: addr().indexed(),
   version: u64().indexed(),
   sealed: bytes(),
 });
 
-export const RosterSchema = defineSchema("cloak.roster", {
+export const RosterSchema = defineSchema("haven.roster", {
   folder: addr().indexed(),
   version: u64().indexed(),
   managers: bytes(),
@@ -64,7 +64,7 @@ export const RosterSchema = defineSchema("cloak.roster", {
 });
 
 /** `name` is the folder's display name, sealed with E_v[0] so every reader of version v can open it. */
-export const RotationSchema = defineSchema("cloak.rotation", {
+export const RotationSchema = defineSchema("haven.rotation", {
   folder: addr().indexed(),
   version: u64().indexed(),
   t0: u64(),
@@ -73,19 +73,19 @@ export const RotationSchema = defineSchema("cloak.rotation", {
 });
 
 /** `group` is the group folder whose manager asks for the refresh; the request counts only from its managers. */
-export const RefreshSchema = defineSchema("cloak.refresh", {
+export const RefreshSchema = defineSchema("haven.refresh", {
   folder: addr().indexed(),
   group: addr(),
   reason: bytes(),
 });
 
-export const LinkSchema = defineSchema("cloak.link", {
+export const LinkSchema = defineSchema("haven.link", {
   link: str().indexed(),
   folder: addr(),
   bundle: bytes(),
 });
 
-export const TombSchema = defineSchema("cloak.tomb", {
+export const TombSchema = defineSchema("haven.tomb", {
   folder: addr().indexed(),
   fileId: str().indexed(),
 });
@@ -95,7 +95,7 @@ export const TombSchema = defineSchema("cloak.tomb", {
 // any account may relay an entry (our API does, so users need no tGLM) and a forged one is simply ignored.
 
 /** One step of a name's public key history: seq 0, 1, 2…, each pointing at the previous entry's Arkiv key. */
-export const KeyLogSchema = defineSchema("cloak.keylog", {
+export const KeyLogSchema = defineSchema("haven.keylog", {
   ensName: str().indexed(),
   seq: u64().indexed(),
   kind: str().indexed(),
@@ -109,7 +109,7 @@ export const KeyLogSchema = defineSchema("cloak.keylog", {
 });
 
 /** A device signed in to a name. Expires after 90 days unless the device keeps using it. */
-export const DeviceSchema = defineSchema("cloak.device", {
+export const DeviceSchema = defineSchema("haven.device", {
   ensName: str().indexed(),
   deviceId: str().indexed(),
   devicePublicKey: str(),
@@ -119,7 +119,7 @@ export const DeviceSchema = defineSchema("cloak.device", {
 });
 
 /** A published website release (F3): the sha256 of its file manifest, signed by the release key R. */
-export const ReleaseSchema = defineSchema("cloak.release", {
+export const ReleaseSchema = defineSchema("haven.release", {
   version: str().indexed(),
   rootHash: str().indexed(),
   gitCommit: str(),
@@ -129,13 +129,13 @@ export const ReleaseSchema = defineSchema("cloak.release", {
 });
 
 /** A release R has withdrawn: the extension treats it as bad. */
-export const UnreleaseSchema = defineSchema("cloak.unrelease", {
+export const UnreleaseSchema = defineSchema("haven.unrelease", {
   rootHash: str().indexed(),
   sig: bytes(),
 });
 
 /** Anyone who rebuilt a release from its commit says whether they got the same root hash. */
-export const RebuildSchema = defineSchema("cloak.rebuild", {
+export const RebuildSchema = defineSchema("haven.rebuild", {
   rootHash: str().indexed(),
   matched: u64(),
 });
@@ -144,19 +144,19 @@ export const RebuildSchema = defineSchema("cloak.rebuild", {
 export const NONE = "none";
 
 export const SCHEMA_NAMES = [
-  "cloak.file",
-  "cloak.welcome",
-  "cloak.keycopy",
-  "cloak.roster",
-  "cloak.rotation",
-  "cloak.refresh",
-  "cloak.link",
-  "cloak.tomb",
-  "cloak.keylog",
-  "cloak.device",
-  "cloak.release",
-  "cloak.unrelease",
-  "cloak.rebuild",
+  "haven.file",
+  "haven.welcome",
+  "haven.keycopy",
+  "haven.roster",
+  "haven.rotation",
+  "haven.refresh",
+  "haven.link",
+  "haven.tomb",
+  "haven.keylog",
+  "haven.device",
+  "haven.release",
+  "haven.unrelease",
+  "haven.rebuild",
 ] as const;
 export type SchemaName = (typeof SCHEMA_NAMES)[number];
 

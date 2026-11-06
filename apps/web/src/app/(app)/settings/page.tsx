@@ -1,8 +1,8 @@
 "use client";
 
-import { NETWORKS } from "@cloakroom/platform";
-import type { AnonStatus, PrivateNetwork, Receipt } from "@cloakroom/types";
-import { Button, ErrorNote, shortAddress } from "@cloakroom/ui";
+import { NETWORKS } from "@haven/platform";
+import type { AnonStatus, PrivateNetwork, Receipt } from "@haven/types";
+import { Button, ErrorNote, shortAddress } from "@haven/ui";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { chooseNetwork, getAnon, selectedNetwork, unavailableReason } from "@/lib/anon";
@@ -10,7 +10,7 @@ import { config } from "@/lib/config";
 import { useDrive } from "@/lib/drive";
 import { useInstall } from "@/lib/pwa";
 import { Devices, KeysInExtension, LinkName, MyKey } from "@/components/KeyDirectory";
-import { useNow } from "@cloakroom/ui";
+import { useNow } from "@haven/ui";
 
 /**
  * Pairs the browser extension: after the user confirms, the account seed goes to the extension's content script on
@@ -28,7 +28,7 @@ function ConnectExtension() {
     const onMessage = (e: MessageEvent) => {
       if (e.source !== window || e.origin !== window.location.origin) return;
       const d = e.data as { source?: string; type?: string; ok?: boolean; ensName?: string | null; error?: string } | null;
-      if (d?.source !== "cloakroom-ext") return;
+      if (d?.source !== "haven-ext") return;
       if (d.type === "present") setPresent(true);
       if (d.type === "paired") {
         setPending(false);
@@ -36,7 +36,7 @@ function ConnectExtension() {
       }
     };
     window.addEventListener("message", onMessage);
-    window.postMessage({ source: "cloakroom-web", type: "ping" }, window.location.origin);
+    window.postMessage({ source: "haven-web", type: "ping" }, window.location.origin);
     return () => window.removeEventListener("message", onMessage);
   }, []);
 
@@ -70,7 +70,7 @@ function ConnectExtension() {
               setPending(true);
               try {
                 const seed = await client.exportSeed();
-                window.postMessage({ source: "cloakroom-web", type: "pair", seed: Array.from(seed), persist }, window.location.origin);
+                window.postMessage({ source: "haven-web", type: "pair", seed: Array.from(seed), persist }, window.location.origin);
                 seed.fill(0);
               } catch (e) {
                 setError(e);

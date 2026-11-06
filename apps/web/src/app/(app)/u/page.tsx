@@ -1,7 +1,7 @@
 "use client";
 
-import type { KeyInfo } from "@cloakroom/core";
-import { Button, EmptyState, ErrorNote, FingerprintWords, Skeleton, formatDate, inputClass, shortAddress, useNow } from "@cloakroom/ui";
+import type { KeyInfo } from "@haven/core";
+import { Button, EmptyState, ErrorNote, FingerprintWords, Skeleton, formatDate, inputClass, shortAddress, useNow } from "@haven/ui";
 import { BadgeCheck, CircleSlash, KeyRound, ShieldAlert, UserRound } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
@@ -60,7 +60,7 @@ function Profile({ name }: { name: string }) {
         ) : (
           <p className="inline-flex items-center gap-1.5 text-sm text-private">
             <BadgeCheck size={16} aria-hidden />
-            {k.ensRecord === "match" ? "Its cloak.key record matches its public log." : "Signed by the name's owner; this name has no cloak.key record."}
+            {k.ensRecord === "match" ? "Its haven.key record matches its public log." : "Signed by the name's owner; this name has no haven.key record."}
           </p>
         )}
         {k.controller && (

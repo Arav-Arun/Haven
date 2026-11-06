@@ -1,4 +1,4 @@
-import type { AnonFetch, AnonStatus, PrivateNetwork } from "@cloakroom/types";
+import type { AnonFetch, AnonStatus, PrivateNetwork } from "@haven/types";
 import { networkInfo } from "./networks";
 
 /** Minimal shape shared by the web and extension harness workers. */

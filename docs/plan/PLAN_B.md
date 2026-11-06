@@ -5,12 +5,12 @@
 
 ## Starter prompt (paste into your Claude agent)
 
-> You are building Plan B of Cloakroom in this repo. Read `CLAUDE.md`, `docs/plan/CLOAKROOM_PLAN.md`,
+> You are building Plan B of Haven in this repo. Read `CLAUDE.md`, `docs/plan/HAVEN_PLAN.md`,
 > `docs/plan/PLAN_SHARED.md` and `docs/plan/PLAN_B.md`, in that order.
 > - Edit only the folders Plan B owns.
 > - Use only the frozen interface in `packages/types/src/index.ts`; never edit it.
 > - There is no mock client. No faking or hardcoding: no placeholder data, seeded data or fake hashes. Wire each
->   screen to the real `@cloakroom/core` as Person A lands the methods it needs (`git rebase origin/main`).
+>   screen to the real `@haven/core` as Person A lands the methods it needs (`git rebase origin/main`).
 > - Work through the steps of `PLAN_B.md` in order. After each step, run its "Done when" check, write the result in
 >   `docs/checks-b.md`, commit and push.
 > - Load the `frontend-design` skill and ethskills `frontend-ux` before building screens.
@@ -32,7 +32,7 @@ After A pushes Step 0: clone, `git checkout -b plan-b`, `pnpm install`.
 **Done when:** the repo builds and the frozen interface compiles.
 
 ## B1 · First-hour checks (H0.5–H3)
-Run checks 6, 7 and 10 from `CLOAKROOM_PLAN.md` section 17:
+Run checks 6, 7 and 10 from `HAVEN_PLAN.md` section 17:
 - **Bee node** (`infra/bee/`): `ethersphere/bee` on Fly.io with a persistent volume and a Gnosis RPC. The human funds
   it or gets a batch from the Swarm team. Buy or obtain a postage batch, then upload and download a test file.
 - **Anon-RPC:** a bare static test page with `@anon-rpc/browser-harness` 0.4.0. For Nym, Nox and Tor, measure:
@@ -50,7 +50,7 @@ Run checks 6, 7 and 10 from `CLOAKROOM_PLAN.md` section 17:
 **If any-HTTPS doesn't work:** ask the EF team at their booth for a worker setting that allows our Bee and API hosts,
 and record their answer.
 
-## B2 · `@cloakroom/platform` (H3–H5)
+## B2 · `@haven/platform` (H3–H5)
 - **`createAnonFetch({ platform: "web" | "extension", network, bootstrapRpcUrl })`** returns `AnonFetch`:
   - web uses `AnonRpcWorker`, with the bootstrap page served by us (`iframeUrl: "/anon-rpc-iframe.html"`) for strict
     CSP;
@@ -72,12 +72,12 @@ No faking or hardcoding: everything here is real from the start.
   signatures to `signIn` once A's session methods land.
 - **Private-network status**: `createAnonFetch` with the configured network; the green "Private: Nym" badge,
   the red "Not private" banner, and the Settings network picker, all reading the live `AnonStatus`.
-- **Live `supportsAnyHttps`**: shown in Settings and the receipts panel, from the probe in `@cloakroom/platform`.
+- **Live `supportsAnyHttps`**: shown in Settings and the receipts panel, from the probe in `@haven/platform`.
 
 **Done when:** the deployed site connects a real wallet, collects and compares two real signatures, and shows the
 real Anon-RPC status.
 
-## B4 · `@cloakroom/ui` (H5–H9)
+## B4 · `@haven/ui` (H5–H9)
 Mobile-first React + Tailwind v4 components (Radix for dialogs, lucide icons, pdf.js for PDF preview). Load the
 `frontend-design` skill first and choose a calm, trustworthy, distinctive look.
 - **Shell and onboarding:**
@@ -95,7 +95,7 @@ Mobile-first React + Tailwind v4 components (Radix for dialogs, lucide icons, pd
     separate access".
 - **Sharing:**
   - **ShareDialog:**
-    - live ENS lookup (with an error when the recipient has no `cloak.key`);
+    - live ENS lookup (with an error when the recipient has no `haven.key`);
     - role;
     - "access until" presets (1 hour, 1 day, 1 week, end of month, custom, never);
     - "hide from other members";
@@ -126,7 +126,7 @@ screen-reader check.
 - **App:** Next.js 16, `output: 'export'`; `transpilePackages` for the workspace packages.
 - **Providers:**
   - wagmi (injected + WalletConnect);
-  - `createDriveClient` from `@cloakroom/core`, the only client;
+  - `createDriveClient` from `@haven/core`, the only client;
   - `createAnonFetch` + `createWebStorage`.
 - **Routes:**
 
@@ -160,11 +160,11 @@ preview URL is live.
 - "Connecting privately…" screen while the worker starts.
 - No push notifications (a push server would learn who waits for what): check on open.
 
-**Done when:** installed and used on a real Android phone and a real iPhone, with "Share to Cloakroom" working from the
+**Done when:** installed and used on a real Android phone and a real iPhone, with "Share to Haven" working from the
 Android gallery.
 
 ## B7 · Extension (H17–H24)
-`apps/extension` with WXT 0.21 + React + `@cloakroom/ui`, MV3.
+`apps/extension` with WXT 0.21 + React + `@haven/ui`, MV3.
 - **Permissions:** `storage`, `contextMenus`, `alarms`, `notifications`, `offscreen`, `sidePanel`. Host permissions
   only for our API, Bee and RPCs.
 - **Pairing:**
@@ -173,7 +173,7 @@ Android gallery.
   - the manifest's `externally_connectable` allows only our origins;
   - the extension calls `signIn({ kind: "seed" })`.
 - **Popup:** recent files, Shared with me, drag to upload (choose a folder).
-- **Right-click:** "Save to Cloakroom" on images, links and the page (Should: the page as MHTML).
+- **Right-click:** "Save to Haven" on images, links and the page (Should: the page as MHTML).
 - **Background:** a `chrome.alarms` check every 15 minutes that runs:
   - `sharedWithMe({ since })` → badge and notification;
   - for owners and managers, `maintain()` (gas top-ups, open refreshes, renewals) → a notification of what it did.
@@ -200,7 +200,7 @@ saves an image privately.
   - `REFRESH_PENDING` → "Waiting for the owner to refresh access";
   - `WALLET_NOT_SUPPORTED` → passkey suggestion;
   - `KEY_MISMATCH` → "This sign-in gives different keys; your files are safe";
-  - `NO_CLOAK_KEY` → "This name hasn't set up Cloakroom yet".
+  - `NO_HAVEN_KEY` → "This name hasn't set up Haven yet".
 - Empty states.
 - **Should:**
   - passkey sign-in (WebAuthn PRF) → `signIn({ kind: "passkey" })`;
@@ -209,7 +209,7 @@ saves an image privately.
 ## B10 · App copy on Swarm (H27–H29)
 - Static export → upload to our Bee with swarm-cli (`--index-document index.html`).
 - Check that absolute asset paths load: use a subdomain gateway such as bzz.link, or set Next's `basePath`.
-- Send the reference to A (H28) for `cloakroom.eth`'s contenthash.
+- Send the reference to A (H28) for `haven.eth`'s contenthash.
 
 **Done when:** the app loads from the Swarm URL with Vercel switched off.
 
@@ -219,7 +219,7 @@ saves an image privately.
   - how to try it (website, phone, extension, "Try it");
   - architecture diagram and screenshots;
   - link to `docs/protocol.md`, plus the sections A owns (merged at M2).
-- **`CROPS` section:** C / O / P / S lines from the CROPS gate in `CLOAKROOM_PLAN.md` section 21, including:
+- **`CROPS` section:** C / O / P / S lines from the CROPS gate in `HAVEN_PLAN.md` section 21, including:
   - the "who can link what" table;
   - routed vs direct traffic.
 - **`AI_USAGE.md`:** how Claude agents built it, per person.
@@ -228,7 +228,7 @@ saves an image privately.
 
 ## B12 · After M2 (H30–H36)
 - Integration checklist with A (`PLAN_SHARED.md` section 9).
-- **Video (3 minutes or less)** following `CLOAKROOM_PLAN.md` section 18:
+- **Video (3 minutes or less)** following `HAVEN_PLAN.md` section 18:
   - record on the real website, phone and extension;
   - note the timestamp where Swarm is used, for `arkiv/swarm.md`.
 - Final Vercel deploy; extension release; run `ethskills:qa`.

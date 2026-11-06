@@ -46,28 +46,28 @@ screen is read live.
 - **ENSv2:** every folder is an ENS name whose subregistry is a `DriveRegistry`, our only contract. It extends
   ENSv2's `UserRegistry` (Enhanced Access Control) with three role bits (viewer, editor, manager), **grants that end
   on their own** (`grantRolesUntil`), an **access history** anyone can query as a view call (`wasAllowed(account,
-  role, t)`), and an **upgrade freeze**. Each user's own `PermissionedResolver` publishes a `cloak.key` record, which
-  is how anyone can share with `alice.cloakroom.eth`. Rooms live under `rooms.cloakroom.eth`. Mounting a folder into
+  role, t)`), and an **upgrade freeze**. Each user's own `PermissionedResolver` publishes a `haven.key` record, which
+  is how anyone can share with `alice.haven.eth`. Rooms live under `rooms.haven.eth`. Mounting a folder into
   your tree uses namespace aliasing.
 - **Keys:** each folder version has a secret; epoch keys come from it by key regression, so holding the key for epoch
   *j* gives every earlier epoch and none later. A member with access until *T* gets the last epoch key that ends by
   *T*. That's why new files lock with no transaction.
-- **Arkiv** holds eight entity types, all sealed: `cloak.file`, `cloak.welcome`, `cloak.keycopy`, `cloak.roster`,
-  `cloak.rotation`, `cloak.refresh`, `cloak.link`, `cloak.tomb`. Anyone can write an entity a query matches, so every
+- **Arkiv** holds eight entity types, all sealed: `haven.file`, `haven.welcome`, `haven.keycopy`, `haven.roster`,
+  `haven.rotation`, `haven.refresh`, `haven.link`, `haven.tomb`. Anyone can write an entity a query matches, so every
   read goes through a validator that asks the folder's `DriveRegistry` whether the creator held the right role at the
   entity's creation time.
 - **Swarm** holds only padded ciphertext (64 KB to 32 MB buckets), uploaded through the API with a signature from a key
   that has WRITE right now.
 
-Details: [`docs/plan/CLOAKROOM_PLAN.md`](docs/plan/CLOAKROOM_PLAN.md) (design), [`docs/protocol.md`](docs/protocol.md).
+Details: [`docs/plan/HAVEN_PLAN.md`](docs/plan/HAVEN_PLAN.md) (design), [`docs/protocol.md`](docs/protocol.md).
 
 ## Add-ons
 
 | Add-on | For | What it does |
 |---|---|---|
-| **Public key log** | Arkiv | Every ENS name has an append-only, signed key history on Arkiv (`cloak.keylog`). Sharing refuses a key that doesn't match its log or its `cloak.key` record, and warns when a recipient's key changed since you last shared. Profiles (`/u/?n=name`) show the 8-word fingerprint to compare in person, the history, devices, and any forged entries (ignored). |
+| **Public key log** | Arkiv | Every ENS name has an append-only, signed key history on Arkiv (`haven.keylog`). Sharing refuses a key that doesn't match its log or its `haven.key` record, and warns when a recipient's key changed since you last shared. Profiles (`/u/?n=name`) show the 8-word fingerprint to compare in person, the history, devices, and any forged entries (ignored). |
 | **Share with an ENS team** | ENS | Share with "everyone at `acme.eth`". The rule lives only in the folder's encrypted roster; each subname holder becomes an ordinary stealth member, and names that expire, move or are excluded lose access at the next sync. The chain only sees random addresses. |
-| **Verified frontend** | EF, CROPS | Each release's file hashes are published on Arkiv and its build on Swarm (`cloakroom.eth`'s contenthash). The extension re-downloads and hashes the files a Haven tab loaded and hands keys only to a page that matches; otherwise a red warning offers the verified copy. Builds are reproducible (build id = git commit). |
+| **Verified frontend** | EF, CROPS | Each release's file hashes are published on Arkiv and its build on Swarm (`haven.eth`'s contenthash). The extension re-downloads and hashes the files a Haven tab loaded and hands keys only to a page that matches; otherwise a red warning offers the verified copy. Builds are reproducible (build id = git commit). |
 | **Groups** | ENS | Make a group once (its own ENS registry, `g-….yourname.eth`), add people, then share any folder with it. Like a team rule, the group lives only in the folder's encrypted roster and each person becomes an ordinary stealth member; adding or removing someone in the group changes every folder shared with it at the next sync, with a key refresh on removal. |
 | **Subfolders that follow their parent** | ENS | A subfolder can inherit its parent's members: the owner's app grants the same member addresses there, with the same roles and end dates, and key copies sealed with the member keys they already hold. Removing someone from the parent removes them from every inheriting subfolder in the same action, with a key refresh. (The contract has no parent link yet, so the app keeps them in step.) |
 | **Live updates** | Swarm | Swarm GSOC "doorbells" on topics that change every epoch, so only current members can listen. A ring only says "check Arkiv now"; nothing is shown until the validator accepts it. Without them the app re-reads Arkiv every 30 seconds. |
@@ -111,32 +111,32 @@ pnpm -r test
 repo-root `.env` (throwaway testnet keys), then:
 
 ```bash
-pnpm --filter @cloakroom/core bootstrap
+pnpm --filter @haven/core bootstrap
 ```
 
-It deploys the `DriveRegistry` implementation, registers `cloakroom.eth` and `rooms.cloakroom.eth`, gives the relayer
+It deploys the `DriveRegistry` implementation, registers `haven.eth` and `rooms.haven.eth`, gives the relayer
 only `ROLE_REGISTRAR` on both, writes the addresses to `contracts/deployments/sepolia.json`, and prints the Etherscan
 verify command. Check with any address: `cast call <registry> "wasAllowed(address,uint256,uint64)" …`.
 
 **2. API.** Copy `apps/api/.env.example` to `apps/api/.env` and fill it in, then
-`pnpm --filter @cloakroom/api start` (or deploy with `apps/api/fly.toml`). The relayer needs Sepolia ETH and tGLM.
+`pnpm --filter @haven/api start` (or deploy with `apps/api/fly.toml`). The relayer needs Sepolia ETH and tGLM.
 
 **3. Website.** Copy `.env.example` values into `apps/web/.env.local`; `NEXT_PUBLIC_API_URL` and
 `NEXT_PUBLIC_BEE_URL` are the API's URL, `NEXT_PUBLIC_ARKIV_RPC_URL` is `<API URL>/arkiv-rpc`. Then
-`pnpm --filter @cloakroom/web dev`, or deploy `apps/web` to Vercel (`apps/web/vercel.json`).
+`pnpm --filter @haven/web dev`, or deploy `apps/web` to Vercel (`apps/web/vercel.json`).
 Set `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` to enable RainbowKit's mobile wallet links and QR pairing;
 without it, only injected browser wallets are available. WalletConnect pairing uses its relay service.
 
-**4. Extension.** `apps/extension/.env` (see its `.env.example`), then `pnpm --filter @cloakroom/extension zip`.
+**4. Extension.** `apps/extension/.env` (see its `.env.example`), then `pnpm --filter @haven/extension zip`.
 
-**5. Website release (add-on F3).** Commit, then `pnpm --filter @cloakroom/web build` and
-`pnpm --filter @cloakroom/core release publish <version>` with `RELEASE_PRIVATE_KEY` (R, funded with tGLM),
+**5. Website release (add-on F3).** Commit, then `pnpm --filter @haven/web build` and
+`pnpm --filter @haven/core release publish <version>` with `RELEASE_PRIVATE_KEY` (R, funded with tGLM),
 `DEPLOYER_PRIVATE_KEY`, `BEE_URL` and `POSTAGE_BATCH_ID` set. It uploads the site and its manifest to Swarm, writes
-`cloak.release` and points `cloakroom.eth` at the Swarm copy; put the printed R address in the extension's
+`haven.release` and points `haven.eth` at the Swarm copy; put the printed R address in the extension's
 `WXT_RELEASE_SIGNER`. Anyone can rebuild the commit and run `release rebuild <rootHash>`; `release revoke <rootHash>`
 withdraws a build.
 
-**6. End-to-end check.** With the API running and `API_URL` set: `pnpm --filter @cloakroom/core e2e`. Three random
+**6. End-to-end check.** With the API running and `API_URL` set: `pnpm --filter @haven/core e2e`. Three random
 identities run the whole story (room, upload, share, expiry, a locked file, removal, public view) and every
 transaction link is appended to `docs/evidence.md`.
 
@@ -149,7 +149,7 @@ import { createPublicClient } from "@arkiv-network/sdk";
 import { rabdi } from "@arkiv-network/sdk/chains";
 import { eq } from "@arkiv-network/sdk/query";
 import { addr } from "@arkiv-network/sdk/schema";
-import { FileSchema } from "@cloakroom/core";
+import { FileSchema } from "@haven/core";
 import { http } from "viem";
 
 const arkiv = createPublicClient({ chain: rabdi({ accessKey }), transport: http(`https://rpc.rabdi.db-chain.testnet.arkiv.network/${accessKey}`) });
@@ -158,14 +158,14 @@ const files = await arkiv.select().from(FileSchema).where(eq("folder", addr("0x<
 ```
 
 The public key log of a name, as any app can read it (forged entries are filtered by checking each `sig` against the
-name's controller, as `checkKeyLog` in `@cloakroom/core` does):
+name's controller, as `checkKeyLog` in `@haven/core` does):
 
 ```ts
 import { asc, eq } from "@arkiv-network/sdk/query";
 import { str } from "@arkiv-network/sdk/schema";
-import { KeyLogSchema } from "@cloakroom/core";
+import { KeyLogSchema } from "@haven/core";
 
-const log = await arkiv.select().from(KeyLogSchema).where(eq("ensName", str("investor.cloakroom.eth"))).orderBy(asc("seq")).fetch();
+const log = await arkiv.select().from(KeyLogSchema).where(eq("ensName", str("investor.haven.eth"))).orderBy(asc("seq")).fetch();
 // each row: ensName, seq, kind, spendingPublicKey, devicePublicKey, prevEntryKey, sig (EIP-712)
 ```
 
@@ -174,13 +174,13 @@ const log = await arkiv.select().from(KeyLogSchema).where(eq("ensName", str("inv
 | Who | Writes | Address |
 |---|---|---|
 | Relayer (API) | Sepolia: names, room registries, drips. Arkiv: tGLM drips | from `RELAYER_PRIVATE_KEY`; shown at `GET /config` |
-| Deployer | Sepolia: the implementation, `cloakroom.eth`, `rooms.cloakroom.eth` | from `DEPLOYER_PRIVATE_KEY` |
+| Deployer | Sepolia: the implementation, `haven.eth`, `rooms.haven.eth` | from `DEPLOYER_PRIVATE_KEY` |
 | Each user's K | Their own folders' entities | derived on the device |
 | Each room's K_room | That room's entities | derived on the device; unlinked to K |
 | Each member's stealth S | Their file entries | derived per share |
-| Relayer (API), add-ons | Arkiv: `cloak.keylog` and `cloak.device` entries users signed (validity is the signature) | same relayer |
-| Release key R | Arkiv: `cloak.release`, `cloak.unrelease` | from `RELEASE_PRIVATE_KEY`; the extension's `WXT_RELEASE_SIGNER` |
-| Any rebuilder | Arkiv: `cloak.rebuild` | their own key |
+| Relayer (API), add-ons | Arkiv: `haven.keylog` and `haven.device` entries users signed (validity is the signature) | same relayer |
+| Release key R | Arkiv: `haven.release`, `haven.unrelease` | from `RELEASE_PRIVATE_KEY`; the extension's `WXT_RELEASE_SIGNER` |
+| Any rebuilder | Arkiv: `haven.rebuild` | their own key |
 
 ## State transitions
 

@@ -1,6 +1,6 @@
 // Turns viem and contract errors into DriveError codes the UI can act on.
 
-import { DriveError, type DriveErrorCode } from "@cloakroom/types";
+import { DriveError, type DriveErrorCode } from "@haven/types";
 import { BaseError, ContractFunctionRevertedError, HttpRequestError, TimeoutError } from "viem";
 
 /** Custom errors from DriveRegistry and the ENSv2 contracts it inherits. */

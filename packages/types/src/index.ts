@@ -38,10 +38,10 @@ export interface KeyValueStore {
 // ---------- Domain types ----------
 
 export interface Identity {
-  ensName: string | null;            // "alice.cloakroom.eth" once claimed
+  ensName: string | null;            // "alice.haven.eth" once claimed
   wallet: Address | null;            // main wallet W (null for passkey or "Try it")
   driveKey: Address;                 // K
-  spendingPublicKey: Hex;            // published as the cloak.key text record
+  spendingPublicKey: Hex;            // published as the haven.key text record
 }
 
 export interface Access {
@@ -52,7 +52,7 @@ export interface Access {
 
 export interface Folder {
   registry: Address;                 // the folder's ID everywhere
-  ensName: string;                   // "f-7k2x.alice.cloakroom.eth" or "r-9f3k2x.rooms.cloakroom.eth"
+  ensName: string;                   // "f-7k2x.alice.haven.eth" or "r-9f3k2x.rooms.haven.eth"
   displayName: string;               // decrypted ("Series A")
   kind: FolderKind;
   parent: Address | null;
@@ -139,9 +139,9 @@ export interface PublicView {
 export type DriveErrorCode =
   | "NOT_SIGNED_IN"
   | "WALLET_NOT_SUPPORTED"           // contract wallet, or signatures differ
-  | "KEY_MISMATCH"                   // derived key != cloak.key on this name
+  | "KEY_MISMATCH"                   // derived key != haven.key on this name
   | "NAME_TAKEN"
-  | "NO_CLOAK_KEY"                    // recipient has no cloak.key record
+  | "NO_HAVEN_KEY"                    // recipient has no haven.key record
   | "NOT_AUTHORIZED"
   | "EXPIRED"
   | "REFRESH_PENDING"                // editors blocked until a manager refreshes keys
@@ -183,7 +183,7 @@ export type SignInSource =
 export interface DriveClient {
   // session
   signInMessage(address: Address): string;
-  /** True when this address has no cloak.key yet, so the UI must collect two signatures. */
+  /** True when this address has no haven.key yet, so the UI must collect two signatures. */
   needsSecondSignature(address: Address): Promise<boolean>;
   signIn(source: SignInSource): Promise<Identity>;
   restore(): Promise<Identity | null>;

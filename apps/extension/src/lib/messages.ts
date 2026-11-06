@@ -15,8 +15,8 @@ export type KeysReply = { ok: true; seed: number[] } | { ok: false; reason: stri
 export type PairReply = { ok: true; ensName: string | null } | { ok: false; error: string };
 
 /** window.postMessage envelopes on the website's page. Both sides check the origin. */
-export const FROM_WEB = "cloakroom-web";
-export const FROM_EXT = "cloakroom-ext";
+export const FROM_WEB = "haven-web";
+export const FROM_EXT = "haven-ext";
 
-export const NEW_SHARES_KEY = "cloak:newShares";
-export const LAST_CHECK_KEY = "cloak:lastCheck";
+export const NEW_SHARES_KEY = "haven:newShares";
+export const LAST_CHECK_KEY = "haven:lastCheck";

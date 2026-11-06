@@ -1,6 +1,6 @@
 "use client";
 
-import type { Folder } from "@cloakroom/types";
+import type { Folder } from "@haven/types";
 import { useState } from "react";
 import { cx } from "./format";
 import { Button, Dialog, ErrorNote, inputClass } from "./primitives";

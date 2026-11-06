@@ -2,7 +2,7 @@
 // The Arkiv side is represented by records shaped exactly as arkiv.ts reads them (block numbers plus a block→time
 // clock); the live A4 script runs the same rules against entities on Arkiv.
 
-import type { Address, Hex } from "@cloakroom/types";
+import type { Address, Hex } from "@haven/types";
 import { toHex } from "viem";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 

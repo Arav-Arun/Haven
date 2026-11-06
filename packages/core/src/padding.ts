@@ -1,10 +1,10 @@
 // Padding: every encrypted file is exactly one bucket size, so its real size doesn't show
-// (CLOAKROOM_PLAN.md section 7). The AES-GCM nonce and tag are counted inside the bucket.
+// (HAVEN_PLAN.md section 7). The AES-GCM nonce and tag are counted inside the bucket.
 //
 //   blob = AES-GCM(fileKey, [4-byte big-endian length][data][zeros])  →  nonce ‖ ciphertext ‖ tag
 //   len(blob) = bucket, exactly
 
-import { DriveError } from "@cloakroom/types";
+import { DriveError } from "@haven/types";
 
 import { AES_OVERHEAD, aesDecrypt, aesEncrypt } from "./crypto";
 

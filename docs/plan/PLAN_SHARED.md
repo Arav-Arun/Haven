@@ -1,7 +1,7 @@
-# Cloakroom: shared rules for the two-person build
+# Haven: shared rules for the two-person build
 
 Both people read this file first, then their own plan (`PLAN_A.md` or `PLAN_B.md`). The design itself is in
-`CLOAKROOM_PLAN.md`; when this file and that one disagree, `CLOAKROOM_PLAN.md` wins on design, and this file wins on
+`HAVEN_PLAN.md`; when this file and that one disagree, `HAVEN_PLAN.md` wins on design, and this file wins on
 who does what.
 
 ## 1. How the split works
@@ -36,10 +36,10 @@ the first real run always finds surprises, and M1 leaves time to fix them.
 
 ## 2. Step 0 (Person A, before either starts; about 30 minutes)
 
-1. Create an empty public GitHub repo `cloakroom` at the event (From Scratch track). Clone it.
+1. Create an empty public GitHub repo `haven` at the event (From Scratch track). Clone it.
 2. Create this skeleton:
    ```
-   package.json            {"name":"cloakroom","private":true,"packageManager":"pnpm@9",
+   package.json            {"name":"haven","private":true,"packageManager":"pnpm@9",
                             "scripts":{"build":"pnpm -r build","test":"pnpm -r test","typecheck":"pnpm -r typecheck"}}
    pnpm-workspace.yaml     packages: ["packages/*", "apps/*"]
    tsconfig.base.json      strict, ES2022, moduleResolution "bundler"
@@ -47,12 +47,12 @@ the first real run always finds surprises, and M1 leaves time to fix them.
    .env.example            (section 4, exactly)
    LICENSE                 MIT
    CLAUDE.md               (section 5, exactly)
-   docs/plan/              copies of CLOAKROOM_PLAN.md, PLAN_SHARED.md, PLAN_A.md, PLAN_B.md
-   packages/types/         package.json {"name":"@cloakroom/types","version":"0.0.0","type":"module",
+   docs/plan/              copies of HAVEN_PLAN.md, PLAN_SHARED.md, PLAN_A.md, PLAN_B.md
+   packages/types/         package.json {"name":"@haven/types","version":"0.0.0","type":"module",
                                          "exports":"./src/index.ts"}, src/index.ts (section 3, exactly)
-   packages/core/          package.json name "@cloakroom/core"      (empty src/, A fills it)
-   packages/platform/      package.json name "@cloakroom/platform"  (empty src/, B fills it)
-   packages/ui/            package.json name "@cloakroom/ui"        (empty src/, B fills it)
+   packages/core/          package.json name "@haven/core"      (empty src/, A fills it)
+   packages/platform/      package.json name "@haven/platform"  (empty src/, B fills it)
+   packages/ui/            package.json name "@haven/ui"        (empty src/, B fills it)
    apps/web/ apps/extension/ apps/api/ contracts/ arkiv/ infra/bee/   (empty, with a .gitkeep)
    ```
 3. Commit with "Step 0: workspace skeleton and frozen interface". Push to `main`.
@@ -107,10 +107,10 @@ export interface KeyValueStore {
 // ---------- Domain types ----------
 
 export interface Identity {
-  ensName: string | null;            // "alice.cloakroom.eth" once claimed
+  ensName: string | null;            // "alice.haven.eth" once claimed
   wallet: Address | null;            // main wallet W (null for passkey or "Try it")
   driveKey: Address;                 // K
-  spendingPublicKey: Hex;            // published as the cloak.key text record
+  spendingPublicKey: Hex;            // published as the haven.key text record
 }
 
 export interface Access {
@@ -121,7 +121,7 @@ export interface Access {
 
 export interface Folder {
   registry: Address;                 // the folder's ID everywhere
-  ensName: string;                   // "f-7k2x.alice.cloakroom.eth" or "r-9f3k2x.rooms.cloakroom.eth"
+  ensName: string;                   // "f-7k2x.alice.haven.eth" or "r-9f3k2x.rooms.haven.eth"
   displayName: string;               // decrypted ("Series A")
   kind: FolderKind;
   parent: Address | null;
@@ -208,9 +208,9 @@ export interface PublicView {
 export type DriveErrorCode =
   | "NOT_SIGNED_IN"
   | "WALLET_NOT_SUPPORTED"           // contract wallet, or signatures differ
-  | "KEY_MISMATCH"                   // derived key != cloak.key on this name
+  | "KEY_MISMATCH"                   // derived key != haven.key on this name
   | "NAME_TAKEN"
-  | "NO_CLOAK_KEY"                    // recipient has no cloak.key record
+  | "NO_HAVEN_KEY"                    // recipient has no haven.key record
   | "NOT_AUTHORIZED"
   | "EXPIRED"
   | "REFRESH_PENDING"                // editors blocked until a manager refreshes keys
@@ -252,7 +252,7 @@ export type SignInSource =
 export interface DriveClient {
   // session
   signInMessage(address: Address): string;
-  /** True when this address has no cloak.key yet, so the UI must collect two signatures. */
+  /** True when this address has no haven.key yet, so the UI must collect two signatures. */
   needsSecondSignature(address: Address): Promise<boolean>;
   signIn(source: SignInSource): Promise<Identity>;
   restore(): Promise<Identity | null>;
@@ -300,8 +300,8 @@ export type CreateDriveClient = (config: DriveConfig) => DriveClient;
 ```
 
 **Where things come from:**
-- `@cloakroom/core` exports `createDriveClient: CreateDriveClient` (A).
-- `@cloakroom/platform` exports `createAnonFetch(...)`, `createWebStorage()` and `createExtensionStorage()` (B).
+- `@haven/core` exports `createDriveClient: CreateDriveClient` (A).
+- `@haven/platform` exports `createAnonFetch(...)`, `createWebStorage()` and `createExtensionStorage()` (B).
 - **No faking, no hardcoding.** There is no mock client, no seeded or placeholder data and no fake hash anywhere. Every value the apps show is read live from Sepolia, Arkiv or Swarm. Only configuration (contract addresses, endpoints, Anon-RPC worker specifiers) is fixed, and it comes from env or one config file.
 
 ---
@@ -313,7 +313,7 @@ New variables go in a package-local `.env.example`.
 ```
 # --- apps (B) ---
 NEXT_PUBLIC_DEMO_MODE=true                 # 1-minute epochs
-NEXT_PUBLIC_APP_ORIGIN=https://cloakroom.vercel.app
+NEXT_PUBLIC_APP_ORIGIN=https://haven.vercel.app
 NEXT_PUBLIC_API_URL=
 NEXT_PUBLIC_BEE_URL=
 NEXT_PUBLIC_SEPOLIA_RPC_URL=
@@ -345,7 +345,7 @@ ETHERSCAN_API_KEY=
 ## 5. Repo `CLAUDE.md` (rules for both coding agents)
 
 ```markdown
-# Cloakroom: rules for coding agents
+# Haven: rules for coding agents
 
 Two people build this repo in parallel on separate laptops. Their branches are merged later.
 
@@ -358,11 +358,11 @@ Two people build this repo in parallel on separate laptops. Their branches are m
 - packages/types/src/index.ts is FROZEN. Never edit it on a branch.
 - Root files (package.json, pnpm-workspace.yaml, tsconfig.base.json, .env.example, CLAUDE.md) are frozen after Step 0.
   Add dependencies only in your own package's package.json.
-- Read docs/plan/CLOAKROOM_PLAN.md (design), docs/plan/PLAN_SHARED.md (rules) and your own plan before starting.
+- Read docs/plan/HAVEN_PLAN.md (design), docs/plan/PLAN_SHARED.md (rules) and your own plan before starting.
   Follow your plan's steps in order. After each step, run its "Done when" check, then commit.
 - Commit at least once an hour with a clear message, and push your branch. Judges check commit history.
 - Never commit .env files, private keys or seeds.
-- Solidity: load ethskills `security` and `testing` first. Addresses only from CLOAKROOM_PLAN.md section 6, never
+- Solidity: load ethskills `security` and `testing` first. Addresses only from HAVEN_PLAN.md section 6, never
   guessed.
 - Never put plaintext file contents, names or keys into Arkiv, ENS, Swarm, logs or analytics.
 - No third-party scripts, trackers or analytics in any client.
@@ -391,7 +391,7 @@ Two people build this repo in parallel on separate laptops. Their branches are m
 
 ## 7. First-hour checks: who does which
 
-Numbers refer to `CLOAKROOM_PLAN.md` section 17. Write results (pass/fail, tx hashes, timings) in
+Numbers refer to `HAVEN_PLAN.md` section 17. Write results (pass/fail, tx hashes, timings) in
 `docs/checks-a.md` or `docs/checks-b.md`.
 
 | Person | Checks |
@@ -399,7 +399,7 @@ Numbers refer to `CLOAKROOM_PLAN.md` section 17. Write results (pass/fail, tx ha
 | A | 1 app names · 2 `DriveRegistry` hooks, bits, upgrade freeze, initializer · 3 resolver · 4 aliasing and expired subname · 5 Arkiv · 8 Fluidkey kit · 9 wallet determinism |
 | B | 6 Bee node and postage · 7 Anon-RPC (JSON-RPC, any-HTTPS, isolation key, speed) · 10 faucets · WalletConnect project ID · Chrome Web Store developer account (a human pays the one-time fee) |
 
-**If a check fails:** the person who ran it posts the fallback they're switching to (each is in `CLOAKROOM_PLAN.md`)
+**If a check fails:** the person who ran it posts the fallback they're switching to (each is in `HAVEN_PLAN.md`)
 in chat, before H3.
 
 ---
@@ -411,10 +411,10 @@ in chat, before H3.
 | H3 | B → A | Anon-RPC result: which network is the default, and `supportsAnyHttps` (true/false) |
 | H4 | B → A | `BEE_URL` and `POSTAGE_BATCH_ID` (a private message, not committed) |
 | H4 | A → B | App names registered. The Arkiv access key stays on A's API; B gets the `/arkiv-rpc` URL once the API is live (H12) |
-| H8 | B → A | `@cloakroom/platform` working on `plan-b` (A can copy the built file locally to test; don't commit it) |
+| H8 | B → A | `@haven/platform` working on `plan-b` (A can copy the built file locally to test; don't commit it) |
 | H12 | A → B | API URL live; contract addresses in `packages/core/src/addresses.ts` |
 | H14 | both | **M1** |
-| H28 | B → A | Swarm reference of the web build, so A sets `cloakroom.eth`'s contenthash |
+| H28 | B → A | Swarm reference of the web build, so A sets `haven.eth`'s contenthash |
 | H30 | both | **M2** |
 
 ---
@@ -441,10 +441,10 @@ git checkout plan-a && git rebase origin/main     # or plan-b
 
 ### M2 at H30 (final)
 Same commands, `-m "M2: …"`. Then run the integration checklist together:
-- [ ] Every flow in `CLOAKROOM_PLAN.md` section 13 works on the deployed website, on testnet.
+- [ ] Every flow in `HAVEN_PLAN.md` section 13 works on the deployed website, on testnet.
 - [ ] The demo script (section 18) runs start to finish with demo epochs. The "locked" file shows on the phone.
 - [ ] The extension, paired with the website: badge, right-click save, the `maintain()` top-up.
-- [ ] The PWA installs on an Android phone and an iPhone; Android "Share to Cloakroom" works.
+- [ ] The PWA installs on an Android phone and an iPhone; Android "Share to Haven" works.
 - [ ] The Public view shows the summary sentence; the receipts show routes; direct calls are listed if any.
 - [ ] The validator hides a planted bad write (an expired editor writing, or a stale version).
 - [ ] `pnpm -r test` and `forge test` pass; the contracts are verified on Etherscan.

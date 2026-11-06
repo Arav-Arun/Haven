@@ -9,7 +9,7 @@
 // needed), then each label's live status, expiry and owner (ens.ts nameController). Holders without a valid public key
 // log (keydir.ts) are skipped and reported.
 
-import type { Address, Hex } from "@cloakroom/types";
+import type { Address, Hex } from "@haven/types";
 import { isAddressEqual } from "viem";
 import { normalize } from "viem/ens";
 

@@ -1,6 +1,6 @@
 "use client";
 
-import type { Role, Timestamp } from "@cloakroom/types";
+import type { Role, Timestamp } from "@haven/types";
 import type { ReactNode } from "react";
 import { cx, formatDate, formatUntil, ROLE_LABEL, ticketSerial } from "./format";
 

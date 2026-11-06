@@ -1,7 +1,7 @@
 "use client";
 
-import type { CloakroomClient, LiveStatus } from "@cloakroom/core";
-import type { Address, FileEntry, Folder, Receipt, Timestamp } from "@cloakroom/types";
+import type { HavenClient, LiveStatus } from "@haven/core";
+import type { Address, FileEntry, Folder, Receipt, Timestamp } from "@haven/types";
 import {
   Button,
   Dialog,
@@ -22,7 +22,7 @@ import {
   nowSeconds,
   useNow,
   type UploadItem,
-} from "@cloakroom/ui";
+} from "@haven/ui";
 import { ArrowLeft, Copy, Eye, FolderDown, FolderPlus, Radio, Share2, Timer } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -42,7 +42,7 @@ function backHref(f: Folder): string {
   return f.kind === "room" ? "/rooms" : f.kind === "group" ? "/groups" : "/drive";
 }
 
-function LinkDialog({ client, file, onClose }: { client: CloakroomClient; file: FileEntry; onClose: () => void }) {
+function LinkDialog({ client, file, onClose }: { client: HavenClient; file: FileEntry; onClose: () => void }) {
   const [hours, setHours] = useState(24);
   const [link, setLink] = useState<{ url: string; expiresAt: Timestamp } | null>(null);
   const [pending, setPending] = useState(false);
@@ -110,7 +110,7 @@ function LinkDialog({ client, file, onClose }: { client: CloakroomClient; file: 
   );
 }
 
-function VersionsDialog({ client, file, onClose }: { client: CloakroomClient; file: FileEntry; onClose: () => void }) {
+function VersionsDialog({ client, file, onClose }: { client: HavenClient; file: FileEntry; onClose: () => void }) {
   const versions = useLoad((c) => c.listVersions(file.folder, file.fileId), [file.folder, file.fileId]);
   const [error, setError] = useState<unknown>(null);
   return (
@@ -156,7 +156,7 @@ function LiveBadge({ status }: { status: LiveStatus | null }) {
   );
 }
 
-export function FolderView({ client, folder }: { client: CloakroomClient; folder: Address }) {
+export function FolderView({ client, folder }: { client: HavenClient; folder: Address }) {
   const router = useRouter();
   const { receipts } = useDrive();
   const now = useNow(1000);

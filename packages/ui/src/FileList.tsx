@@ -1,6 +1,6 @@
 "use client";
 
-import type { FileEntry, Folder, Timestamp } from "@cloakroom/types";
+import type { FileEntry, Folder, Timestamp } from "@haven/types";
 import { ChevronRight, Download, Eye, FileText, Folder as FolderIcon, History, Link2, Lock, Trash2, Users } from "lucide-react";
 import type { ReactNode } from "react";
 import { cx, formatAgo, formatBytes, formatDate, formatUntil, ROLE_LABEL } from "./format";

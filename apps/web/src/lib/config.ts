@@ -1,4 +1,4 @@
-import type { PrivateNetwork } from "@cloakroom/types";
+import type { PrivateNetwork } from "@haven/types";
 import { sepolia } from "viem/chains";
 
 /**
@@ -52,6 +52,6 @@ export const config = {
   walletConnectProjectId: raw.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? "",
   /** Sepolia's block explorer, from viem's chain definition. */
   explorerUrl: sepolia.blockExplorers.default.url,
-  /** The parent of every claimed name (CLOAKROOM_PLAN.md section 5): alice.cloakroom.eth. */
-  ensParent: "cloakroom.eth",
+  /** The parent of every claimed name (HAVEN_PLAN.md section 5): alice.haven.eth. */
+  ensParent: "haven.eth",
 };

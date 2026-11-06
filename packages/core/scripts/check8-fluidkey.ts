@@ -1,8 +1,8 @@
-// First-hour check 8 (CLOAKROOM_PLAN.md section 17): the Fluidkey stealth-account-kit 1.1.1
+// First-hour check 8 (HAVEN_PLAN.md section 17): the Fluidkey stealth-account-kit 1.1.1
 //   - derives the same keys from the same signature of the fixed sign-in message;
 //   - a sharer computes stealth address S from the recipient's spending public key P and a random ephemeral key e;
 //   - the recipient recovers S's private key from its spending private key and e·G, and nobody else does.
-// Run: pnpm --filter @cloakroom/core check8
+// Run: pnpm --filter @haven/core check8
 // Uses only local, freshly generated test keys. Nothing touches a network.
 
 import assert from "node:assert/strict";
@@ -16,19 +16,19 @@ import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 
 const ROUNDS = 200;
 
-/** The fixed SIWE-format message from CLOAKROOM_PLAN.md section 5 (address must be EIP-55 checksummed). */
+/** The fixed SIWE-format message from HAVEN_PLAN.md section 5 (address must be EIP-55 checksummed). */
 function signInMessage(address: Hex): string {
   return [
-    "cloakroom.vercel.app wants you to sign in with your Ethereum account:",
+    "haven.vercel.app wants you to sign in with your Ethereum account:",
     getAddress(address),
     "",
-    "Create your Cloakroom keys. Anyone who gets this signature can read all your Cloakroom files.",
-    "Only sign this on https://cloakroom.vercel.app.",
+    "Create your Haven keys. Anyone who gets this signature can read all your Haven files.",
+    "Only sign this on https://haven.vercel.app.",
     "",
-    "URI: https://cloakroom.vercel.app",
+    "URI: https://haven.vercel.app",
     "Version: 1",
     "Chain ID: 11155111",
-    "Nonce: cloakroomkeysv1",
+    "Nonce: havenkeysv1",
     "Issued At: 2026-11-06T00:00:00.000Z",
   ].join("\n");
 }

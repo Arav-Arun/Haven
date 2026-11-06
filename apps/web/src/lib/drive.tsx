@@ -1,25 +1,25 @@
 "use client";
 
-import { createDriveClient, type CloakroomClient } from "@cloakroom/core";
-import { createWebStorage, requestVerifiedKeys } from "@cloakroom/platform";
-import type { Identity, KeyValueStore, Receipt } from "@cloakroom/types";
+import { createDriveClient, type HavenClient } from "@haven/core";
+import { createWebStorage, requestVerifiedKeys } from "@haven/platform";
+import type { Identity, KeyValueStore, Receipt } from "@haven/types";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { getAnon } from "./anon";
 import { CLIENT_NEEDS, config, missingConfig } from "./config";
 
-/** The one place the app gets a DriveClient: @cloakroom/core's createDriveClient. There is no mock. */
+/** The one place the app gets a DriveClient: @haven/core's createDriveClient. There is no mock. */
 
 /** Whose keys this tab is using: your own, or one of the two "Try it" personas, each with its own storage. */
 export type Profile = "me" | "founder" | "investor";
-const PROFILE_KEY = "cloakroom:profile";
+const PROFILE_KEY = "haven:profile";
 
 function storageName(p: Profile) {
-  return p === "me" ? "cloakroom" : `cloakroom-try-${p}`;
+  return p === "me" ? "haven" : `haven-try-${p}`;
 }
 
 // ---------------------------------------------------------------- add-on F3: keys kept in the extension
 
-const CUSTODY_KEY = "cloakroom:custody";
+const CUSTODY_KEY = "haven:custody";
 const SEED_KEY = "seed";
 
 /** True when the user chose "Keep keys in the extension": the seed is then never written to this site's storage. */
@@ -61,7 +61,7 @@ function unavailableReason(): string | null {
 }
 
 /** A client for one profile. Exported for "Try it", which keeps both personas signed in at once. */
-export function makeClient(profile: Profile): CloakroomClient | null {
+export function makeClient(profile: Profile): HavenClient | null {
   if (unavailableReason()) return null;
   const storage = createWebStorage({ dbName: storageName(profile) });
   return createDriveClient({
@@ -78,7 +78,7 @@ export function makeClient(profile: Profile): CloakroomClient | null {
 }
 
 interface DriveState {
-  client: CloakroomClient | null;
+  client: HavenClient | null;
   /** Why there is no client, in a sentence for the screen. */
   unavailable: string | null;
   profile: Profile;
@@ -164,7 +164,7 @@ export function useDrive(): DriveState {
 }
 
 /** Runs `load` with the client whenever its inputs change, with loading and error state. */
-export function useLoad<T>(load: ((c: CloakroomClient) => Promise<T>) | null, deps: unknown[]) {
+export function useLoad<T>(load: ((c: HavenClient) => Promise<T>) | null, deps: unknown[]) {
   const { client } = useDrive();
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<unknown>(null);

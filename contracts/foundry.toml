@@ -1,4 +1,4 @@
-# Cloakroom contracts (Person A). DriveRegistry builds on ENSv2 at ensdomains/contracts-v2@48b3e2d,
+# Haven contracts (Person A). DriveRegistry builds on ENSv2 at ensdomains/contracts-v2@48b3e2d,
 # vendored as the git submodule lib/contracts-v2. Its own dependencies live under
 # lib/contracts-v2/contracts/lib/ and are mapped in remappings.txt.
 

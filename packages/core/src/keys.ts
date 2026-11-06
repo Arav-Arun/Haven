@@ -1,4 +1,4 @@
-// Sign-in and identity keys (CLOAKROOM_PLAN.md section 5).
+// Sign-in and identity keys (HAVEN_PLAN.md section 5).
 //
 // Every identity comes from one secret seed:
 //   wallet  → r ‖ s of the signature of the fixed sign-in message (v is ignored, as in the Fluidkey kit, because
@@ -11,7 +11,7 @@
 //   K_room[n] = HKDF(seed, "room/n")
 
 import { generateKeysFromSignature } from "@fluidkey/stealth-account-kit";
-import { DriveError, type Address, type Hex, type SignInSource } from "@cloakroom/types";
+import { DriveError, type Address, type Hex, type SignInSource } from "@haven/types";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import {
   bytesToHex,
@@ -32,7 +32,7 @@ import { concatBytes, equalBytes, hkdf, randomBytes, toPrivateKey } from "./cryp
 
 /** Part of key derivation: changing any of these changes every user's keys. */
 export const SIGN_IN_CHAIN_ID = sepolia.id;
-export const SIGN_IN_NONCE = "cloakroomkeysv1";
+export const SIGN_IN_NONCE = "havenkeysv1";
 export const SIGN_IN_ISSUED_AT = "2026-11-06T00:00:00.000Z";
 
 /**
@@ -50,7 +50,7 @@ export function signInMessage(appOrigin: string, address: Address): string {
     `${origin.host} wants you to sign in with your Ethereum account:`,
     getAddress(address),
     "",
-    "Create your Cloakroom keys. Anyone who gets this signature can read all your Cloakroom files. " +
+    "Create your Haven keys. Anyone who gets this signature can read all your Haven files. " +
       `Only sign this on ${origin.origin}.`,
     "",
     `URI: ${origin.origin}`,
@@ -74,7 +74,7 @@ export interface IdentityKeys {
   wallet: Address | null;
   spendingPrivateKey: Hex;
   viewingPrivateKey: Hex;
-  /** Uncompressed (0x04…), published as the cloak.key text record. */
+  /** Uncompressed (0x04…), published as the haven.key text record. */
   spendingPublicKey: Hex;
   /** K, the drive key (private). */
   driveKey: Hex;
@@ -166,7 +166,7 @@ export interface WalletSignInCheck {
   appOrigin: string;
   address: Address;
   signatures: Hex[];
-  /** First device (no cloak.key yet): two signatures are required and must match. */
+  /** First device (no haven.key yet): two signatures are required and must match. */
   firstDevice: boolean;
   /** Code at the address on Sepolia (read through Anon-RPC). */
   getCode: (address: Address) => Promise<Hex | undefined>;
@@ -212,7 +212,7 @@ export async function checkWalletSignIn(check: WalletSignInCheck): Promise<KeyMa
 }
 
 /**
- * Later devices: the derived spending public key must equal the cloak.key record on the user's name, or the app
+ * Later devices: the derived spending public key must equal the haven.key record on the user's name, or the app
  * stops instead of silently creating a second identity. No record (null or empty) means there is nothing to compare.
  */
 export function assertMatchesPublished(keys: IdentityKeys, published: string | null | undefined): void {

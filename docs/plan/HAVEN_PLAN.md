@@ -1,4 +1,4 @@
-# Cloakroom: build plan (ETHGlobal Mumbai 2026)
+# Haven: build plan (ETHGlobal Mumbai 2026)
 
 Version 2, written 2026-11-06. Version 2 fixes the eight problems an outside review found in
 version 1; section 22 maps each one to its fix. The two-person build split is in `PLAN_SHARED.md`, `PLAN_A.md` and
@@ -22,7 +22,7 @@ version 1; section 22 maps each one to its fix. The two-person build split is in
 - Google Drive and DocSend see every file and every viewer.
 - Putting access onchain is worse: the whole world can see which investors got your data room.
 
-Cloakroom lets you share files with any ENS name so that only the recipient knows:
+Haven lets you share files with any ENS name so that only the recipient knows:
 - Each recipient is added as a fresh random address that can't be traced to their name.
 - For a data room, you can use an unlinked room that isn't connected to your name at all.
 - Files are encrypted in your browser, stored on Swarm, and listed on Arkiv.
@@ -57,7 +57,7 @@ Columns: **Web** = website; **Phone** = the same site installed as a PWA; **Ext*
 | # | Feature | What the user sees | Web | Phone | Ext | Priority |
 |---|---|---|---|---|---|---|
 | 1 | Safe sign-in | Sign one domain-bound message (twice on the first device, to check the wallet signs the same way each time). Wallets that can't are refused and pointed to passkey | ✓ | ✓ | pairs with web | Must |
-| 2 | Free name | Claim `you.cloakroom.eth` with no gas, or bring your own ENSv2 `.eth` | ✓ | ✓ | – | Must |
+| 2 | Free name | Claim `you.haven.eth` with no gas, or bring your own ENSv2 `.eth` | ✓ | ✓ | – | Must |
 | 3 | Two kinds of folder | **In my drive** (listed under your name) or **Unlinked room** (random name, not connected to you; recommended for data rooms) | ✓ | ✓ | view | Must |
 | 4 | Upload | Drag and drop; many files; up to 25 MB each; encrypted and padded in the browser | ✓ | ✓ camera/files | popup drop, right-click | Must |
 | 5 | Preview and download | Images, PDF, video and text, decrypted locally; "download whole folder" | ✓ | ✓ | side panel | Must |
@@ -70,20 +70,20 @@ Columns: **Web** = website; **Phone** = the same site installed as a PWA; **Ext*
 | 12 | Receipts panel | Each action: tx hashes, which permission check ran, Swarm reference, and which network route each call took (Anon-RPC or direct) | ✓ | compact | – | Must |
 | 13 | Private network by default | Anon-RPC on; picker for Nym / Nox / Tor; red "Not private" banner if off | ✓ | ✓ | ✓ | Must |
 | 14 | New-device recovery | Sign in on a new device and everything comes back, including unlinked rooms | ✓ | ✓ | ✓ | Must |
-| 15 | Extension basics | Popup (recent files, shared with me, upload), right-click "Save to Cloakroom", badge for new shares, background check that tops up members' gas for owners | – | – | ✓ | Must |
+| 15 | Extension basics | Popup (recent files, shared with me, upload), right-click "Save to Haven", badge for new shares, background check that tops up members' gas for owners | – | – | ✓ | Must |
 | 16 | Installable phone app | Home-screen icon, full screen, app shell works offline | – | ✓ | – | Must |
 | 17 | Groups | Share once with a group; add people in one place; removing someone triggers a key refresh in every folder shared with the group | ✓ | ✓ | – | Should |
 | 18 | Expiring links | Link for one file, for people with no wallet; the key sits in the `#fragment`, never sent to a server | ✓ | ✓ | copy link | Should |
 | 19 | Member list for members only | Members see each other unless marked "hide from other members" | ✓ | ✓ | – | Should |
 | 20 | Versions | Upload a new version; see history | ✓ | ✓ | – | Should |
 | 21 | Mount a folder | Add someone's folder into your own ENS tree (namespace aliasing). Public, so the UI warns; not allowed for unlinked rooms | ✓ | – | – | Should |
-| 22 | Android share target | "Share to Cloakroom" from any app's share sheet | – | ✓ Android | – | Should |
+| 22 | Android share target | "Share to Haven" from any app's share sheet | – | ✓ Android | – | Should |
 | 23 | Side panel and Save page | Full drive in Chrome's side panel; save the current page privately | – | – | ✓ | Should |
 | 24 | Passkey sign-in | No wallet needed; keys from a passkey (WebAuthn PRF). Phishing-resistant by design | ✓ | ✓ | pairs | Should |
 | 25 | Search | Local search over decrypted names | ✓ | ✓ | ✓ | Should |
 | 26 | App copy on Swarm | Same app served from Swarm via the ENS name; works if Vercel is down | ✓ | – | – | Should |
 | 27 | Unlinkable room tokens | Blind-signed tokens so even our API can't link a room to the account that made it | ✓ | ✓ | – | Should |
-| 28 | Gmail button | "Insert Cloakroom link" in Gmail compose | – | – | ✓ | Stretch |
+| 28 | Gmail button | "Insert Haven link" in Gmail compose | – | – | ✓ | Stretch |
 | 29 | Firefox build | Signed XPI | – | – | ✓ | Stretch |
 | 30 | Files as ENS names | Every file resolves as an ENS name with no token, answered from Arkiv (CCIP-Read) | ✓ | – | – | Stretch |
 
@@ -125,16 +125,16 @@ The signed message is SIWE-format, so the wallet itself checks the domain. It is
 issued-at), so it always produces the same keys:
 
 ```
-cloakroom.vercel.app wants you to sign in with your Ethereum account:
+haven.vercel.app wants you to sign in with your Ethereum account:
 0xYourAddress
 
-Create your Cloakroom keys. Anyone who gets this signature can read all your Cloakroom files.
-Only sign this on https://cloakroom.vercel.app.
+Create your Haven keys. Anyone who gets this signature can read all your Haven files.
+Only sign this on https://haven.vercel.app.
 
-URI: https://cloakroom.vercel.app
+URI: https://haven.vercel.app
 Version: 1
 Chain ID: 11155111
-Nonce: cloakroomkeysv1
+Nonce: havenkeysv1
 Issued At: 2026-11-06T00:00:00.000Z
 ```
 
@@ -146,7 +146,7 @@ Issued At: 2026-11-06T00:00:00.000Z
   - First device: the app asks for the signature **twice** and compares the two. It refuses if they differ, or if the
     address has contract code (Safe, Coinbase Smart Wallet and other smart-contract wallets), and points the user to
     passkey sign-in.
-  - Every later device: the derived spending public key must equal the `cloak.key` record on the user's ENS name.
+  - Every later device: the derived spending public key must equal the `haven.key` record on the user's ENS name.
     Otherwise the app stops with "This sign-in gives different keys; your files are safe; use your original method".
     It never silently creates a second identity.
 - **Derived from the seed** (the signature, or the passkey PRF output):
@@ -169,13 +169,13 @@ Issued At: 2026-11-06T00:00:00.000Z
 
 | Name | What it is | Who holds what |
 |---|---|---|
-| `cloakroom.eth` | App name, registered through `ETHRegistrar`. Subregistry: stock `UserRegistry` proxy. Contenthash: app copy on Swarm | Team multisig. API registrar key: only `ROLE_REGISTRAR` |
-| `rooms.cloakroom.eth` | Parent of all unlinked rooms | Team multisig. API registrar key: only `ROLE_REGISTRAR` |
-| `alice.cloakroom.eth` | A user. Resolver: Alice's own PermissionedResolver (`cloak.key`). Subregistry: her drive root (a `DriveRegistry`) | Name owned by Alice's wallet W (dangerous powers); drive root everyday roles to K |
-| `<random>.alice.cloakroom.eth` | A folder in her drive: a `DriveRegistry` | W: dangerous powers. K: everyday roles |
-| `r-<random>.rooms.cloakroom.eth` | An unlinked room: a `DriveRegistry` with no link to Alice | `K_room[n]` (fresh key) |
+| `haven.eth` | App name, registered through `ETHRegistrar`. Subregistry: stock `UserRegistry` proxy. Contenthash: app copy on Swarm | Team multisig. API registrar key: only `ROLE_REGISTRAR` |
+| `rooms.haven.eth` | Parent of all unlinked rooms | Team multisig. API registrar key: only `ROLE_REGISTRAR` |
+| `alice.haven.eth` | A user. Resolver: Alice's own PermissionedResolver (`haven.key`). Subregistry: her drive root (a `DriveRegistry`) | Name owned by Alice's wallet W (dangerous powers); drive root everyday roles to K |
+| `<random>.alice.haven.eth` | A folder in her drive: a `DriveRegistry` | W: dangerous powers. K: everyday roles |
+| `r-<random>.rooms.haven.eth` | An unlinked room: a `DriveRegistry` with no link to Alice | `K_room[n]` (fresh key) |
 | `l-<random>.<folder>` | Expiring link subname | K |
-| `<label>.priya.cloakroom.eth` → another folder's registry | Mount (namespace aliasing); not allowed for rooms | Priya's K |
+| `<label>.priya.haven.eth` → another folder's registry | Mount (namespace aliasing); not allowed for rooms | Priya's K |
 
 ### Roles in each `DriveRegistry`
 
@@ -271,7 +271,7 @@ Keep these only in `packages/core/src/addresses.ts`. Re-check before deploying.
 
 ### Rules for writing and reading
 1. **Write rule.** Before every upload, the app:
-   - loads the folder's latest version (`cloak.rotation`) and any open refresh requests;
+   - loads the folder's latest version (`haven.rotation`) and any open refresh requests;
    - encrypts with the **latest version's current epoch key**;
    - if a refresh request is open, editors are blocked with "Waiting for the owner to refresh access", while a
      manager's app refreshes first, automatically.
@@ -304,13 +304,13 @@ Keep these only in `packages/core/src/addresses.ts`. Re-check before deploying.
   group changes and uploads: **no file written after a member's end, or after their removal, decrypts with any key that
   member ever received.**
 
-### Private share to `vc.cloakroom.eth`
-1. Read `cloak.key` (spending public key P) through the Universal Resolver.
+### Private share to `vc.haven.eth`
+1. Read `haven.key` (spending public key P) through the Universal Resolver.
 2. Pick a random ephemeral key e. Compute `S = generateStealthAddresses({ spendingPublicKeys: [P], ephemeralPrivateKey: e })`.
    The welcome note is sealed with `HKDF(ECDH(e, P))`.
 3. Onchain: `grantRolesUntil(S)`. For editors and managers, the sharer's key also sends S its gas in the same action
    (section 8).
-4. On Arkiv: a `cloak.welcome` (holds `e·G` and the sealed `MK_S`), a `cloak.keycopy` for S, and a roster update.
+4. On Arkiv: a `haven.welcome` (holds `e·G` and the sealed `MK_S`), a `haven.keycopy` for S, and a roster update.
 5. **The recipient**, for each welcome note:
    - gets S's private key from `generateStealthPrivateKey({ spendingPrivateKey, ephemeralPublicKey })`;
    - unseals `MK_S`, then its key copies.
@@ -339,8 +339,8 @@ Keep these only in `packages/core/src/addresses.ts`. Re-check before deploying.
 
 ## 9. Unlinked rooms (fixes "the owner's activity is public")
 
-- A room is `r-<random>.rooms.cloakroom.eth`, a `DriveRegistry` whose root is `K_room[n]`, a fresh key from the seed.
-  No record, transaction or gas payment connects it to `alice.cloakroom.eth`, K or W.
+- A room is `r-<random>.rooms.haven.eth`, a `DriveRegistry` whose root is `K_room[n]`, a fresh key from the seed.
+  No record, transaction or gas payment connects it to `alice.haven.eth`, K or W.
 - **Creation goes through the API** (`POST /room`): the API registers the label and deploys the registry, so `K_room`
   needs no funds at creation. Gas for later grants comes in a batched drip.
 - **What the API learns:**
@@ -365,14 +365,14 @@ Keep these only in `packages/core/src/addresses.ts`. Re-check before deploying.
 
 | Schema | Owner (`$owner`) | Indexed | Stored (all sealed) | Expires | Valid only if the owner had (at `$createdAt`) |
 |---|---|---|---|---|---|
-| `cloak.file` | the writer | `folder` addr, `fileId` str, `version` u64, `epoch` u64 | `swarmRef` str, `meta` bytes | 182 days, renewed | WRITE, plus the read rules in section 7 |
-| `cloak.welcome` | the sharer | `folder` addr, `bucket` u64 (week) | `ephemeralPub` str, `sealedMemberKey` bytes | the member's end, or 182 days at most | SHARE |
-| `cloak.keycopy` | the sharer | `folder` addr, `recipient` addr, `version` u64 | `sealed` bytes | the member's end | SHARE |
-| `cloak.roster` | a manager | `folder` addr, `version` u64 | `managers` bytes, `members` bytes | renewed | SHARE |
-| `cloak.rotation` | a manager | `folder` addr, `version` u64 | `t0` u64, `epochLength` u64 | renewed | SHARE |
-| `cloak.refresh` | a group manager | `folder` addr | `reason` bytes | 30 days | SHARE on the group |
-| `cloak.link` | the sharer | `link` str (namehash) | `bundle` bytes | link end | SHARE |
-| `cloak.tomb` | the writer | `folder` addr, `fileId` str | – | 182 days | WRITE |
+| `haven.file` | the writer | `folder` addr, `fileId` str, `version` u64, `epoch` u64 | `swarmRef` str, `meta` bytes | 182 days, renewed | WRITE, plus the read rules in section 7 |
+| `haven.welcome` | the sharer | `folder` addr, `bucket` u64 (week) | `ephemeralPub` str, `sealedMemberKey` bytes | the member's end, or 182 days at most | SHARE |
+| `haven.keycopy` | the sharer | `folder` addr, `recipient` addr, `version` u64 | `sealed` bytes | the member's end | SHARE |
+| `haven.roster` | a manager | `folder` addr, `version` u64 | `managers` bytes, `members` bytes | renewed | SHARE |
+| `haven.rotation` | a manager | `folder` addr, `version` u64 | `t0` u64, `epochLength` u64 | renewed | SHARE |
+| `haven.refresh` | a group manager | `folder` addr | `reason` bytes | 30 days | SHARE on the group |
+| `haven.link` | the sharer | `link` str (namehash) | `bundle` bytes | link end | SHARE |
+| `haven.tomb` | the writer | `folder` addr, `fileId` str | – | 182 days | WRITE |
 
 - **Why validation matters:** the SDK's own docs warn that anyone can write an entity a query matches. Every read
   passes the validator, which calls `wasAllowed` (section 6) as a normal view call.
@@ -399,7 +399,7 @@ Keep these only in `packages/core/src/addresses.ts`. Re-check before deploying.
   leaves the browser.
 - **Download:** Bee `/bytes/<ref>`. "Download whole folder" is the default when opening a folder, so the node can't
   tell which single file you wanted.
-- **App copy:** upload the static export (`--index-document index.html`) and set `cloakroom.eth`'s contenthash. Check
+- **App copy:** upload the static export (`--index-document index.html`) and set `haven.eth`'s contenthash. Check
   that absolute asset paths load from the gateway (a subdomain gateway such as bzz.link, or Next `basePath`)
   **(check)**.
 - **Rejected:** Swarm ACT (every reader would need a Bee node).
@@ -416,7 +416,7 @@ Keep these only in `packages/core/src/addresses.ts`. Re-check before deploying.
   demo gateway "may disappear").
 - **Always routed:** all JSON-RPC (Sepolia and Arkiv), through a viem `custom({ request })` transport over
   `worker.fetch`. That covers every sensitive lookup:
-  - name and `cloak.key` lookups;
+  - name and `haven.key` lookups;
   - roles and `wasAllowed`;
   - file lists, welcome scans and key copies;
   - all writes.
@@ -438,12 +438,12 @@ Keep these only in `packages/core/src/addresses.ts`. Re-check before deploying.
 ## 13. How each flow works
 
 1. **Sign in:** sign the message (twice on the first device) → check → keys → K gets a drip if new.
-2. **Claim a name:** `/claim` deploys Alice's resolver with `cloak.key`, deploys her drive root (K everyday, W
+2. **Claim a name:** `/claim` deploys Alice's resolver with `haven.key`, deploys her drive root (K everyday, W
    dangerous), and registers the name. The app then checks that the API holds no role on either contract and that
-   `cloak.key` equals her derived key.
+   `haven.key` equals her derived key.
 3. **Create a folder:** K deploys a `DriveRegistry` proxy and registers a random label, choosing "inherit" or "separate
    access". **Create a room:** `/room` with a token.
-4. **Upload:** apply the write rule → pad → encrypt → `/upload` → `cloak.file`.
+4. **Upload:** apply the write rule → pad → encrypt → `/upload` → `haven.file`.
 5. **Share:** derive S → grant (with an end date) → fund S if editor or manager → welcome note, key copy, roster →
    cascade key copies into inheriting subfolders.
 6. **Shared with me:** fetch new welcome notes by `bucket` → try each locally → read key copies and files with
@@ -451,7 +451,7 @@ Keep these only in `packages/core/src/addresses.ts`. Re-check before deploying.
 7. **End date:** nothing to do. Epoch keys, `_getRoles` and Arkiv expiry all end on their own.
 8. **Remove early:** revoke → refresh the folder and its inheriting subfolders → delete their key copies.
 9. **Groups / links / mount (Should):** as in sections 6, 7 and 9.
-10. **New device:** sign in → check keys against `cloak.key` → drive tree from ENS → rooms by checking n → entries from
+10. **New device:** sign in → check keys against `haven.key` → drive tree from ENS → rooms by checking n → entries from
     Arkiv → files from Swarm.
 11. **Extension pairing:** the site sends the seed to the extension through `externally_connectable` (our origins
     only), after the user confirms.
@@ -495,7 +495,7 @@ They get real names and rooms on testnet; the judge uploads their own files. Not
 | `POST /arkiv-rpc` | JSON-RPC pass-through to Arkiv that adds our access key server-side | Allowlisted methods only; rate limits; no logs |
 | `POST /upload` | Streams ciphertext to Bee | Signed by a key with WRITE (`wasAllowed` now); 25 MB per file; quota per key; stamp budget guard |
 
-- Relayer keys hold `ROLE_REGISTRAR` on `cloakroom.eth` and `rooms.cloakroom.eth`, and nothing else.
+- Relayer keys hold `ROLE_REGISTRAR` on `haven.eth` and `rooms.haven.eth`, and nothing else.
 - Logs: rate-limit counters for 24 hours; no contents.
 - **Escape:** users with their own `.eth` name and gas don't need the API, except for uploads (any Bee node works).
 
@@ -520,11 +520,11 @@ No funds move in the product beyond gas dust.
 
 ## 17. First-hour checks (H0–H3; split between A and B in `PLAN_SHARED.md`)
 
-1. **Register the app names:** `cloakroom.eth` through `ETHRegistrar`, then `rooms.cloakroom.eth`.
+1. **Register the app names:** `haven.eth` through `ETHRegistrar`, then `rooms.haven.eth`.
 2. **`DriveRegistry` at `48b3e2d`:** it compiles; bits 40/44/48 are free; `_onRolesGranted` / `_onRolesRevoked` work
    for the history; stripping `ROLE_UPGRADE` in `_getRoles` blocks `upgradeToAndCall`; our initializer works through
    `VerifiableFactory`.
-3. **PermissionedResolver** proxy with `initialize(grants, calls)` sets `cloak.key`; the deployer keeps no roles.
+3. **PermissionedResolver** proxy with `initialize(grants, calls)` sets `haven.key`; the deployer keeps no roles.
 4. **Namespace aliasing** resolves through `UniversalResolverV2`; an expired subname stops resolving.
 5. **Arkiv:**
    - `$createdAt` can be selected (and its unit);
@@ -551,12 +551,12 @@ No funds move in the product beyond gas dust.
 
 1. **0:00:** "Who did you share your data room with? Onchain, everyone knows. Here's how no one does."
 2. **0:15 Founder:** sign in → create an **unlinked room** "Series A" → drag in the deck and financials.
-3. **0:40 Share:** `vc.cloakroom.eth` as viewer until a time 2 minutes away (demo epochs are 1 minute); `priya` as
+3. **0:40 Share:** `vc.haven.eth` as viewer until a time 2 minutes away (demo epochs are 1 minute); `priya` as
    editor. Funding for Priya goes out in the same action.
 4. **1:00 Public view:** random addresses with end dates; ciphertext on Arkiv; the plain sentence "Anyone can see…
-   They can't see who owns it…". Then show that `acme.cloakroom.eth` has no link to the room.
+   They can't see who owns it…". Then show that `acme.haven.eth` has no link to the room.
 5. **1:20 Investor on a phone:** "Shared with you: Series A"; the deck opens.
-6. **1:45 Lawyer in Chrome:** right-click a term sheet → "Save to Cloakroom" → it appears in the room.
+6. **1:45 Lawyer in Chrome:** right-click a term sheet → "Save to Haven" → it appears in the room.
 7. **2:05 End date passes:**
    - the investor still has the deck they opened (we say so);
    - the founder uploads "Final terms", and on the investor's phone it shows as **locked**;
@@ -613,7 +613,7 @@ No funds move in the product beyond gas dust.
 | Access history | Foundry: `wasAllowed` before, during and after; revoke mid-way; renew; inherited; group |
 | Can't upgrade | Foundry: `upgradeToAndCall` reverts for K, W and the owner; fuzz over role grants |
 | Power split | Foundry: K can't set a subregistry, set the parent, unregister or transfer |
-| Wallet checks | Core tests: two different signatures are refused; a key mismatch with `cloak.key` is refused |
+| Wallet checks | Core tests: two different signatures are refused; a key mismatch with `haven.key` is refused |
 | Gas doesn't link | e2e: viewers never receive funds; S is funded only by the sharer; the API drip goes only to K or `K_room` |
 
 ---
@@ -634,7 +634,7 @@ No funds move in the product beyond gas dust.
 **CROPS gate (expand into the README `CROPS` section):**
 - **C (censorship resistance):** our API can refuse names, rooms, drips and uploads; Vercel can go down; an Anon-RPC
   network can fail.
-  - Escape: bring your own `.eth` name and gas, use any Bee node, open the Swarm copy at `cloakroom.eth`, or switch
+  - Escape: bring your own `.eth` name and gas, use any Bee node, open the Swarm copy at `haven.eth`, or switch
     network in Settings.
 - **O (open source):** MIT licence; contracts verified on Etherscan; the API and a Bee node run from the repo, so
   anyone can self-host the whole stack.
@@ -669,10 +669,10 @@ No funds move in the product beyond gas dust.
 | # | Finding | Fix (section) |
 |---|---|---|
 | 1 | Gas funding links stealth addresses | Viewers never need gas; the sharer funds editors and managers in the grant action; API drips go only to public keys, batched; "who can link what" table (8, 21) |
-| 2 | The owner's activity is public | Unlinked rooms under `rooms.cloakroom.eth` with fresh keys, created through the API with tokens; a plain-language metadata sentence in the Public view (9) |
+| 2 | The owner's activity is public | Unlinked rooms under `rooms.haven.eth` with fresh keys, created through the API with tokens; a plain-language metadata sentence in the Public view (9) |
 | 3 | Editors can leak new files to expired members; subfolders keep old keys | Epoch keys by key regression (expiry is cryptographic); refresh in the same action as removal; write rule and read rule; independent subfolder secrets with cascading refresh; property test (7, 20) |
 | 4 | "Access ends" overclaims | New wording everywhere: new files lock out; what they opened, they keep (1, 18) |
-| 5 | Phishing; wallets that don't sign deterministically | Domain-bound SIWE-format message with a warning; sign twice and compare; detect smart wallets; check against `cloak.key` on new devices; passkey path (5) |
+| 5 | Phishing; wallets that don't sign deterministically | Domain-bound SIWE-format message with a warning; sign twice and compare; detect smart wallets; check against `haven.key` on new devices; passkey path (5) |
 | 6 | A hot key can upgrade the contract | `_getRoles` strips the upgrade role from everyone, so it's frozen; dangerous roles on W; K only everyday roles and gas dust (6) |
 | 7 | Anon-RPC may not carry HTTP traffic | All JSON-RPC routed; a first-hour check for any-HTTPS; otherwise ask EF, and state and show what goes direct; "download whole folder" (12, 11) |
 | 8 | Past permissions need an archive node | Access history stored in `DriveRegistry`; `wasAllowed(account, role, t)` is a normal view call; event-log rebuild as a fallback (6, 10) |

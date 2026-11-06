@@ -1,6 +1,6 @@
 "use client";
 
-import type { AnonStatus } from "@cloakroom/types";
+import type { AnonStatus } from "@haven/types";
 import { ShieldAlert, ShieldCheck, ShieldEllipsis } from "lucide-react";
 import { networkName } from "./format";
 

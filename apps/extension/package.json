@@ -1,5 +1,5 @@
 {
-  "name": "@cloakroom/extension",
+  "name": "@haven/extension",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,10 +12,10 @@
   },
   "dependencies": {
     "@anon-rpc/browser-extension-harness": "0.4.0",
-    "@cloakroom/core": "workspace:*",
-    "@cloakroom/platform": "workspace:*",
-    "@cloakroom/types": "workspace:*",
-    "@cloakroom/ui": "workspace:*",
+    "@haven/core": "workspace:*",
+    "@haven/platform": "workspace:*",
+    "@haven/types": "workspace:*",
+    "@haven/ui": "workspace:*",
     "lucide-react": "^1.60.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"

@@ -6,13 +6,13 @@
 // deploys the room registry and registers its label, and uploads go through the same verifyUpload + wasAllowed check
 // before reaching Bee. Every key except the relayer's is fresh and random; nothing is pre-seeded.
 //
-// Run: pnpm --filter @cloakroom/core a4
+// Run: pnpm --filter @haven/core a4
 // Needs (repo-root .env and apps/api/.env): SEPOLIA_RPC_URL, RELAYER_PRIVATE_KEY (Sepolia ETH, tGLM, ROLE_REGISTRAR
-// on rooms.cloakroom.eth), ARKIV_RPC_URL, ARKIV_ACCESS_KEY, BEE_URL, POSTAGE_BATCH_ID; and in
-// contracts/deployments/sepolia.json: cloakroom.driveRegistryImpl, cloakroom.roomsRegistry.
+// on rooms.haven.eth), ARKIV_RPC_URL, ARKIV_ACCESS_KEY, BEE_URL, POSTAGE_BATCH_ID; and in
+// contracts/deployments/sepolia.json: haven.driveRegistryImpl, haven.roomsRegistry.
 
 import { secp256k1 } from "@noble/curves/secp256k1";
-import type { Hex, ReceiptStep } from "@cloakroom/types";
+import type { Hex, ReceiptStep } from "@haven/types";
 import {
   bytesToHex,
   createPublicClient,
@@ -167,7 +167,7 @@ const relayerIsRegistrar = await sepoliaPublic.readContract({
   functionName: "hasRootRoles",
   args: [1n, relayer.address],
 });
-check("relayer holds ROLE_REGISTRAR on rooms.cloakroom.eth", relayerIsRegistrar);
+check("relayer holds ROLE_REGISTRAR on rooms.haven.eth", relayerIsRegistrar);
 if (!relayerIsRegistrar) process.exit(1);
 
 // 1. A room, as POST /room will make it: K_room is a fresh key from a fresh seed; the relayer pays.
@@ -183,7 +183,7 @@ const { registry: room } = await deployDrive(
   stepLogger("relayer"),
 );
 const roomLabel = randomLabel("r");
-const roomName = `${roomLabel}.rooms.cloakroom.eth`;
+const roomName = `${roomLabel}.rooms.haven.eth`;
 await registerName(
   relayerSepolia,
   {

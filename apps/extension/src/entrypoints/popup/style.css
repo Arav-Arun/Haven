@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import "@cloakroom/ui/styles.css";
+@import "@haven/ui/styles.css";
 
 body {
   width: 380px;

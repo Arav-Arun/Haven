@@ -1,4 +1,4 @@
-// @cloakroom/core: the protocol library behind DriveClient.
+// @haven/core: the protocol library behind DriveClient.
 
 export * from "./addresses";
 export * from "./api";

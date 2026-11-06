@@ -1,4 +1,4 @@
-import type { PrivateNetwork, Role, Timestamp } from "@cloakroom/types";
+import type { PrivateNetwork, Role, Timestamp } from "@haven/types";
 import { useEffect, useState } from "react";
 
 export function cx(...parts: (string | false | null | undefined)[]): string {

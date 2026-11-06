@@ -1,7 +1,7 @@
 "use client";
 
-import type { AnonStatus } from "@cloakroom/types";
-import { NetworkBadge as Badge } from "@cloakroom/ui";
+import type { AnonStatus } from "@haven/types";
+import { NetworkBadge as Badge } from "@haven/ui";
 import { useEffect, useState } from "react";
 import { getAnon } from "@/lib/anon";
 

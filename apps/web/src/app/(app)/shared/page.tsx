@@ -1,8 +1,8 @@
 "use client";
 
-import { EmptyState, ErrorNote, IncomingTickets, Skeleton, useNow } from "@cloakroom/ui";
+import { EmptyState, ErrorNote, IncomingTickets, Skeleton, useNow } from "@haven/ui";
 import { Inbox } from "lucide-react";
-import type { Address } from "@cloakroom/types";
+import type { Address } from "@haven/types";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { RequireIdentity } from "@/components/Gate";

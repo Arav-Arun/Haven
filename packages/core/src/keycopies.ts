@@ -1,10 +1,10 @@
-// Key copies (cloak.keycopy): one per member per folder version, sealed so only that member opens it.
+// Key copies (haven.keycopy): one per member per folder version, sealed so only that member opens it.
 //   members  get { epoch, version, j, E_v[j] }   (j = last epoch ending at or before their end; N if no end)
 //   managers get { secret, version, FS_v }
 // Sealed with a key from the member's MK_S (from their welcome note), or, for the user's own copies, from
 // HKDF(K or K_room, folder) (keys.ownSealKey). Each copy is bound to its folder and version.
 
-import type { Address } from "@cloakroom/types";
+import type { Address } from "@haven/types";
 
 import { aesDecrypt, aesEncrypt, hkdf } from "./crypto";
 import { EPOCHS } from "./epochs";

@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, shortAddress } from "@cloakroom/ui";
+import { Button, shortAddress } from "@haven/ui";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { Wallet } from "lucide-react";
 import { useEffect, useState } from "react";

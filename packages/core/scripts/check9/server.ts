@@ -3,7 +3,7 @@
 // the injected wallet for two signatures, then runs core's own checkWalletSignIn on them.
 // Prints only the address, the wallet's name and pass/fail lines — never a signature (it would derive the user's keys).
 //
-// Run: pnpm --filter @cloakroom/core check9   then open http://localhost:8799 in the browser with the wallet.
+// Run: pnpm --filter @haven/core check9   then open http://localhost:8799 in the browser with the wallet.
 // Uses SEPOLIA_RPC_URL for the smart-wallet check when set.
 
 import { readFileSync } from "node:fs";
@@ -11,13 +11,13 @@ import { createServer } from "node:http";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { DriveError, type Address, type Hex } from "@cloakroom/types";
+import { DriveError, type Address, type Hex } from "@haven/types";
 import { getAddress, isAddress } from "viem";
 
 import { checkWalletSignIn, deriveKeys, signInMessage } from "../../src/keys";
 import { log, sepoliaReader } from "../lib";
 
-const APP_ORIGIN = process.env.NEXT_PUBLIC_APP_ORIGIN || "https://cloakroom.vercel.app";
+const APP_ORIGIN = process.env.NEXT_PUBLIC_APP_ORIGIN || "https://haven.vercel.app";
 const PORT = 8799;
 const page = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "index.html"));
 const reader = process.env.SEPOLIA_RPC_URL ? sepoliaReader() : null;
@@ -51,7 +51,7 @@ createServer(async (req, res) => {
           getCode: async (a) => (reader ? reader.getCode({ address: a }) : undefined),
         });
         const keys = deriveKeys(material);
-        const detail = `two identical signatures from ${address}; cloak.key ${keys.spendingPublicKey.slice(0, 18)}…${reader ? "; not a smart wallet" : "; smart-wallet check skipped (no SEPOLIA_RPC_URL)"}`;
+        const detail = `two identical signatures from ${address}; haven.key ${keys.spendingPublicKey.slice(0, 18)}…${reader ? "; not a smart wallet" : "; smart-wallet check skipped (no SEPOLIA_RPC_URL)"}`;
         log(`- PASS check 9 (${wallet}): ${detail}`);
         json(200, { ok: true, detail });
       } catch (error) {

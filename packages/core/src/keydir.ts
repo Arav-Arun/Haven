@@ -1,19 +1,19 @@
 // Add-on F1: a public key directory and key-transparency log on Arkiv, keyed by ENS name.
 //
-// Sharing encrypts to the recipient's spending public key, published as the cloak.key text record. If that record, its
+// Sharing encrypts to the recipient's spending public key, published as the haven.key text record. If that record, its
 // resolver or our onboarding API were ever compromised, a sender would silently encrypt to an attacker. So every name
-// also has an append-only log on Arkiv (cloak.keylog): seq 0, 1, 2…, each entry signed (EIP-712) by the name's
+// also has an append-only log on Arkiv (haven.keylog): seq 0, 1, 2…, each entry signed (EIP-712) by the name's
 // controller and pointing at the previous entry's Arkiv key. Anyone can read it with one query and see every change.
 //
-// Rules (CLOAKROOM add-ons spec, F1):
+// Rules (HAVEN add-ons spec, F1):
 //   1. Valid chain: only entries signed by the name's controller count (others are listed as ignored); seq has no gaps
 //      and no duplicates; each prevEntryKey is the previous entry's key. Otherwise KEY_MISMATCH.
-//   2. Agreement: the current key (last publish/rotate) must equal cloak.key when the name has that record.
+//   2. Agreement: the current key (last publish/rotate) must equal haven.key when the name has that record.
 //   3. Trust on first use: the first share stores the recipient's fingerprint; a later change needs a confirmation.
 //   4. Fingerprint: 8 words, one per byte of keccak256(compressed key), for an in-person check.
-// Device entries (cloak.device) list where a user is signed in; a revoked or expired device is not trusted.
+// Device entries (haven.device) list where a user is signed in; a revoked or expired device is not trusted.
 
-import { DriveError, type Address, type Hex, type KeyValueStore, type Timestamp } from "@cloakroom/types";
+import { DriveError, type Address, type Hex, type KeyValueStore, type Timestamp } from "@haven/types";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import {
   bytesToHex,
@@ -33,7 +33,7 @@ const KINDS: readonly string[] = ["publish", "rotate", "revoke-device"];
 
 // ---------------------------------------------------------------- signed messages
 
-export const KEYLOG_DOMAIN = { name: "Cloakroom", version: "1", chainId: 11155111 } as const satisfies TypedDataDomain;
+export const KEYLOG_DOMAIN = { name: "Haven", version: "1", chainId: 11155111 } as const satisfies TypedDataDomain;
 
 export const KEYLOG_TYPES = {
   KeyLogEntry: [
@@ -243,10 +243,10 @@ export function nextEntry(
   };
 }
 
-/** Rule 2: does the log's current key equal the cloak.key record? "none" when the name has no record. */
-export function ensAgreement(logKey: Hex | null, cloakKey: string | null): "match" | "mismatch" | "none" {
-  if (!cloakKey) return "none";
-  return logKey && sameKey(logKey, cloakKey) ? "match" : "mismatch";
+/** Rule 2: does the log's current key equal the haven.key record? "none" when the name has no record. */
+export function ensAgreement(logKey: Hex | null, havenKey: string | null): "match" | "mismatch" | "none" {
+  if (!havenKey) return "none";
+  return logKey && sameKey(logKey, havenKey) ? "match" : "mismatch";
 }
 
 // ---------------------------------------------------------------- devices
@@ -296,12 +296,12 @@ export async function checkDevices(
 const deviceLabelKey = (driveKey: Hex) => hkdf(hexToBytes(driveKey), "device-label");
 
 export function sealDeviceLabel(driveKey: Hex, deviceId: string, label: string): Promise<Uint8Array> {
-  return aesEncrypt(deviceLabelKey(driveKey), utf8(label.slice(0, 64)), utf8(`cloak.device/${deviceId}`));
+  return aesEncrypt(deviceLabelKey(driveKey), utf8(label.slice(0, 64)), utf8(`haven.device/${deviceId}`));
 }
 
 export async function openDeviceLabel(driveKey: Hex, deviceId: string, sealed: Uint8Array): Promise<string> {
   try {
-    return new TextDecoder().decode(await aesDecrypt(deviceLabelKey(driveKey), sealed, utf8(`cloak.device/${deviceId}`)));
+    return new TextDecoder().decode(await aesDecrypt(deviceLabelKey(driveKey), sealed, utf8(`haven.device/${deviceId}`)));
   } catch {
     return "Unknown device";
   }
@@ -350,7 +350,7 @@ export function keyProblem(ensName: string, why: "broken" | "mismatch" | "missin
     case "mismatch":
       return new DriveError("KEY_MISMATCH", "This name's key doesn't match its public log.");
     case "missing":
-      return new DriveError("NO_CLOAK_KEY", `${ensName} has no public key log yet, so nothing can be shared with it.`);
+      return new DriveError("NO_HAVEN_KEY", `${ensName} has no public key log yet, so nothing can be shared with it.`);
     case "changed":
       return new DriveError("KEY_MISMATCH", `${ensName}'s key changed${detail ? ` on ${detail}` : ""}. Compare fingerprints, then confirm the change.`);
   }

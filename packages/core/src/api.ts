@@ -1,7 +1,7 @@
-// The formats apps/api accepts (CLOAKROOM_PLAN.md section 15), shared by the client and the server so both sides
+// The formats apps/api accepts (HAVEN_PLAN.md section 15), shared by the client and the server so both sides
 // sign and check exactly the same bytes. Upload signing lives in swarm.ts.
 
-import { DriveError, type Address, type Hex } from "@cloakroom/types";
+import { DriveError, type Address, type Hex } from "@haven/types";
 import { getAddress, isAddress, isHex, recoverMessageAddress, type LocalAccount } from "viem";
 
 import { sha256, utf8 } from "./crypto";
@@ -17,7 +17,7 @@ export interface ClaimRequest {
   driveKey: Address;
   /** W, or null for passkey and "Try it" identities. */
   mainWallet: Address | null;
-  /** The cloak.key record: the spending public key, uncompressed. */
+  /** The haven.key record: the spending public key, uncompressed. */
   spendingPublicKey: Hex;
   time: number;
   signature: Hex;
@@ -34,11 +34,11 @@ export interface ClaimResponse {
 
 export function claimMessage(r: Omit<ClaimRequest, "signature">): string {
   return [
-    "Cloakroom claim v1",
+    "Haven claim v1",
     `label: ${r.label}`,
     `drive key: ${getAddress(r.driveKey)}`,
     `main wallet: ${r.mainWallet ? getAddress(r.mainWallet) : "none"}`,
-    `cloak.key: ${r.spendingPublicKey.toLowerCase()}`,
+    `haven.key: ${r.spendingPublicKey.toLowerCase()}`,
     `time: ${r.time}`,
   ].join("\n");
 }
@@ -102,7 +102,7 @@ function leadingZeroBits(hash: Uint8Array): number {
 }
 
 function powHash(roomKey: Address, nonce: number): Uint8Array {
-  return sha256(utf8(`cloakroom-room:${getAddress(roomKey)}:${nonce}`));
+  return sha256(utf8(`haven-room:${getAddress(roomKey)}:${nonce}`));
 }
 
 /** Finds a nonce whose hash has `difficulty` leading zero bits. About 2^difficulty hashes; 20 bits takes a second or two. */

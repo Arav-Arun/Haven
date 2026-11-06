@@ -1,20 +1,20 @@
 {
-  "name": "@cloakroom/web",
+  "name": "@haven/web",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "anon-iframe": "node scripts/copy-anon-iframe.mjs",
-    "dev": "pnpm anon-iframe && next dev",
+    "dev": "node scripts/copy-anon-iframe.mjs && next dev",
     "build": "pnpm anon-iframe && SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) next build",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@anon-rpc/browser-harness": "0.4.0",
-    "@cloakroom/core": "workspace:*",
-    "@cloakroom/platform": "workspace:*",
-    "@cloakroom/types": "workspace:*",
-    "@cloakroom/ui": "workspace:*",
+    "@haven/core": "workspace:*",
+    "@haven/platform": "workspace:*",
+    "@haven/types": "workspace:*",
+    "@haven/ui": "workspace:*",
     "@rainbow-me/rainbowkit": "2.2.11",
     "@tanstack/react-query": "^5.90.0",
     "@walletconnect/ethereum-provider": "^2.26.0",

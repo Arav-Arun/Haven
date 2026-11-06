@@ -1,4 +1,4 @@
-// Epoch keys by key regression (CLOAKROOM_PLAN.md section 7).
+// Epoch keys by key regression (HAVEN_PLAN.md section 7).
 //
 // Each folder version v has a random secret FS_v, a start time t0 and an epoch length L.
 //   E[N]   = HKDF(FS_v, "chain")
@@ -7,7 +7,7 @@
 // no E[j+1], since that would mean inverting SHA-256. A member with access until T gets E[j] for the last epoch that
 // ends at or before T, so files written after T use keys they can't compute. No transaction is needed.
 
-import { DriveError, type Timestamp } from "@cloakroom/types";
+import { DriveError, type Timestamp } from "@haven/types";
 
 import { hkdf, sha256 } from "./crypto";
 
@@ -20,7 +20,7 @@ export function epochSecondsFor(demoMode: boolean): number {
   return demoMode ? DEMO_EPOCH_SECONDS : EPOCH_SECONDS;
 }
 
-/** The timing of one folder version (stored in its cloak.rotation entity). */
+/** The timing of one folder version (stored in its haven.rotation entity). */
 export interface EpochSchedule {
   t0: Timestamp;
   epochSeconds: number;
@@ -51,7 +51,7 @@ export function deriveEpochKey(held: EpochKey, i: number): Uint8Array {
   return key;
 }
 
-/** The key managers seal the roster with (CLOAKROOM_PLAN.md section 7, "Member key"). */
+/** The key managers seal the roster with (HAVEN_PLAN.md section 7, "Member key"). */
 export function rosterKey(folderSecret: Uint8Array): Uint8Array {
   return hkdf(folderSecret, "managers");
 }

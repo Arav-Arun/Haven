@@ -1,10 +1,10 @@
-// ENS on Sepolia (CLOAKROOM_PLAN.md section 6): reads through UniversalResolverV2 and the DriveRegistry views, and the
+// ENS on Sepolia (HAVEN_PLAN.md section 6): reads through UniversalResolverV2 and the DriveRegistry views, and the
 // everyday writes signed by K or K_room. Every write is simulated first (so a revert comes back as a named error),
 // then sent, waited for, and reported as a "sepolia-tx" receipt step.
 //
 // Clients are passed in, so the caller picks the route: one anonTransport per isolation key (stealth address or room).
 
-import { DriveError, type AccessVia, type Address, type Hex, type Role } from "@cloakroom/types";
+import { DriveError, type AccessVia, type Address, type Hex, type Role } from "@haven/types";
 import {
   type Account,
   type Chain,
@@ -125,21 +125,21 @@ export interface SepoliaWriter {
 
 // ---------------------------------------------------------------- reads
 
-/** The cloak.key text record (the recipient's spending public key), or null if the name has none. */
-export async function getCloakKey(client: SepoliaReader, name: string): Promise<string | null> {
+/** The haven.key text record (the recipient's spending public key), or null if the name has none. */
+export async function getHavenKey(client: SepoliaReader, name: string): Promise<string | null> {
   try {
     const value = await getEnsText(client, {
       name: normalize(name),
-      key: "cloak.key",
+      key: "haven.key",
       universalResolverAddress: ensv2.UniversalResolverV2,
     });
     return value === null || value === "" ? null : value;
   } catch (error) {
-    throw toDriveError(error, `cloak.key of ${name}`);
+    throw toDriveError(error, `haven.key of ${name}`);
   }
 }
 
-/** The registry a name points to (a folder, a drive root, or rooms.cloakroom.eth's registry), or null. */
+/** The registry a name points to (a folder, a drive root, or rooms.haven.eth's registry), or null. */
 export async function findRegistry(client: SepoliaReader, name: string): Promise<Address | null> {
   try {
     const registry = await client.readContract({
@@ -296,10 +296,10 @@ export function splitName(name: string): { label: string; parent: string } | nul
   return { label: name.slice(0, i), parent: name.slice(i + 1) };
 }
 
-/** A user name we issue: <label>.cloakroom.eth (exactly three labels). */
-export function isCloakroomUserName(name: string): boolean {
+/** A user name we issue: <label>.haven.eth (exactly three labels). */
+export function isHavenUserName(name: string): boolean {
   const parts = name.split(".");
-  return parts.length === 3 && parts[1] === "cloakroom" && parts[2] === "eth" && parts[0] !== "rooms";
+  return parts.length === 3 && parts[1] === "haven" && parts[2] === "eth" && parts[0] !== "rooms";
 }
 
 export interface NameHolding {
@@ -330,13 +330,13 @@ export async function holderIn(client: SepoliaReader, registry: Address, label: 
 
 /**
  * The account whose signature counts for a name's public key log:
- *   <label>.cloakroom.eth → the drive key K that owns its drive root (the key the user's app holds);
+ *   <label>.haven.eth → the drive key K that owns its drive root (the key the user's app holds);
  *   any other ENSv2 name  → its current token owner in the parent's registry (a wallet).
  * null when the name doesn't exist or has expired.
  */
 export async function nameController(client: SepoliaReader, name: string): Promise<Address | null> {
   const n = normalize(name);
-  if (isCloakroomUserName(n)) {
+  if (isHavenUserName(n)) {
     const root = await findRegistry(client, n);
     return root ? driveOwner(client, root) : null;
   }
@@ -495,7 +495,7 @@ function revertData(error: unknown): Hex | null {
 }
 
 export interface DeployDriveParams {
-  /** The DriveRegistry implementation (cloakroom.driveRegistryImpl). */
+  /** The DriveRegistry implementation (haven.driveRegistryImpl). */
   implementation: Address;
   /** K or K_room: gets the everyday roles. */
   driveKey: Address;

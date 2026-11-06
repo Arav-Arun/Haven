@@ -5,7 +5,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { Hex, ReceiptStep } from "@cloakroom/types";
+import type { Hex, ReceiptStep } from "@haven/types";
 import { createPublicClient, createWalletClient, isHex, type TransactionReceipt } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { sepolia } from "viem/chains";
@@ -94,13 +94,13 @@ export function flushLogs(): Promise<void> {
   return printing;
 }
 
-export function readDeployment(): { cloakroom: Record<string, unknown> } & Record<string, unknown> {
+export function readDeployment(): { haven: Record<string, unknown> } & Record<string, unknown> {
   return JSON.parse(readFileSync(deploymentPath, "utf8"));
 }
 
-/** Records our addresses under "cloakroom" in contracts/deployments/sepolia.json (the single source for addresses). */
+/** Records our addresses under "haven" in contracts/deployments/sepolia.json (the single source for addresses). */
 export function recordDeployment(entries: Record<string, string | number>) {
   const json = readDeployment();
-  json.cloakroom = { ...json.cloakroom, ...entries };
+  json.haven = { ...json.haven, ...entries };
   writeFileSync(deploymentPath, `${JSON.stringify(json, null, 2)}\n`);
 }

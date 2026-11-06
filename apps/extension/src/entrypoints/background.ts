@@ -1,15 +1,15 @@
-import { addToInbox, readInbox } from "@cloakroom/platform";
-import { describeError } from "@cloakroom/ui/errors";
-import type { VerificationResult } from "@cloakroom/core";
-import type { Address } from "@cloakroom/types";
+import { addToInbox, readInbox } from "@haven/platform";
+import { describeError } from "@haven/ui/errors";
+import type { VerificationResult } from "@haven/core";
+import type { Address } from "@haven/types";
 import { makeClient, setPersist } from "@/lib/client";
 import { config } from "@/lib/config";
 import { LAST_CHECK_KEY, NEW_SHARES_KEY, type ExtMessage, type KeysReply, type PairReply } from "@/lib/messages";
 import { verifyUrls } from "@/lib/verify";
 
-const CHECK_ALARM = "cloakroom-check";
-const LIVE_ALARM = "cloakroom-live";
-const MENU_ID = "save-to-cloakroom";
+const CHECK_ALARM = "haven-check";
+const LIVE_ALARM = "haven-live";
+const MENU_ID = "save-to-haven";
 
 function notify(title: string, message: string) {
   chrome.notifications.create({ type: "basic", iconUrl: chrome.runtime.getURL("icon/128.png"), title, message });
@@ -48,7 +48,7 @@ async function check() {
 
 // ---------------------------------------------------------------- add-on F3: verified frontend
 
-const verifyKey = (tabId: number) => `cloak:verify:${tabId}`;
+const verifyKey = (tabId: number) => `haven:verify:${tabId}`;
 
 async function verifyTab(tabId: number, urls: string[]): Promise<VerificationResult> {
   let result: VerificationResult;

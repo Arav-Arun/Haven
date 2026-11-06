@@ -1,7 +1,7 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 
-import type { AnonFetch, AnonStatus, ReceiptStep } from "@cloakroom/types";
+import type { AnonFetch, AnonStatus, ReceiptStep } from "@haven/types";
 import fc from "fast-check";
 import { getAddress, toHex } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
@@ -77,7 +77,7 @@ describe("sealed records", () => {
       role: "editor" as const,
       until: 1_800_000_000,
       hiddenFromMembers: true,
-      label: "vc.cloakroom.eth",
+      label: "vc.haven.eth",
       via: "direct" as const,
     };
     const roster = { managers: [{ ...member, role: "manager" as const, until: null, label: null }], members: [member] };
@@ -136,11 +136,11 @@ describe("signed uploads", () => {
     tampered[0]! ^= 1;
     await expect(verifyUpload(headersOf(headers), tampered, 1_800_000_100)).rejects.toMatchObject({ code: "NOT_AUTHORIZED" });
     await expect(
-      verifyUpload(headersOf({ ...headers, "x-cloak-folder": otherFolder }), body, 1_800_000_100),
+      verifyUpload(headersOf({ ...headers, "x-haven-folder": otherFolder }), body, 1_800_000_100),
     ).rejects.toMatchObject({ code: "NOT_AUTHORIZED" });
     const other = privateKeyToAccount(generatePrivateKey()).address;
     await expect(
-      verifyUpload(headersOf({ ...headers, "x-cloak-signer": other }), body, 1_800_000_100),
+      verifyUpload(headersOf({ ...headers, "x-haven-signer": other }), body, 1_800_000_100),
     ).rejects.toMatchObject({ code: "NOT_AUTHORIZED" });
     await expect(verifyUpload(headersOf(headers), body, 1_800_000_301)).rejects.toMatchObject({ code: "NOT_AUTHORIZED" });
     await expect(verifyUpload(headersOf({}), body)).rejects.toMatchObject({ code: "NOT_AUTHORIZED" });

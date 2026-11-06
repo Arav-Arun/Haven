@@ -1,12 +1,12 @@
-// The read rules (CLOAKROOM_PLAN.md section 7, "Rules for writing and reading", and the table in section 10).
+// The read rules (HAVEN_PLAN.md section 7, "Rules for writing and reading", and the table in section 10).
 // Anyone can write an Arkiv entity that a query matches, so nothing is shown until it passes here. An entity counts
 // only if:
 //   - it was created read-only (so its attributes are what was written at $createdAt);
 //   - its creator held the schema's role in the folder's DriveRegistry at its creation time (wasAllowed, a plain view
 //     call over the registry's own history):
-//       cloak.file, cloak.tomb                                 WRITE
-//       cloak.rotation, roster, keycopy, welcome, link         SHARE
-//       cloak.refresh                                          SHARE on the named group, which must itself be a member
+//       haven.file, haven.tomb                                 WRITE
+//       haven.rotation, roster, keycopy, welcome, link         SHARE
+//       haven.refresh                                          SHARE on the named group, which must itself be a member
 // and, for files, also:
 //   - its version was the latest rotation's version when it was created (no stale version);
 //   - its epoch is within one epoch of its creation time under that version's schedule (no back-dating);
@@ -14,7 +14,7 @@
 // Ordering between Arkiv entities uses block numbers (exact); role checks use the block's timestamp (Arkiv's
 // $createdAt is a block number, so BlockClock turns it into a time).
 
-import type { Address } from "@cloakroom/types";
+import type { Address } from "@haven/types";
 
 import type {
   EntityInfo,
@@ -131,7 +131,7 @@ export class Validator {
     return out;
   }
 
-  /** cloak.welcome, cloak.keycopy, cloak.roster and cloak.link: only a manager of the folder could write them. */
+  /** haven.welcome, haven.keycopy, haven.roster and haven.link: only a manager of the folder could write them. */
   shareRecords<R extends EntityInfo & { folder: Address }>(records: R[]): Promise<Checked<R>> {
     return this.checkRoles(records.map((record) => ({ record, registry: record.folder, role: ROLE_DRIVE_SHARE })));
   }

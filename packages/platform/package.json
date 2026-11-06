@@ -1,5 +1,5 @@
 {
-  "name": "@cloakroom/platform",
+  "name": "@haven/platform",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,7 +11,7 @@
   "dependencies": {
     "@anon-rpc/browser-extension-harness": "0.4.0",
     "@anon-rpc/browser-harness": "0.4.0",
-    "@cloakroom/types": "workspace:*"
+    "@haven/types": "workspace:*"
   },
   "devDependencies": {
     "fake-indexeddb": "^6.0.0",

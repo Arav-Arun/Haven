@@ -2,14 +2,14 @@
 // contracts/deployments/sepolia.json first, so a partial run resumes where it stopped.
 //   1. DriveRegistry implementation: deployed from contracts/out with viem, then verified on Etherscan with
 //      `forge verify-contract` when ETHERSCAN_API_KEY is set.
-//   2. cloakroom.eth through ETHRegistrar (commit, wait, register; paid in MockUSDC, which anyone can mint on Sepolia):
+//   2. haven.eth through ETHRegistrar (commit, wait, register; paid in MockUSDC, which anyone can mint on Sepolia):
 //      owner = deployer, subregistry = a stock UserRegistry, resolver = a PermissionedResolver (contenthash later).
-//   3. rooms.cloakroom.eth: another stock UserRegistry under cloakroom.eth.
+//   3. rooms.haven.eth: another stock UserRegistry under haven.eth.
 //   4. The relayer (API key) gets ROLE_REGISTRAR on both registries and nothing else.
 // Every address is recorded in contracts/deployments/sepolia.json as soon as it exists, then `gen` runs.
-// The deployer moves the names to a team Safe later (CLOAKROOM_PLAN.md section 6).
+// The deployer moves the names to a team Safe later (HAVEN_PLAN.md section 6).
 //
-// Run: pnpm --filter @cloakroom/core bootstrap
+// Run: pnpm --filter @haven/core bootstrap
 // Needs: SEPOLIA_RPC_URL, DEPLOYER_PRIVATE_KEY and RELAYER_PRIVATE_KEY (both funded with Sepolia ETH);
 // optional ETHERSCAN_API_KEY.
 
@@ -17,7 +17,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import type { Address, Hex } from "@cloakroom/types";
+import type { Address, Hex } from "@haven/types";
 import { type Abi, encodeAbiParameters, formatEther, getAddress, isAddressEqual, parseAbiParameters } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
@@ -48,7 +48,7 @@ import {
   stepLogger,
 } from "./lib";
 
-const APP_LABEL = "cloakroom";
+const APP_LABEL = "haven";
 const APP_NAME = `${APP_LABEL}.eth`;
 const ROOMS_NAME = `rooms.${APP_NAME}`;
 const DURATION = 365n * 24n * 3600n;
@@ -59,7 +59,7 @@ const deployer = privateKeyToAccount(deployerKey).address;
 const relayer = privateKeyToAccount(envKey("RELAYER_PRIVATE_KEY")).address;
 const writer = sepoliaWriter(deployerKey);
 const step = stepLogger("deployer", reader);
-const recorded = () => readDeployment().cloakroom as Record<string, string | number | undefined>;
+const recorded = () => readDeployment().haven as Record<string, string | number | undefined>;
 
 log(`# Sepolia bootstrap, ${new Date().toISOString()}`);
 if ((await reader.getChainId()) !== 11155111) throw new Error("SEPOLIA_RPC_URL is not Sepolia");
@@ -123,7 +123,7 @@ if (!recorded().driveRegistryImpl) {
   log(`- already deployed: ${recorded().driveRegistryImpl}`);
 }
 
-// ---- 2. cloakroom.eth
+// ---- 2. haven.eth
 log();
 log(`## 2. ${APP_NAME}`);
 let appRegistry = recorded().appRegistry as Address | undefined;
@@ -160,7 +160,7 @@ if (appFound && isAddressEqual(appFound, appRegistry)) {
   );
 }
 
-// ---- 3. rooms.cloakroom.eth
+// ---- 3. rooms.haven.eth
 log();
 log(`## 3. ${ROOMS_NAME}`);
 let roomsRegistry = recorded().roomsRegistry as Address | undefined;
@@ -214,7 +214,7 @@ for (const [name, registry] of [
 log(`- ${APP_NAME} expires ${new Date(Number(await ethNameExpiry(reader, APP_LABEL)) * 1000).toISOString()}`);
 
 if (!isRehearsal) {
-  const gen = spawnSync("pnpm", ["--filter", "@cloakroom/core", "gen"], { cwd: repoRoot, stdio: "inherit" });
+  const gen = spawnSync("pnpm", ["--filter", "@haven/core", "gen"], { cwd: repoRoot, stdio: "inherit" });
   if (gen.status !== 0) process.exitCode = 1;
 }
 log(process.exitCode ? "RESULT: FAIL" : "RESULT: PASS");

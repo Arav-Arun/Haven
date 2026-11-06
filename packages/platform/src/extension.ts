@@ -2,8 +2,8 @@
 // every file this page loaded and compares them with a published release; only a verified page gets the seed. The
 // reply comes back on a MessageChannel port, never on window.postMessage, so other listeners on the page don't see it.
 
-const FROM_WEB = "cloakroom-web";
-const FROM_EXT = "cloakroom-ext";
+const FROM_WEB = "haven-web";
+const FROM_EXT = "haven-ext";
 
 export type VerifiedKeys = { ok: true; seed: Uint8Array } | { ok: false; reason: string };
 

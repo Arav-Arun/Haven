@@ -1,6 +1,6 @@
 "use client";
 
-import { AppShell, ReceiptsDrawer, useNow, type NavItem } from "@cloakroom/ui";
+import { AppShell, ReceiptsDrawer, useNow, type NavItem } from "@haven/ui";
 import { DoorClosed, HardDrive, Inbox, ReceiptText, Settings, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-// First-hour check 2 (CLOAKROOM_PLAN.md section 17), against ensdomains/contracts-v2@48b3e2d:
+// First-hour check 2 (HAVEN_PLAN.md section 17), against ensdomains/contracts-v2@48b3e2d:
 //   a) a registry derived from UserRegistry compiles;
 //   b) bits 40/44/48 (and their admin bits) are free and valid EAC role bits;
 //   c) every grant/revoke path reaches an override we control (history must hook in there);

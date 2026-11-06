@@ -20,5 +20,5 @@ const env = readEnv(process.env);
 const { app, relayer, doorbellsOn } = createApi(env);
 const port = Number(process.env.PORT);
 if (!port) throw new Error("PORT is not set");
-const server = serve({ fetch: app.fetch, port }, () => console.log(`Cloakroom API on :${port}, relayer ${relayer}`));
+const server = serve({ fetch: app.fetch, port }, () => console.log(`Haven API on :${port}, relayer ${relayer}`));
 if (doorbellsOn) attachDoorbellProxy(server as unknown as import("node:http").Server, env.BEE_URL);

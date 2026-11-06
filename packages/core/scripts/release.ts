@@ -1,11 +1,11 @@
 // Add-on F3: publish, check and revoke website releases.
 //
-//   pnpm --filter @cloakroom/core release manifest            root hash of apps/web/out (run after `pnpm --filter @cloakroom/web build`)
-//   pnpm --filter @cloakroom/core release publish <version>   site + manifest to Swarm, cloak.release on Arkiv, cloakroom.eth contenthash
-//   pnpm --filter @cloakroom/core release revoke <rootHash>   cloak.unrelease (the extension then treats that build as bad)
-//   pnpm --filter @cloakroom/core release rebuild <rootHash>  rebuild yourself first; posts cloak.rebuild {matched} from your own key
+//   pnpm --filter @haven/core release manifest            root hash of apps/web/out (run after `pnpm --filter @haven/web build`)
+//   pnpm --filter @haven/core release publish <version>   site + manifest to Swarm, haven.release on Arkiv, haven.eth contenthash
+//   pnpm --filter @haven/core release revoke <rootHash>   haven.unrelease (the extension then treats that build as bad)
+//   pnpm --filter @haven/core release rebuild <rootHash>  rebuild yourself first; posts haven.rebuild {matched} from your own key
 //
-// Env (repo-root .env, then apps/api/.env): SEPOLIA_RPC_URL, DEPLOYER_PRIVATE_KEY (owns cloakroom.eth), RELEASE_PRIVATE_KEY
+// Env (repo-root .env, then apps/api/.env): SEPOLIA_RPC_URL, DEPLOYER_PRIVATE_KEY (owns haven.eth), RELEASE_PRIVATE_KEY
 // (R, needs tGLM), ARKIV_RPC_URL, ARKIV_ACCESS_KEY, BEE_URL, POSTAGE_BATCH_ID; REBUILDER_PRIVATE_KEY for `rebuild`.
 
 import { execFileSync } from "node:child_process";
@@ -13,7 +13,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { Address, Hex, ReceiptStep } from "@cloakroom/types";
+import type { Address, Hex, ReceiptStep } from "@haven/types";
 import { concatBytes, createPublicClient, createWalletClient, encodeFunctionData, http, isAddressEqual, isHex, parseAbi, zeroAddress } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { sepolia } from "viem/chains";
@@ -91,7 +91,7 @@ function gitCommit(): string {
 }
 
 function siteFiles() {
-  if (!existsSync(resolve(out, "index.html"))) throw new Error("apps/web/out is missing: run `pnpm --filter @cloakroom/web build` first");
+  if (!existsSync(resolve(out, "index.html"))) throw new Error("apps/web/out is missing: run `pnpm --filter @haven/web build` first");
   return walk(out)
     .map((p) => ({ path: relative(out, p).split(sep).join("/"), bytes: new Uint8Array(readFileSync(p)) }))
     .sort((a, b) => (a.path < b.path ? -1 : 1));
@@ -155,7 +155,7 @@ function swarmContenthash(reference: string): Hex {
   return `0xe40101fa011b20${reference.toLowerCase()}`;
 }
 
-// ---------------------------------------------------------------- Sepolia: cloakroom.eth's contenthash
+// ---------------------------------------------------------------- Sepolia: haven.eth's contenthash
 
 const resolverAbi = parseAbi([
   "function initialize((address account, uint256 roleBitmap)[] grants, bytes[] calls)",
@@ -168,19 +168,19 @@ async function setContenthash(contenthash: Hex, log: (s: ReceiptStep) => void) {
   const transport = http(env("SEPOLIA_RPC_URL"));
   const client = createPublicClient({ chain: sepolia, transport });
   const writer: SepoliaWriter = { public: client, wallet: createWalletClient({ chain: sepolia, transport, account: deployer }) };
-  const name = dnsEncode("cloakroom.eth");
-  const current = await client.readContract({ address: ensv2.ETHRegistry, abi: driveRegistryAbi, functionName: "getResolver", args: ["cloakroom"] });
+  const name = dnsEncode("haven.eth");
+  const current = await client.readContract({ address: ensv2.ETHRegistry, abi: driveRegistryAbi, functionName: "getResolver", args: ["haven"] });
   if (isAddressEqual(current, zeroAddress)) {
     const init = encodeFunctionData({
       abi: resolverAbi,
       functionName: "initialize",
       args: [[{ account: deployer.address, roleBitmap: ALL_ROLES & ~RESOLVER_UPGRADE_ROLES }], [encodeFunctionData({ abi: resolverAbi, functionName: "setContenthash", args: [name, contenthash] })]],
     });
-    const { proxy } = await deployProxy(writer, { implementation: ensv2.PermissionedResolverImpl, init, label: "Create cloakroom.eth resolver" }, log);
-    const data = encodeFunctionData({ abi: driveRegistryAbi, functionName: "setResolver", args: [labelId("cloakroom"), proxy] });
-    await sendTx(writer, "Point cloakroom.eth at its resolver", ensv2.ETHRegistry, data, log);
+    const { proxy } = await deployProxy(writer, { implementation: ensv2.PermissionedResolverImpl, init, label: "Create haven.eth resolver" }, log);
+    const data = encodeFunctionData({ abi: driveRegistryAbi, functionName: "setResolver", args: [labelId("haven"), proxy] });
+    await sendTx(writer, "Point haven.eth at its resolver", ensv2.ETHRegistry, data, log);
   } else {
-    await sendTx(writer, "Set cloakroom.eth contenthash", current as Address, encodeFunctionData({ abi: resolverAbi, functionName: "setContenthash", args: [name, contenthash] }), log);
+    await sendTx(writer, "Set haven.eth contenthash", current as Address, encodeFunctionData({ abi: resolverAbi, functionName: "setContenthash", args: [name, contenthash] }), log);
   }
 }
 
@@ -222,15 +222,15 @@ if (command === "manifest") {
   const R = privateKeyToAccount(key("RELEASE_PRIVATE_KEY"));
   const release = { version: arg, rootHash, gitCommit: m.gitCommit, manifestSwarmRef: `0x${manifestRef}` as Hex, siteSwarmRef: siteRef };
   const sig = await R.signTypedData(releaseTypedData(release));
-  const { keys } = await writeEntities(arkiv(key("RELEASE_PRIVATE_KEY")), [releaseOp({ ...release, sig })], "cloak.release", log);
-  console.log(`4. cloak.release ${keys[0]} signed by R = ${R.address} (set WXT_RELEASE_SIGNER to this)`);
+  const { keys } = await writeEntities(arkiv(key("RELEASE_PRIVATE_KEY")), [releaseOp({ ...release, sig })], "haven.release", log);
+  console.log(`4. haven.release ${keys[0]} signed by R = ${R.address} (set WXT_RELEASE_SIGNER to this)`);
   await setContenthash(swarmContenthash(siteRef), log);
-  console.log(`5. cloakroom.eth contenthash → ${siteRef}`);
+  console.log(`5. haven.eth contenthash → ${siteRef}`);
 } else if (command === "revoke") {
   if (!arg || !isHex(arg)) throw new Error("usage: release revoke <rootHash>");
   const R = privateKeyToAccount(key("RELEASE_PRIVATE_KEY"));
   const sig = await R.signTypedData(unreleaseTypedData(arg));
-  const { keys } = await writeEntities(arkiv(key("RELEASE_PRIVATE_KEY")), [unreleaseOp({ rootHash: arg, sig })], "cloak.unrelease", log);
+  const { keys } = await writeEntities(arkiv(key("RELEASE_PRIVATE_KEY")), [unreleaseOp({ rootHash: arg, sig })], "haven.unrelease", log);
   console.log(`revoked ${arg}: ${keys[0]}`);
 } else if (command === "rebuild") {
   if (!arg || !isHex(arg)) throw new Error("usage: release rebuild <rootHash> (after building the release's commit yourself)");
@@ -238,8 +238,8 @@ if (command === "manifest") {
   // The version string is part of the manifest, so pass the release's version: RELEASE_VERSION=1.0.0
   const matched = mine.toLowerCase() === arg.toLowerCase();
   console.log(`your build: ${mine} → ${matched ? "MATCHES" : "differs"}`);
-  const { keys } = await writeEntities(arkiv(key("REBUILDER_PRIVATE_KEY")), [rebuildOp({ rootHash: arg, matched })], "cloak.rebuild", log);
-  console.log(`cloak.rebuild ${keys[0]}`);
+  const { keys } = await writeEntities(arkiv(key("REBUILDER_PRIVATE_KEY")), [rebuildOp({ rootHash: arg, matched })], "haven.rebuild", log);
+  console.log(`haven.rebuild ${keys[0]}`);
 } else {
   console.log("usage: release manifest | publish <version> | revoke <rootHash> | rebuild <rootHash>");
   process.exit(1);

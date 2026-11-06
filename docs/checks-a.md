@@ -1,22 +1,22 @@
 # Person A: checks and "Done when" results
 
 Each Plan A step's "Done when" result, starting with the A1 first-hour checks (1, 2, 3, 4, 5, 8 and 9 from
-`docs/plan/CLOAKROOM_PLAN.md` section 17). A2 is at the end. ENSv2 source:
+`docs/plan/HAVEN_PLAN.md` section 17). A2 is at the end. ENSv2 source:
 `ensdomains/contracts-v2@48b3e2d39513b9dd32ef1850877a29009bc807b9` ("Post Audit Changes (#301)", 2026-07-03), vendored
 as the submodule `contracts/lib/contracts-v2`. Toolchain: Foundry 1.8.7, solc 0.8.28, EVM `cancun`, Node 22.23.4.
 
 | # | Check | Result |
 |---|---|---|
-| 1 | Register `cloakroom.eth` and `rooms.cloakroom.eth` | **Pass on a fork of live Sepolia** (`DriveRegistry.fork.t.sol`, below). Live run ready: `pnpm --filter @cloakroom/core bootstrap`; needs Sepolia ETH |
+| 1 | Register `haven.eth` and `rooms.haven.eth` | **Pass on a fork of live Sepolia** (`DriveRegistry.fork.t.sol`, below). Live run ready: `pnpm --filter @haven/core bootstrap`; needs Sepolia ETH |
 | 2 | `DriveRegistry` at `48b3e2d` | **Pass, with one fallback** (2c, below) |
-| 3 | PermissionedResolver sets `cloak.key`, deployer keeps no roles | **Pass on the fork** (and on a local chain with the live resolver bytecode, `apps/api` tests). Live run ready: `pnpm --filter @cloakroom/core a1` |
+| 3 | PermissionedResolver sets `haven.key`, deployer keeps no roles | **Pass on the fork** (and on a local chain with the live resolver bytecode, `apps/api` tests). Live run ready: `pnpm --filter @haven/core a1` |
 | 4 | Namespace aliasing; expired subname stops resolving | **Pass on the fork.** Live run ready: `a1` |
 | 5 | Arkiv: `$createdAt`, custom transport, expiry, tGLM transfer | Answered from the SDK source (`$createdAt` is a block number). The live run is part of `a4`; needs tGLM and the Bee handoff |
 | 8 | Fluidkey kit: keys, S from P, recipient recovers S's key | **Pass** (below) |
-| 9 | Wallets sign the fixed message identically | Page ready: `pnpm --filter @cloakroom/core check9`, then open http://localhost:8799 with MetaMask (needs you). Self-tested with a local key. Rabby and Ledger: untested |
+| 9 | Wallets sign the fixed message identically | Page ready: `pnpm --filter @haven/core check9`, then open http://localhost:8799 with MetaMask (needs you). Self-tested with a local key. Rabby and Ledger: untested |
 
 Keys (in the gitignored repo-root `.env`, never committed): deployer `0xBFfd32f336D5201c0388C71Fd9e9754eC0692a54`,
-relayer `0xaF3a34364A03119637c9517fdD914F7194F319F7`. Decision: the deployer registers `cloakroom.eth`; the name moves
+relayer `0xaF3a34364A03119637c9517fdD914F7194F319F7`. Decision: the deployer registers `haven.eth`; the name moves
 to a team Safe later.
 
 ---
@@ -70,7 +70,7 @@ prototype; step A2 replaces it.
 
 ## Check 8: Fluidkey stealth-account-kit 1.1.1
 
-Evidence: `packages/core/scripts/check8-fluidkey.ts`. Run it with `pnpm --filter @cloakroom/core check8`. It uses local
+Evidence: `packages/core/scripts/check8-fluidkey.ts`. Run it with `pnpm --filter @haven/core check8`. It uses local
 throwaway keys only and makes no network calls.
 
 | Part | Result |
@@ -93,7 +93,7 @@ throwaway keys only and makes no network calls.
   - The recipient scans with the **spending** private key; the kit's viewing key isn't used in our flow.
   - The welcome-note seal (`HKDF(ECDH(e, P))`) reuses the same shared secret, kept separate from the kit's keccak by
     HKDF with its own info string.
-- **`P` format:** uncompressed, 65 bytes (`0x04…`), as published in `cloak.key`. The kit also accepts compressed keys,
+- **`P` format:** uncompressed, 65 bytes (`0x04…`), as published in `haven.key`. The kit also accepts compressed keys,
   but that wasn't tested here.
 - **Dependencies:** the kit pins its own `viem` 2.7.9 and `@noble/secp256k1` 1.7.1 internally. Core itself uses
   `viem` 2.57.16.
@@ -104,14 +104,14 @@ throwaway keys only and makes no network calls.
 
 Code: `contracts/src/DriveRegistry.sol`. Tests: `contracts/test/DriveRegistry.t.sol` (unit and fuzz),
 `DriveRegistry.invariant.t.sol` and `DriveRegistry.fork.t.sol`. Run with `cd contracts && forge test`. The ABI and
-addresses go to `packages/core/src/generated.ts` via `pnpm --filter @cloakroom/core gen`. Addresses are kept only in
+addresses go to `packages/core/src/generated.ts` via `pnpm --filter @haven/core gen`. Addresses are kept only in
 `contracts/deployments/sepolia.json`, which was extracted from the plan's section 6 table.
 
 | Done when | Status |
 |---|---|
 | `forge test` passes, including invariants and the fork test | **Pass, 35 tests:** 26 unit/fuzz (1,024 fuzz runs each), the invariant suite (256 runs × 64 calls, 0 unexpected reverts), the 6 check-2 tests, and the 2 fork tests against live Sepolia (block pinned in `deployments/sepolia.json`). The fork run used a public RPC, which only keeps recent state, so it ran at the then-latest block |
-| Implementation verified on Etherscan | Pending funds and `ETHERSCAN_API_KEY`. `pnpm --filter @cloakroom/core bootstrap` deploys it (about 31.3M gas, measured on a fork) and runs `forge verify-contract` |
-| Demo proxy on Sepolia: grant → `wasAllowed` true → time passes → false, with the interval still readable | **Pass on the fork.** Live run ready: `pnpm --filter @cloakroom/core a1` |
+| Implementation verified on Etherscan | Pending funds and `ETHERSCAN_API_KEY`. `pnpm --filter @haven/core bootstrap` deploys it (about 31.3M gas, measured on a fork) and runs `forge verify-contract` |
+| Demo proxy on Sepolia: grant → `wasAllowed` true → time passes → false, with the interval still readable | **Pass on the fork.** Live run ready: `pnpm --filter @haven/core a1` |
 | `upgradeToAndCall` reverts when called by K | Shown in tests (`test_upgradeReverts_forOwnerAndWallet_withAnyTarget`, a fuzz over any caller, and invariants) and on the fork for K and W. Live run ready: `a1` |
 
 ### What the contract does beyond the plan, and why
@@ -161,7 +161,7 @@ addresses go to `packages/core/src/generated.ts` via `pnpm --filter @cloakroom/c
 ## A3: core foundations
 
 Code: `packages/core/src/` — `crypto.ts`, `keys.ts`, `epochs.ts`, `padding.ts`, `stealth.ts`, `keycopies.ts`,
-`transport.ts`. Tests: `packages/core/test/` (vitest + fast-check). Run with `pnpm --filter @cloakroom/core test`.
+`transport.ts`. Tests: `packages/core/test/` (vitest + fast-check). Run with `pnpm --filter @haven/core test`.
 
 | Done when | Status |
 |---|---|
@@ -172,7 +172,7 @@ Code: `packages/core/src/` — `crypto.ts`, `keys.ts`, `epochs.ts`, `padding.ts`
 
 **34 tests pass in about 2 s.** An 11-mutant check on the claims above kills all 11: going up the chain, the until
 rounding, the back-dating window, accepting differing or foreign signatures, smart wallets, including `v` in K,
-skipping the `cloak.key` comparison, unbinding welcomes from their folder, padding without the AES overhead, and the
+skipping the `haven.key` comparison, unbinding welcomes from their folder, padding without the AES overhead, and the
 `randomBytes` chunking.
 
 ### Decisions and findings
@@ -203,7 +203,7 @@ skipping the `cloak.key` comparison, unbinding welcomes from their folder, paddi
 Code: `packages/core/src/` — `ens.ts`, `arkiv.ts`, `validator.ts`, `swarm.ts`, plus `records.ts` (the sealed contents
 of each entity), `receipts.ts`, `errors.ts` and `addresses.ts` (the single place addresses come from, generated from
 `contracts/deployments/sepolia.json`). Tests: `packages/core/test/`. Live check: `packages/core/scripts/a4-live.ts`
-(`pnpm --filter @cloakroom/core a4`).
+(`pnpm --filter @haven/core a4`).
 
 | Done when | Status |
 |---|---|
@@ -259,10 +259,10 @@ every role question is answered by the real contract's history. Run `forge build
   rotations, tombs) also allow permissionless extension, so a manager can renew an editor's entry without being able to
   change it.
 - **Three schema additions beyond the plan's table:**
-  - `cloak.rotation.name`: the folder's display name, sealed with `E_v[0]` so every reader of version v can open it;
+  - `haven.rotation.name`: the folder's display name, sealed with `E_v[0]` so every reader of version v can open it;
     the plan didn't say where display names live;
-  - `cloak.refresh.group`: the validator needs to know which group's managers may open the request;
-  - `cloak.link.folder`: which folder's managers may write the link.
+  - `haven.refresh.group`: the validator needs to know which group's managers may open the request;
+  - `haven.link.folder`: which folder's managers may write the link.
 - **Welcome notes store `e·G` compressed (33 bytes).** Uncompressed it's 132 hex characters, over Arkiv's 128-byte
   string limit.
 - **Refresh requests count only from a group that is itself a member of the folder.** Otherwise any group manager
@@ -279,10 +279,10 @@ every role question is answered by the real contract's history. Run `forge build
   govern the name, so the hot key gains nothing on the token.
 - **Child folders are listed from logs (`eth_getLogs`).** This is the plan's "(check)" item. The scan starts at the
   registry's creation block and halves the range when a provider refuses one. Whether the chosen RPC accepts it is
-  part of the live run; the fallback (a sealed `cloak.index` entity per owner) stays available.
+  part of the live run; the fallback (a sealed `haven.index` entity per owner) stays available.
 - **Update after A4: the registry walk uses `UniversalHelper`.** The live deployment moved `findExactRegistry` and
   the other registry-walk functions out of UniversalResolverV2 (see the next section). `findRegistry` now calls
-  UniversalHelper. `cloak.key` still resolves through UniversalResolverV2, whose `resolveWithGateways` viem's
+  UniversalHelper. `haven.key` still resolves through UniversalResolverV2, whose `resolveWithGateways` viem's
   `getEnsText` uses.
 
 ---
@@ -304,24 +304,24 @@ Found while preparing A5. All of it was checked onchain, read-only.
 |---|---|---|
 | The registry walk (`findExactRegistry`, `findRegistries`, …) moved from UniversalResolverV2 to a new `UniversalHelper` (`0xd453…`, same docs page) | `findExactRegistry` on UniversalResolverV2 reverts | `findRegistry` calls UniversalHelper. Resolution (`resolve`, `findResolver`) stays on UniversalResolverV2 |
 | `UserRegistry.initialize` and `PermissionedResolver.initialize` take `Grant[]` (and the resolver also takes `bytes[] calls`) | The plan's "`initialize(grants, calls)`" is this newer API | `naming.ts` encodes the live signatures, checked against the onchain selectors |
-| PermissionedResolver keeps records by DNS-encoded name: `setText(bytes name, …)`, read through ENSIP-10 `resolve(name, data)` | `cloak.key` is written with the name, not the node | `deployResolver` |
+| PermissionedResolver keeps records by DNS-encoded name: `setText(bytes name, …)`, read through ENSIP-10 `resolve(name, data)` | `haven.key` is written with the name, not the node | `deployResolver` |
 | ENS's `UserRegistryImpl` gives the implementation-namer role to ENS's owner account, not to `ContractNamer` | Our old deploy script required `isContractNamer(ContractNamer)`, which would have aborted the live deploy | Our implementation's namer is our deployer (mirrors ENS); the script that required it is removed |
 | Resolver role bits moved (`ROLE_SET_TEXT` and the upgrade bits did not) | None for us | `naming.ts` uses only the unchanged bits |
 | Registry role bits, the EAC hooks `DriveRegistry` overrides (`_getRoles`, `_grantRoles`, `_revokeRoles`), and `IRegistry` | Identical, so drive bits 40/44/48 are still free | **`DriveRegistry` stays on `48b3e2d`**: re-pinning would add the new HCA dependencies (account-abstraction, nexus and others) and force solc 0.8.25, for no change in behaviour we use |
 
 **Proof that our design works with the live contracts.**
 - `DriveRegistry.fork.t.sol` runs the whole setup and every onchain flow on them:
-  - `cloakroom.eth` through the real ETHRegistrar (commit, wait, register, paid in MockUSDC, which anyone can mint);
-  - `rooms.cloakroom.eth`;
+  - `haven.eth` through the real ETHRegistrar (commit, wait, register, paid in MockUSDC, which anyone can mint);
+  - `rooms.haven.eth`;
   - the relayer holding exactly `ROLE_REGISTRAR`;
-  - `/claim` with `cloak.key` read back through `UniversalResolverV2.resolve`, and no role left to the relayer;
+  - `/claim` with `haven.key` read back through `UniversalResolverV2.resolve`, and no role left to the relayer;
   - the user's resolver frozen against upgrades;
   - folder and room found by the registry walk through our `DriveRegistry`;
   - mount aliasing;
   - an expired name that stops resolving;
   - grant → expiry → history;
   - the upgrade freeze for K and W.
-- `cloakroom.eth` was available at the fork block.
+- `haven.eth` was available at the fork block.
 
 **Sepolia now charges about 1,542 gas per byte of deployed code** (Prague charges 200).
 - Measured with `eth_estimateGas` on creations of 1,000, 2,000 and 4,000 bytes. It was already in effect at block
@@ -339,12 +339,12 @@ Found while preparing A5. All of it was checked onchain, read-only.
 
 | Step | Gas |
 |---|---|
-| `ETHRegistrar.register(cloakroom)` | 255,422 |
+| `ETHRegistrar.register(haven)` | 255,422 |
 | `/claim` (resolver proxy + drive root proxy + register) | 920,316 |
 | Folder (DriveRegistry proxy + register) | 482,549 |
 | `/room` (DriveRegistry proxy + register) | 432,790 |
 | `grantRolesUntil` (new editor) | 148,233 |
-| `cloakroom.eth` for a year | 8 MockUSDC (free mint) |
+| `haven.eth` for a year | 8 MockUSDC (free mint) |
 
 ---
 
@@ -377,26 +377,26 @@ unchanged):
    - Sepolia ETH on the deployer `0xBFfd32f336D5201c0388C71Fd9e9754eC0692a54` (about 0.1 ETH covers the 31.3M-gas
      deploy at Sepolia's ~1 gwei);
    - Sepolia ETH on the relayer `0xaF3a34364A03119637c9517fdD914F7194F319F7`.
-2. `pnpm --filter @cloakroom/core rehearse`: the same steps on a local fork of Sepolia, with fork-only ETH.
-3. `pnpm --filter @cloakroom/core bootstrap`: the live A1 check 1 and A2 deploy. Commit `deployments/sepolia.json` and
+2. `pnpm --filter @haven/core rehearse`: the same steps on a local fork of Sepolia, with fork-only ETH.
+3. `pnpm --filter @haven/core bootstrap`: the live A1 check 1 and A2 deploy. Commit `deployments/sepolia.json` and
    `generated.ts`.
-4. `pnpm --filter @cloakroom/core a1`: the live checks 3 and 4 and the A2 demo, with gas. Paste the output here.
-5. `pnpm --filter @cloakroom/core check9`: MetaMask, twice, by hand.
+4. `pnpm --filter @haven/core a1`: the live checks 3 and 4 and the A2 demo, with gas. Paste the output here.
+5. `pnpm --filter @haven/core check9`: MetaMask, twice, by hand.
 6. **The API:** `fly auth login`, `fly secrets set --config apps/api/fly.toml …`, then from the repo root
    `fly deploy --config apps/api/fly.toml --dockerfile apps/api/Dockerfile .`. curl each endpoint.
-7. **After the tGLM and Bee handoff:** `pnpm --filter @cloakroom/core a4` (the A4 Done-when and check 5).
+7. **After the tGLM and Bee handoff:** `pnpm --filter @haven/core a4` (the A4 Done-when and check 5).
 
 ---
 
 ## Add-ons F1, F2, F4 (core and API), done on plan-b
 
 Spec: the add-ons build spec (F1 key log, F2 subtree sharing, F3 verified frontend, F4 doorbells). Names follow the
-repo (`cloak.*`, `cloakroom.eth`) rather than the spec's older `hush.*`, `hushdrive.eth`.
+repo (`haven.*`, `haven.eth`) rather than the spec's older `hush.*`, `hushdrive.eth`.
 
 - **Interface:** `packages/types` is frozen on branches, so the new members live in `packages/core/src/extras.ts`
-  (`CloakroomClient extends DriveClient`); `docs/requests-b.md` asks for them on `main`.
+  (`HavenClient extends DriveClient`); `docs/requests-b.md` asks for them on `main`.
 - **F1 check, the signer.** The spec says "the signer is the name's current drive-root K". That holds for
-  `<label>.cloakroom.eth` (`driveOwner(findExactRegistry(name))`). Other names (needed for F2: `priya.acme.eth`) have no
+  `<label>.haven.eth` (`driveOwner(findExactRegistry(name))`). Other names (needed for F2: `priya.acme.eth`) have no
   drive root, so their controller is the token owner in the parent registry (`getStatus`, `getExpiry`, `getTokenId`,
   `ownerOf`). Validity goes by the EIP-712 signature, not `$creator`, so the API relays entries (`POST /keylog`) and
   users need no tGLM; a forged entry is ignored and listed.

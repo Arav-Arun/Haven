@@ -1,6 +1,6 @@
-// Private shares: stealth member addresses and welcome notes (CLOAKROOM_PLAN.md section 7, "Private share").
+// Private shares: stealth member addresses and welcome notes (HAVEN_PLAN.md section 7, "Private share").
 //
-// Sharer, given the recipient's spending public key P (their cloak.key record):
+// Sharer, given the recipient's spending public key P (their haven.key record):
 //   e random;  S = Fluidkey generateStealthAddresses([P], e)        ← the address that gets the onchain grant
 //   note = { e·G, AES-GCM(HKDF(ECDH(e, P), "welcome"), MK_S, aad = folder) }
 // Recipient, for each note:
@@ -10,14 +10,14 @@
 // share a key.
 
 import { generateStealthAddresses, generateStealthPrivateKey } from "@fluidkey/stealth-account-kit";
-import { DriveError, type Address, type Hex } from "@cloakroom/types";
+import { DriveError, type Address, type Hex } from "@haven/types";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { bytesToHex, getAddress, hexToBytes } from "viem";
 import { privateKeyToAddress } from "viem/accounts";
 
 import { aesDecrypt, aesEncrypt, hkdf, randomBytes } from "./crypto";
 
-/** What goes on Arkiv as cloak.welcome (besides the folder and the week bucket). */
+/** What goes on Arkiv as haven.welcome (besides the folder and the week bucket). */
 export interface WelcomeNote {
   /** e·G, uncompressed. */
   ephemeralPublicKey: Hex;
@@ -55,14 +55,14 @@ function welcomeKey(sharedPoint: Uint8Array): Uint8Array {
   return hkdf(sharedPoint.subarray(1), "welcome"); // x ‖ y, as the kit uses
 }
 
-/** Sharer side. Throws NO_CLOAK_KEY if the recipient's published key isn't a valid public key. */
+/** Sharer side. Throws NO_HAVEN_KEY if the recipient's published key isn't a valid public key. */
 export async function createWelcome(params: {
   recipientSpendingPublicKey: string;
   folder: Address;
   memberKey?: Uint8Array;
 }): Promise<CreatedWelcome> {
   const P = parsePoint(params.recipientSpendingPublicKey);
-  if (!P) throw new DriveError("NO_CLOAK_KEY", "the recipient's cloak.key is not a valid public key");
+  if (!P) throw new DriveError("NO_HAVEN_KEY", "the recipient's haven.key is not a valid public key");
   const memberKey = params.memberKey ?? randomBytes(32);
   if (memberKey.length !== 32) throw new Error("member key must be 32 bytes");
 

@@ -1,4 +1,4 @@
-import type { DriveErrorCode } from "@cloakroom/types";
+import type { DriveErrorCode } from "@haven/types";
 
 export interface ErrorCopy {
   code: DriveErrorCode;
@@ -18,7 +18,7 @@ const COPY: Record<DriveErrorCode, { title: string; detail: string }> = {
     detail: "The keys from this signature don't match this name's Haven key. Your files are safe; sign in with the wallet that set up this name.",
   },
   NAME_TAKEN: { title: "That name is taken", detail: "Try another name." },
-  NO_CLOAK_KEY: {
+  NO_HAVEN_KEY: {
     title: "This name hasn't set up Haven yet",
     detail: "Ask them to sign in to Haven once. Then you can share with them.",
   },

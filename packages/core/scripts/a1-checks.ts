@@ -1,6 +1,6 @@
 // Live first-hour checks after the bootstrap (PLAN_A A1 checks 3 and 4, and the A2 demo proxy), with gas per step.
-//   check 3: POST /claim's onchain part — the relayer deploys a resolver with cloak.key and a drive root and registers
-//            the name; the API keeps no role; cloak.key reads back through UniversalResolverV2 (verifyClaim).
+//   check 3: POST /claim's onchain part — the relayer deploys a resolver with haven.key and a drive root and registers
+//            the name; the API keeps no role; haven.key reads back through UniversalResolverV2 (verifyClaim).
 //   check 4: namespace aliasing (a mount resolves names below it like the canonical path) and an expired subname
 //            that stops resolving.
 //   A2 demo: grant until +90 s → wasAllowed true → time passes → false, the interval still readable; neither K nor W
@@ -8,9 +8,9 @@
 // Fresh random keys for the user; the relayer funds K (as the API's drip will). Takes about two minutes (waits for
 // the grant and the link to end on chain time).
 //
-// Run: pnpm --filter @cloakroom/core a1   (after `bootstrap`)
+// Run: pnpm --filter @haven/core a1   (after `bootstrap`)
 
-import type { Address, Hex } from "@cloakroom/types";
+import type { Address, Hex } from "@haven/types";
 import { decodeErrorResult, encodeFunctionData, parseEther } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 
@@ -43,10 +43,10 @@ import {
 } from "./lib";
 
 const reader = sepoliaReader();
-const deployment = readDeployment().cloakroom as Record<string, Address | undefined>;
+const deployment = readDeployment().haven as Record<string, Address | undefined>;
 const implementation = deployment.driveRegistryImpl;
 const appRegistry = deployment.appRegistry;
-if (!implementation || !appRegistry) throw new Error("run `pnpm --filter @cloakroom/core bootstrap` first");
+if (!implementation || !appRegistry) throw new Error("run `pnpm --filter @haven/core bootstrap` first");
 
 const relayerKey = envKey("RELAYER_PRIVATE_KEY");
 const relayer = privateKeyToAccount(relayerKey).address;
@@ -69,7 +69,7 @@ log(`# A1 checks 3 and 4, A2 demo, ${new Date().toISOString()}`);
 
 // ---------------------------------------------------------------- check 3
 log();
-log("## Check 3: claim a name (resolver with cloak.key, drive root), API keeps no role");
+log("## Check 3: claim a name (resolver with haven.key, drive root), API keeps no role");
 const user = deriveKeys(randomMaterial());
 const kKey: Hex = user.driveKey;
 const K = user.driveAddress;
@@ -85,7 +85,7 @@ const claim = await claimName(
     driveKey: K,
     mainWallet: W,
     spendingPublicKey: user.spendingPublicKey,
-    expiry: await ethNameExpiry(reader, "cloakroom"),
+    expiry: await ethNameExpiry(reader, "haven"),
   },
   stepLogger("relayer"),
 );
@@ -93,7 +93,7 @@ await flushLogs();
 log(`- ${claim.ensName}: resolver ${claim.resolver}, drive root ${claim.driveRoot}`);
 try {
   await verifyClaim(reader, { ...claim, api: relayer, spendingPublicKey: user.spendingPublicKey });
-  check("API holds no role on the resolver or the drive root, and cloak.key reads back through UniversalResolverV2", true);
+  check("API holds no role on the resolver or the drive root, and haven.key reads back through UniversalResolverV2", true);
 } catch (error) {
   check("verifyClaim", false, String(error));
 }

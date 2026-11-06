@@ -21,7 +21,7 @@ import {
   type KeyMaterial,
 } from "../src/keys";
 
-const ORIGIN = "https://cloakroom.vercel.app";
+const ORIGIN = "https://haven.vercel.app";
 const eoa = async () => undefined;
 
 /** A valid signature of the message that differs from the deterministic (RFC 6979) one, like a wallet that adds
@@ -45,16 +45,16 @@ describe("signInMessage", () => {
     const address = "0x2222222222222222222222222222222222222222";
     expect(signInMessage(ORIGIN, address)).toBe(
       [
-        "cloakroom.vercel.app wants you to sign in with your Ethereum account:",
+        "haven.vercel.app wants you to sign in with your Ethereum account:",
         address,
         "",
-        "Create your Cloakroom keys. Anyone who gets this signature can read all your Cloakroom files. " +
-          "Only sign this on https://cloakroom.vercel.app.",
+        "Create your Haven keys. Anyone who gets this signature can read all your Haven files. " +
+          "Only sign this on https://haven.vercel.app.",
         "",
-        "URI: https://cloakroom.vercel.app",
+        "URI: https://haven.vercel.app",
         "Version: 1",
         "Chain ID: 11155111",
-        "Nonce: cloakroomkeysv1",
+        "Nonce: havenkeysv1",
         "Issued At: 2026-11-06T00:00:00.000Z",
       ].join("\n"),
     );
@@ -205,7 +205,7 @@ describe("derived keys", () => {
   });
 });
 
-describe("cloak.key comparison", () => {
+describe("haven.key comparison", () => {
   it("accepts the same key in either encoding, refuses anything else with KEY_MISMATCH", () => {
     const keys = deriveKeys(randomMaterial());
     const compressed = bytesToHex(secp256k1.getPublicKey(hexToBytes(keys.spendingPrivateKey), true));

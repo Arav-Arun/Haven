@@ -1,4 +1,4 @@
-import type { AnonFetch, AnonStatus, PrivateNetwork } from "@cloakroom/types";
+import type { AnonFetch, AnonStatus, PrivateNetwork } from "@haven/types";
 import { createPublicClient } from "viem";
 import { sepolia } from "viem/chains";
 import { describe, expect, it } from "vitest";

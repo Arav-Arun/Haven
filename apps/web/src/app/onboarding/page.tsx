@@ -1,7 +1,7 @@
 "use client";
 
-import type { DriveClient, Hex, Identity } from "@cloakroom/types";
-import { Button, ErrorNote, ReceiptSteps, inputClass } from "@cloakroom/ui";
+import type { DriveClient, Hex, Identity } from "@haven/types";
+import { Button, ErrorNote, ReceiptSteps, inputClass } from "@haven/ui";
 import { ArrowLeft, Check, LoaderCircle, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -37,7 +37,7 @@ function Step({ n, title, description, done, active, children }: { n: number; ti
 }
 
 /**
- * Signature step. The client says whether this address is new (no cloak.key yet): then the wallet must sign the
+ * Signature step. The client says whether this address is new (no haven.key yet): then the wallet must sign the
  * same message twice, and both signatures must match, or the keys couldn't be rebuilt later.
  */
 function SignStep({ client, onSignedIn }: { client: DriveClient; onSignedIn: (i: Identity) => void }) {

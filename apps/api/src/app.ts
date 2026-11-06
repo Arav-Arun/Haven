@@ -1,6 +1,6 @@
-// apps/api (PLAN_A.md step A5; CLOAKROOM_PLAN.md section 15). A small relayer:
-//   POST /claim       deploy the user's resolver (cloak.key) and drive root, register <label>.cloakroom.eth
-//   POST /room        proof-of-work, then deploy a room registry for K_room and register r-<random>.rooms.cloakroom.eth
+// apps/api (PLAN_A.md step A5; HAVEN_PLAN.md section 15). A small relayer:
+//   POST /claim       deploy the user's resolver (haven.key) and drive root, register <label>.haven.eth
+//   POST /room        proof-of-work, then deploy a room registry for K_room and register r-<random>.rooms.haven.eth
 //   POST /drip        Sepolia ETH + tGLM to K or K_room only, sent in batches
 //   POST /arkiv-rpc   JSON-RPC pass-through to Arkiv that adds the access key server-side
 //   POST /upload      signed by a key with WRITE now; streams padded ciphertext to Bee
@@ -35,7 +35,7 @@ import {
   checkRoomPow,
   checkUserLabel,
   claimName,
-  cloakroom,
+  haven,
   createRoom,
   driveOwner,
   ensv2,
@@ -57,8 +57,8 @@ import {
   type RoomRequest,
   type RoomResponse,
   type SepoliaWriter,
-} from "@cloakroom/core";
-import { DriveError, type Address, type Hex } from "@cloakroom/types";
+} from "@haven/core";
+import { DriveError, type Address, type Hex } from "@haven/types";
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import {
@@ -223,7 +223,7 @@ export function createApi(env: ApiEnv) {
   const timer = setInterval(() => void sendBatch(), env.DRIP_BATCH_SECONDS * 1000);
   timer.unref?.();
 
-  /** True if `registry` is a Cloakroom DriveRegistry proxy (made by ENS's VerifiableFactory from our implementation). */
+  /** True if `registry` is a Haven DriveRegistry proxy (made by ENS's VerifiableFactory from our implementation). */
   const isOurRegistry = async (registry: Address) => {
     try {
       const impl = await sepoliaClient.readContract({
@@ -240,7 +240,7 @@ export function createApi(env: ApiEnv) {
 
   const app = new Hono();
   // No cookies or credentials anywhere, so any origin may call (the website, the extension, the Swarm copy).
-  app.use("*", cors({ origin: "*", exposeHeaders: ["content-length"], allowHeaders: ["content-type", "x-cloak-folder", "x-cloak-signer", "x-cloak-time", "x-cloak-signature"] }));
+  app.use("*", cors({ origin: "*", exposeHeaders: ["content-length"], allowHeaders: ["content-type", "x-haven-folder", "x-haven-signer", "x-haven-time", "x-haven-signature"] }));
 
   app.get("/health", (c) => c.json({ ok: true }));
 
@@ -353,7 +353,7 @@ export function createApi(env: ApiEnv) {
           driveKey: getAddress(r.driveKey),
           mainWallet: r.mainWallet ? getAddress(r.mainWallet) : null,
           spendingPublicKey: r.spendingPublicKey,
-          expiry: await ethNameExpiry(sepoliaClient, "cloakroom"),
+          expiry: await ethNameExpiry(sepoliaClient, "haven"),
         }),
       );
       return c.json<ClaimResponse>({
@@ -381,7 +381,7 @@ export function createApi(env: ApiEnv) {
           roomsRegistry: requireDeployed("roomsRegistry"),
           implementation: requireDeployed("driveRegistryImpl"),
           roomKey: getAddress(r.roomKey),
-          expiry: await ethNameExpiry(sepoliaClient, "cloakroom"),
+          expiry: await ethNameExpiry(sepoliaClient, "haven"),
         }),
       );
       return c.json<RoomResponse>({ ensName: room.ensName, registry: room.registry, blockNumber: room.blockNumber.toString() });
@@ -396,7 +396,7 @@ export function createApi(env: ApiEnv) {
       if (!isAddress(r?.address ?? "") || !isAddress(r?.registry ?? "")) throw new DriveError("NOT_AUTHORIZED", "malformed drip request");
       const address = getAddress(r.address);
       const registry = getAddress(r.registry);
-      // Only the owner key of a Cloakroom registry (K of a drive root, or K_room of a room). Never a stealth member.
+      // Only the owner key of a Haven registry (K of a drive root, or K_room of a room). Never a stealth member.
       if (!(await isOurRegistry(registry))) throw new DriveError("NOT_AUTHORIZED", "not a Haven registry");
       const [owner, access] = await Promise.all([driveOwner(sepoliaClient, registry), accessOf(sepoliaClient, registry, address)]);
       if (!isAddressEqual(owner, address) || access.via !== "owner") throw new DriveError("NOT_AUTHORIZED", "only a registry's owner key gets gas");
@@ -456,5 +456,5 @@ export function createApi(env: ApiEnv) {
     }
   });
 
-  return { app, relayer: relayer.address, close: () => clearInterval(timer), sendBatch, deployment: cloakroom, doorbellsOn: env.DOORBELL_PROXIMITY !== null };
+  return { app, relayer: relayer.address, close: () => clearInterval(timer), sendBatch, deployment: haven, doorbellsOn: env.DOORBELL_PROXIMITY !== null };
 }

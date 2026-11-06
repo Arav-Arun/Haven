@@ -9,7 +9,7 @@ Results and evidence are in `docs/checks-a.md`.
 | 1 | `BEE_URL` and `POSTAGE_BATCH_ID`, sent privately, not committed | A4's live run, and the API's `/upload` | H4 |
 | 2 | The Anon-RPC result: the default network, and whether `supportsAnyHttps` is true | Whether Swarm and API calls are routed or marked `direct` | H3 |
 | 3 | That the Bee node accepts `POST /bytes` from the API's Fly machine (region `bom`), and from nowhere else if you lock it down | The API streams uploads to it | With 1 |
-| 4 | The Swarm reference of the web build | A sets `cloakroom.eth`'s contenthash | H28 |
+| 4 | The Swarm reference of the web build | A sets `haven.eth`'s contenthash | H28 |
 
 ## Notes for B (no action unless stated)
 

@@ -13,7 +13,7 @@ are created with permissionless extension, so a manager can renew an editor's en
 **Expiry.** It changes what users see:
 - A guest's **key copy expires at the end of their access**, so a new device can't even fetch it afterwards.
 - **Welcome notes expire** with the share, which keeps "Shared with me" fast on phones (the scan only reads live notes).
-- **Links stop working** at their end: the `cloak.link` entity is gone.
+- **Links stop working** at their end: the `haven.link` entity is gone.
 - Refresh requests expire after 30 days.
 - Everything else lives as long as Arkiv allows (about 182 days) and managers' apps renew it.
 
@@ -22,10 +22,10 @@ query; the members panel reads the sealed roster; the Public view lists every en
 size and expiry; the receipts panel links each Arkiv transaction.
 
 **Public data (add-ons).** Arkiv also holds data meant for everyone:
-- **A key directory keyed by ENS name** (`cloak.keylog`): any app looks up a name's current key, and its whole history,
+- **A key directory keyed by ENS name** (`haven.keylog`): any app looks up a name's current key, and its whole history,
   with one query, and can tell a swapped key from a real change. Sharing in Haven refuses a key that doesn't match
   its log, and warns when a key changed since the last share. Forged entries (written about a name by anyone but its
   controller) show on the profile page as ignored.
-- **Devices** (`cloak.device`) expire after 90 days unless used, so a lost laptop drops off on its own.
-- **Website releases** (`cloak.release`): the extension reads them to decide whether the page in front of it may get
-  the user's keys. Independent rebuilders post `cloak.rebuild` from their own wallets; the extension counts them.
+- **Devices** (`haven.device`) expire after 90 days unless used, so a lost laptop drops off on its own.
+- **Website releases** (`haven.release`): the extension reads them to decide whether the page in front of it may get
+  the user's keys. Independent rebuilders post `haven.rebuild` from their own wallets; the extension counts them.

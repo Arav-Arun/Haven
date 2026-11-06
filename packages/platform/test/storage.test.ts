@@ -43,6 +43,6 @@ describe("storage adapters", () => {
     const s = createExtensionStorage({ area });
     await s.set("seed", bytes(1, 255));
     expect(await s.get("seed")).toEqual(bytes(1, 255));
-    expect(Object.keys(data)).toEqual(["cloak:seed"]);
+    expect(Object.keys(data)).toEqual(["haven:seed"]);
   });
 });

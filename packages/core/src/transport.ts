@@ -1,9 +1,9 @@
-// JSON-RPC over Anon-RPC (CLOAKROOM_PLAN.md section 12).
+// JSON-RPC over Anon-RPC (HAVEN_PLAN.md section 12).
 // A viem `custom` transport that POSTs every request through AnonFetch, under an isolation key when given (one per
 // stealth address and per room, so the network can't link your shares), and reports the route of each call for the
-// receipts panel. Person B's @cloakroom/platform supplies the real AnonFetch; passthroughAnon() is for Node and tests.
+// receipts panel. Person B's @haven/platform supplies the real AnonFetch; passthroughAnon() is for Node and tests.
 
-import type { AnonFetch, AnonStatus, KeyValueStore, ReceiptStep } from "@cloakroom/types";
+import type { AnonFetch, AnonStatus, KeyValueStore, ReceiptStep } from "@haven/types";
 import { custom, HttpRequestError, RpcRequestError, type CustomTransport } from "viem";
 
 export type RouteStep = Extract<ReceiptStep, { kind: "route" }>;

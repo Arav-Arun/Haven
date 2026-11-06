@@ -63,14 +63,14 @@ describe("welcome notes", () => {
     }
   });
 
-  it("accepts a compressed cloak.key and refuses an invalid one with NO_CLOAK_KEY", async () => {
+  it("accepts a compressed haven.key and refuses an invalid one with NO_HAVEN_KEY", async () => {
     const recipient = deriveKeys(randomMaterial());
     const compressed = bytesToHex(secp256k1.getPublicKey(hexToBytes(recipient.spendingPrivateKey), true));
     const created = await createWelcome({ recipientSpendingPublicKey: compressed, folder });
     const opened = await openWelcome({ spendingPrivateKey: recipient.spendingPrivateKey, folder, note: created.note });
     expect(opened?.stealthAddress).toBe(created.stealthAddress);
     await expect(createWelcome({ recipientSpendingPublicKey: "0x1234", folder })).rejects.toMatchObject({
-      code: "NO_CLOAK_KEY",
+      code: "NO_HAVEN_KEY",
     });
   });
 });

@@ -1,8 +1,8 @@
 "use client";
 
-import type { CloakroomClient } from "@cloakroom/core";
-import type { Identity } from "@cloakroom/types";
-import { EmptyState, Skeleton } from "@cloakroom/ui";
+import type { HavenClient } from "@haven/core";
+import type { Identity } from "@haven/types";
+import { EmptyState, Skeleton } from "@haven/ui";
 import { KeyRound, Plug, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -18,7 +18,7 @@ export function ClientUnavailable({ reason }: { reason: string }) {
 }
 
 /** Renders children with a client, or explains why it can't. */
-export function RequireClient({ children }: { children: (client: CloakroomClient) => ReactNode }) {
+export function RequireClient({ children }: { children: (client: HavenClient) => ReactNode }) {
   const { client, unavailable, restoring } = useDrive();
   if (restoring) return <Skeleton />;
   if (!client) return <ClientUnavailable reason={unavailable ?? "No client."} />;
@@ -26,7 +26,7 @@ export function RequireClient({ children }: { children: (client: CloakroomClient
 }
 
 /** Renders children for a signed-in user, or points to sign-in. */
-export function RequireIdentity({ children }: { children: (client: CloakroomClient, identity: Identity) => ReactNode }) {
+export function RequireIdentity({ children }: { children: (client: HavenClient, identity: Identity) => ReactNode }) {
   const { client, unavailable, restoring, identity, custodyProblem } = useDrive();
   if (restoring) return <Skeleton />;
   if (!client) return <ClientUnavailable reason={unavailable ?? "No client."} />;

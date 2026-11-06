@@ -7,8 +7,8 @@ import { hkdf as nobleHkdf } from "@noble/hashes/hkdf";
 import { sha256 as nobleSha256 } from "@noble/hashes/sha2";
 import { bytesToBigInt, numberToHex, type Hex } from "viem";
 
-/** Domain-separation salt for every HKDF call in Cloakroom. Changing it changes every derived key. */
-const HKDF_SALT = utf8("cloakroom/v1");
+/** Domain-separation salt for every HKDF call in Haven. Changing it changes every derived key. */
+const HKDF_SALT = utf8("haven/v1");
 
 const AES_NONCE_BYTES = 12;
 const AES_TAG_BYTES = 16;
@@ -52,7 +52,7 @@ export function sha256(data: Uint8Array): Uint8Array {
   return nobleSha256(data);
 }
 
-/** HKDF-SHA256 with the Cloakroom salt. `info` names the purpose, e.g. "drive", "room/3", "welcome". */
+/** HKDF-SHA256 with the Haven salt. `info` names the purpose, e.g. "drive", "room/3", "welcome". */
 export function hkdf(ikm: Uint8Array, info: string, length = 32): Uint8Array {
   return nobleHkdf(nobleSha256, ikm, HKDF_SALT, utf8(info), length);
 }
