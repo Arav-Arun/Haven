@@ -155,3 +155,43 @@ addresses go to `packages/core/src/generated.ts` via `pnpm --filter @cloakroom/c
   access windows are minutes to days.
 - **Runtime size:** 19,847 bytes, a 4,729-byte margin under EIP-170. A7 (inheritance) and A9 (groups) add code, so
   watch it.
+
+---
+
+## A3: core foundations
+
+Code: `packages/core/src/` — `crypto.ts`, `keys.ts`, `epochs.ts`, `padding.ts`, `stealth.ts`, `keycopies.ts`,
+`transport.ts`. Tests: `packages/core/test/` (vitest + fast-check). Run with `pnpm --filter @cloakroom/core test`.
+
+| Done when | Status |
+|---|---|
+| Same signature → same keys | **Pass.** Property test over 25 random wallets. The keys also equal the Fluidkey kit's own output, and v encoded as 0/1 or 27/28 gives the same keys |
+| Different signatures → `WALLET_NOT_SUPPORTED` | **Pass.** A second valid signature made with a randomised nonce is refused. So are smart-contract wallets (but not EIP-7702 delegated EOAs), signatures from another address, and non-65-byte (e.g. ERC-6492) signatures |
+| A holder of `E[j]` derives `E[i]` for every i ≤ j and never `E[j+1]` | **Pass.** Property test (40 random secrets and epochs). The reference chain is built from the spec (`E[i-1] = SHA-256(E[i])`); the API refuses `j+1` with `NOT_AUTHORIZED`; `E[j+1]` is a SHA-256 preimage of `E[j]`, and nothing the holder can compute equals it |
+| Welcome round-trip; a wrong key doesn't match | **Pass.** The recipient opens MK_S and gets the private key of exactly the granted address S. A stranger's key, another folder, a tampered note or a malformed `e·G` all return no match. Scanning 10 notes for 5 people finds exactly each person's own |
+
+**34 tests pass in about 2 s.** An 11-mutant check on the claims above kills all 11: going up the chain, the until
+rounding, the back-dating window, accepting differing or foreign signatures, smart wallets, including `v` in K,
+skipping the `cloak.key` comparison, unbinding welcomes from their folder, padding without the AES overhead, and the
+`randomBytes` chunking.
+
+### Decisions and findings
+- **The sign-in statement is one line (a change from the plan's text).** ERC-4361 says the statement must not contain
+  `\n`. A strict SIWE parser would reject the plan's two-line version, and the wallet's domain warning (the phishing
+  defence) wouldn't fire. Check 9 will confirm MetaMask's warning.
+- **The message names the canonical origin** (`config.appOrigin`), never the page's origin. The Swarm copy then gives
+  the same keys, and wallets warn there by design.
+- **K and K_room come from `r ‖ s`, not the full signature.** Wallets encode `v` differently, and including it would
+  give one person different drive keys on different devices. The Fluidkey kit ignores `v` for the same reason.
+- **Exact-size padding:** an encrypted file is exactly 64 KiB, 256 KiB, 1 MiB, 4 MiB, 16 MiB or 32 MiB, because the
+  AES-GCM nonce and tag count inside the bucket. The cap is 25 MiB.
+- **Bug found by the tests:** WebCrypto's `getRandomValues` refuses more than 64 KiB per call, so `randomBytes` now
+  fills in chunks.
+- **Binding and portability:**
+  - Welcome notes and key copies are bound to their folder (AES-GCM associated data), and key copies to their
+    version, so neither can be replayed elsewhere.
+  - HKDF and SHA-256 use `@noble/hashes` (synchronous, the same on every platform); AES-GCM and randomness use
+    WebCrypto.
+  - Imports are extensionless, so Next.js can compile core without extra configuration.
+- **For A6, epoch-key cost:** deriving E[0] from E[N] takes 8,760 SHA-256 calls, a few ms in Node. Readers should
+  cache derived keys per folder version.
