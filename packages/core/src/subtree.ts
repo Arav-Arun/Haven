@@ -14,6 +14,7 @@ import { isAddressEqual } from "viem";
 import { normalize } from "viem/ens";
 
 import { creationBlock, findRegistry, listChildren, nameController, type SepoliaReader } from "./ens";
+import { sameKey } from "./keydir";
 import type { RosterMember, SubtreeRuleData } from "./records";
 
 /** ENSv2 roles allow at most 15 holders per role; one slot stays free for the owner's own changes. */
@@ -69,6 +70,7 @@ export interface SyncPlan {
  * - new holder with a valid key → add
  * - member whose name is gone, expired, excluded, or now controlled by someone else → remove
  *   (and the new controller, if they have a key, is added fresh)
+ * - member whose public key changed since they were shared → remove, and share again to the new key
  */
 export function planSync(rule: SubtreeRuleData, members: readonly RosterMember[], holders: readonly SubtreeHolder[]): SyncPlan {
   const excluded = new Set(rule.excluded.map((n) => n.toLowerCase()));
@@ -80,7 +82,9 @@ export function planSync(rule: SubtreeRuleData, members: readonly RosterMember[]
   for (const m of mine) {
     const name = (m.label ?? "").toLowerCase();
     const h = live.get(name);
-    if (!h || !m.holder || !isAddressEqual(h.controller, m.holder)) remove.push(m);
+    // A new key in their public log (say, the old one leaked) means the old share must go: it was sealed to that key.
+    const rekeyed = !!m.sharedKey && !!h?.key && !sameKey(m.sharedKey, h.key);
+    if (!h || !m.holder || !isAddressEqual(h.controller, m.holder) || rekeyed) remove.push(m);
     else kept.add(name);
   }
   const add = [...live.values()].filter((h) => !kept.has(h.name.toLowerCase()));

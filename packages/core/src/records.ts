@@ -106,6 +106,8 @@ export interface RosterMember {
   rule?: string;
   /** Add-on F2: who controlled the member's ENS name when they were added (a transfer means re-share). */
   holder?: Address;
+  /** Add-on F2: the spending key this member was shared to. If their public log moves on, the share is replaced. */
+  sharedKey?: Hex;
 }
 
 /** Add-on F2: "share with everyone under <parent>". Lives only inside the sealed roster, never onchain. */
@@ -139,6 +141,7 @@ function encodeMembers(list: RosterMember[]) {
     v: m.via,
     ...(m.rule ? { g: m.rule } : {}),
     ...(m.holder ? { o: getAddress(m.holder) } : {}),
+    ...(m.sharedKey ? { p: m.sharedKey } : {}),
   }));
 }
 
@@ -181,6 +184,7 @@ function decodeMembers(value: unknown): RosterMember[] {
       via: m.v === "group" ? "group" : "direct",
       ...(isText(m.g, 255) ? { rule: m.g } : {}),
       ...(typeof m.o === "string" ? { holder: getAddress(m.o) } : {}),
+      ...(typeof m.p === "string" && isHex(m.p) && m.p.length <= 132 ? { sharedKey: m.p } : {}),
     };
   });
 }

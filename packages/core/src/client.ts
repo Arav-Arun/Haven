@@ -1341,6 +1341,7 @@ class Client implements CloakroomClient {
         via: "direct",
         ...(p.rule ? { rule: p.rule } : {}),
         ...(p.holder ? { holder: p.holder } : {}),
+        ...(p.rule ? { sharedKey: p.key } : {}),
       });
       const copy: KeyCopy | null =
         opts.role === "manager"

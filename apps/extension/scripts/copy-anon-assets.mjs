@@ -6,7 +6,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const require = createRequire(import.meta.url);
-const pkgDir = dirname(require.resolve("@anon-rpc/browser-extension-harness")).replace(/\/dist$/, "");
+// Either separator: on Windows the resolved path uses backslashes.
+const pkgDir = dirname(require.resolve("@anon-rpc/browser-extension-harness")).replace(/[\\/]dist$/, "");
 const target = fileURLToPath(new URL("../public/anon-rpc", import.meta.url));
 rmSync(target, { recursive: true, force: true });
 cpSync(join(pkgDir, "dist/static/anon-rpc"), target, { recursive: true });

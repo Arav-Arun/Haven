@@ -108,6 +108,29 @@ describe("F1 key log", () => {
     expect((await checkKeyLog([e0!, e1!], null)).chain).toEqual([]);
   });
 
+  it("a copy of a signed entry, written by anyone, can't make the log look forked", async () => {
+    const [e0, e1] = await validChain();
+    const stranger = privateKeyToAccount(generatePrivateKey()).address;
+    // Byte-for-byte copies of seq 0 and seq 1, relayed later by someone else.
+    const copyOf = (r: KeyLogRecord) =>
+      record(
+        { ensName: r.ensName, seq: r.seq, kind: r.kind, spendingPublicKey: r.spendingPublicKey, devicePublicKey: r.devicePublicKey, prevEntryKey: r.prevEntryKey, sig: r.sig },
+        stranger,
+        key(5000 + Number(block)),
+      );
+    const copy0 = copyOf(e0!);
+    const copy1 = copyOf(e1!);
+    const c = await checkKeyLog([copy1, e0!, copy0, e1!], controller);
+    expect(c.problem).toBeNull();
+    expect(c.chain.map((r) => r.key)).toEqual([e0!.key, e1!.key]);
+    expect(c.ignored).toEqual(expect.arrayContaining([copy0, copy1]));
+    expect(currentKey(c.chain)).toBe(compressKey(spend2));
+
+    // Two different entries the controller signed for one seq are a real fork, and still break the chain.
+    const fork = await entry(K, nextEntry([e0!], { ensName: name, kind: "rotate", spendingPublicKey: spend1 }));
+    expect((await checkKeyLog([e0!, e1!, fork], controller)).problem).toMatch(/two entries claim seq 1/);
+  });
+
   it("blocks sharing when the log doesn't match cloak.key", () => {
     expect(ensAgreement(compressKey(spend1), spend1)).toBe("match");
     expect(ensAgreement(compressKey(spend1), spend2)).toBe("mismatch");
@@ -195,6 +218,26 @@ describe("F2 subtree sync", () => {
     expect(t.add.map((h) => h.controller)).toEqual([newOwner]);
     // members added by hand or by another rule are left alone
     expect(planSync(rule, [member("bob.cloakroom.eth", a1, "other.eth")], []).remove).toEqual([]);
+  });
+
+  it("replaces a member's share when their public key changes, and keeps it while it doesn't", () => {
+    const now = holder("priya.acme.eth", a1);
+    const priya = { ...member("priya.acme.eth", a1), sharedKey: now.key! };
+    expect(planSync(rule, [priya], [now])).toEqual({ add: [], remove: [] });
+    const rotated = holder("priya.acme.eth", a1); // same holder, new key in their log
+    const plan = planSync(rule, [priya], [rotated]);
+    expect(plan.remove).toEqual([priya]);
+    expect(plan.add).toEqual([rotated]);
+    // rosters written before keys were recorded are left as they are
+    expect(planSync(rule, [member("priya.acme.eth", a1)], [rotated]).remove).toEqual([]);
+  });
+
+  it("records the shared key in the sealed roster", async () => {
+    const fs = new Uint8Array(32).fill(7);
+    const folder = privateKeyToAccount(generatePrivateKey()).address;
+    const m = { ...member("priya.acme.eth", a1), sharedKey: compressKey(pubOf(generatePrivateKey())) };
+    const opened = await openRoster(fs, folder, 1, await sealRoster(fs, folder, 1, { managers: [], members: [m] }));
+    expect(opened.members[0]!.sharedKey).toBe(m.sharedKey);
   });
 
   it("refuses more than 14 people", () => {

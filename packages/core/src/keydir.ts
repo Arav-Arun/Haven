@@ -162,6 +162,11 @@ async function signerOf(r: KeyLogRecord): Promise<Address | null> {
   }
 }
 
+/** Everything the signature covers, as one string: two records with equal content are copies of one signed entry. */
+function signedContent(r: KeyLogRecord): string {
+  return [r.ensName, r.seq, r.kind, r.spendingPublicKey, r.devicePublicKey, r.prevEntryKey].join("|").toLowerCase();
+}
+
 /** Rule 1. `controller` is the name's controller now (ens.ts nameController); null means nothing can be valid. */
 export async function checkKeyLog(records: readonly KeyLogRecord[], controller: Address | null): Promise<CheckedKeyLog> {
   const signed: KeyLogRecord[] = [];
@@ -171,7 +176,23 @@ export async function checkKeyLog(records: readonly KeyLogRecord[], controller: 
     if (controller && signer && isAddressEqual(signer, controller)) signed.push(r);
     else ignored.push(r);
   }
-  signed.sort((a, b) => a.seq - b.seq || Number(a.createdAtBlock - b.createdAtBlock));
+  signed.sort((a, b) => a.seq - b.seq || Number(a.createdAtBlock - b.createdAtBlock) || a.key.localeCompare(b.key));
+  // Entries are relayed (POST /keylog), so anyone can write a byte-for-byte copy of an entry the controller signed.
+  // Copies of one signed entry are the same entry: keep the copy the next entry points at (or the earliest), and set
+  // the rest aside, so a copy can't make a name's log look forked. Two DIFFERENT signed entries for one seq can only
+  // come from the controller, and still break the chain below.
+  const pointedAt = new Set(signed.map((r) => r.prevEntryKey.toLowerCase()));
+  const kept = new Map<string, KeyLogRecord>(); // seq + signed content → the copy that counts
+  for (const r of signed) {
+    const id = `${r.seq}|${signedContent(r)}`;
+    const held = kept.get(id);
+    if (!held) kept.set(id, r);
+    else if (!pointedAt.has(held.key.toLowerCase()) && pointedAt.has(r.key.toLowerCase())) {
+      ignored.push(held);
+      kept.set(id, r);
+    } else ignored.push(r);
+  }
+  signed.splice(0, signed.length, ...[...kept.values()].sort((a, b) => a.seq - b.seq || Number(a.createdAtBlock - b.createdAtBlock)));
   let problem: string | null = null;
   for (let i = 0; i < signed.length && !problem; i++) {
     const r = signed[i]!;
