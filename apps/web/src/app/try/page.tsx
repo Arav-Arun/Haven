@@ -57,7 +57,7 @@ function PersonaCard({ persona, client, onReady }: { persona: Persona; client: D
   return (
     <div className="flex flex-col gap-3">
       {identity?.ensName ? (
-        <Ticket address={identity.driveKey} title={identity.ensName} subtitle={`The ${persona}`} role="owner" until={null} now={now} />
+        <Ticket address={identity.driveKey} href={`${config.explorerUrl}/address/${identity.driveKey}`} title={identity.ensName} subtitle={`The ${persona}`} role="owner" until={null} now={now} />
       ) : (
         <div className="flex flex-col gap-3 rounded-lg border border-line bg-card p-4">
           <h2 className="font-semibold">The {persona}</h2>

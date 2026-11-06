@@ -18,8 +18,11 @@ export function Ticket({
   now,
   tags,
   actions,
+  href,
 }: {
   address: string;
+  /** Where the address can be checked onchain (Etherscan). Makes the ticket number a link. */
+  href?: string;
   title: ReactNode;
   subtitle?: ReactNode;
   role: Role | "owner";
@@ -31,12 +34,28 @@ export function Ticket({
   const ended = until !== null && until <= now;
   return (
     <div className={cx("ticket flex min-h-[88px] items-stretch text-ink", ended && "ticket-ended")}>
-      <div className="flex w-[72px] shrink-0 flex-col items-center justify-center px-1 text-stamp" title={address}>
-        <span className="text-[10px] leading-none">No.</span>
-        <span className="font-display text-[22px] font-bold leading-none tracking-wide [font-variant-numeric:tabular-nums]">
-          {ticketSerial(address)}
-        </span>
-      </div>
+      {href ? (
+        <a
+          href={href}
+          target="_blank"
+          rel="noreferrer noopener"
+          title={`${address}: view on Etherscan`}
+          className="group flex w-[72px] shrink-0 flex-col items-center justify-center px-1 text-stamp"
+        >
+          <span className="text-[10px] leading-none">No.</span>
+          <span className="font-display text-[22px] font-bold leading-none tracking-wide [font-variant-numeric:tabular-nums] group-hover:underline">
+            {ticketSerial(address)}
+          </span>
+          <span className="mt-1 text-[10px] leading-none underline decoration-stamp/40 underline-offset-2">Etherscan</span>
+        </a>
+      ) : (
+        <div className="flex w-[72px] shrink-0 flex-col items-center justify-center px-1 text-stamp" title={address}>
+          <span className="text-[10px] leading-none">No.</span>
+          <span className="font-display text-[22px] font-bold leading-none tracking-wide [font-variant-numeric:tabular-nums]">
+            {ticketSerial(address)}
+          </span>
+        </div>
+      )}
       <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3 pl-4 pr-3">
         <div className="min-w-0">
           <p className="truncate font-medium">{title}</p>

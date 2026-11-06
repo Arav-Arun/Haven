@@ -1,7 +1,7 @@
 # Haven API on Fly.io. Secrets (never in this file):
 #   fly secrets set --config apps/api/fly.toml SEPOLIA_RPC_URL=… RELAYER_PRIVATE_KEY=… ARKIV_ACCESS_KEY=… \
 #     POSTAGE_BATCH_ID=… BEE_URL=http://haven-bee.internal:1633
-app = "haven-api"
+app = "havenethglobal-api"
 primary_region = "sin"
 
 [env]

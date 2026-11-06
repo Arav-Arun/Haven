@@ -88,7 +88,10 @@ export function MembersPanel({
   onExclude,
   onSync,
   onRemoveRule,
+  addressUrl,
 }: {
+  /** Links each member's random address to the block explorer. */
+  addressUrl?: (address: string) => string;
   members: PanelMember[];
   now: Timestamp;
   canManage: boolean;
@@ -114,6 +117,7 @@ export function MembersPanel({
         <li key={m.address}>
           <Ticket
             address={m.address}
+            {...(addressUrl ? { href: addressUrl(m.address) } : {})}
             title={m.label}
             role={m.role}
             until={m.until}

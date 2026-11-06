@@ -109,7 +109,8 @@ export function readEnv(source: Record<string, string | undefined>): ApiEnv {
     ARKIV_RPC_URL: need("ARKIV_RPC_URL"),
     ARKIV_ACCESS_KEY: need("ARKIV_ACCESS_KEY"),
     BEE_URL: need("BEE_URL"),
-    POSTAGE_BATCH_ID: need("POSTAGE_BATCH_ID"),
+    // Empty while a new Bee node is still syncing: everything else works, and uploads say storage isn't ready yet.
+    POSTAGE_BATCH_ID: source.POSTAGE_BATCH_ID ?? "",
     ROOM_POW_DIFFICULTY: Number(need("ROOM_POW_DIFFICULTY")),
     DRIP_SEPOLIA_WEI: BigInt(need("DRIP_SEPOLIA_WEI")),
     DRIP_ARKIV_WEI: BigInt(need("DRIP_ARKIV_WEI")),
@@ -180,7 +181,7 @@ class Queue {
 function fail(c: Context, e: unknown) {
   const code = e instanceof DriveError ? e.code : "UNKNOWN";
   const status =
-    { NOT_AUTHORIZED: 403, NAME_TAKEN: 409, RATE_LIMITED: 429, TOO_LARGE: 413, NOT_FOUND: 404, EXPIRED: 410, KEY_MISMATCH: 409 }[code as string] ?? 500;
+    { NOT_AUTHORIZED: 403, NAME_TAKEN: 409, RATE_LIMITED: 429, TOO_LARGE: 413, NOT_FOUND: 404, EXPIRED: 410, KEY_MISMATCH: 409, NETWORK: 503 }[code as string] ?? 500;
   const message = e instanceof Error ? e.message : String(e);
   if (status === 500) console.error(`[api] ${c.req.path}: ${message}`);
   return c.json({ error: { code, message } }, status as 403);
@@ -320,6 +321,7 @@ export function createApi(env: ApiEnv) {
   app.post("/doorbell", async (c) => {
     try {
       if (env.DOORBELL_PROXIMITY === null) throw new DriveError("NOT_FOUND", "live updates are off on this server");
+      storageReady();
       const ring = (await c.req.json()) as DoorbellRing;
       if (!(await checkRing(ring))) throw new DriveError("NOT_AUTHORIZED", "malformed or unsigned doorbell");
       if (!counters.hit(`ring:${ring.owner.toLowerCase()}`, 1, LIMITS.ringsPerAddressPerHour, 3600)) throw new DriveError("RATE_LIMITED");
@@ -437,8 +439,13 @@ export function createApi(env: ApiEnv) {
   app.get("/bytes/:ref", (c) => bytes(c, "GET"));
   app.on("HEAD", "/bytes/:ref", (c) => bytes(c, "HEAD"));
 
+  const storageReady = () => {
+    if (!env.POSTAGE_BATCH_ID) throw new DriveError("NETWORK", "File storage is still being set up. Try uploading again in a few minutes.");
+  };
+
   app.post("/upload", async (c) => {
     try {
+      storageReady();
       const declared = Number(c.req.header("content-length") ?? "0");
       if (declared > MAX_UPLOAD_BYTES) throw new DriveError("TOO_LARGE");
       const body = new Uint8Array(await c.req.arrayBuffer());

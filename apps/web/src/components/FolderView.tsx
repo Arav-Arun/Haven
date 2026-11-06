@@ -23,7 +23,7 @@ import {
   useNow,
   type UploadItem,
 } from "@haven/ui";
-import { ArrowLeft, Copy, Eye, FolderDown, FolderPlus, Radio, Share2, Timer } from "lucide-react";
+import { ArrowLeft, Copy, ExternalLink, Eye, FolderDown, FolderPlus, Radio, Share2, Timer } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -272,6 +272,15 @@ export function FolderView({ client, folder }: { client: HavenClient; folder: Ad
         <Link href={`/public?f=${folder}`} className="inline-flex min-h-10 items-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium hover:bg-line/60">
           <Eye size={16} aria-hidden /> Public view
         </Link>
+        <a
+          href={`${config.explorerUrl}/address/${folder}`}
+          target="_blank"
+          rel="noreferrer noopener"
+          title="This folder is its own ENS registry contract on Sepolia"
+          className="inline-flex min-h-10 items-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium hover:bg-line/60"
+        >
+          <ExternalLink size={16} aria-hidden /> View on Etherscan
+        </a>
       </FolderHeader>
       <LiveBadge status={live} />
       <ErrorNote error={zipError} />
@@ -325,6 +334,7 @@ export function FolderView({ client, folder }: { client: HavenClient; folder: Ad
           <ErrorNote error={members.error} />
           {members.data && (
             <MembersPanel
+              addressUrl={(a) => `${config.explorerUrl}/address/${a}`}
               members={members.data}
               now={now}
               canManage={canManage}
