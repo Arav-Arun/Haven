@@ -63,6 +63,10 @@ import {
   haven,
   createRoom,
   driveOwner,
+  getSubregistry,
+  driveRegistryAbi,
+  getHavenKey,
+  creationBlock,
   ensv2,
   ethNameExpiry,
   isLabelAvailable,
@@ -385,6 +389,19 @@ export function createApi(env: ApiEnv) {
     return job;
   };
 
+  /** A claim already on chain for `driveKey`: its drive root is owned by K and haven.key is this public key. */
+  const existingClaim = async (appRegistry: Address, label: string, driveKey: Address, spendingPublicKey: Hex): Promise<ClaimResponse | null> => {
+    const driveRoot = await getSubregistry(sepoliaClient, appRegistry, label);
+    if (!driveRoot || !isAddressEqual(await driveOwner(sepoliaClient, driveRoot), driveKey)) return null;
+    const ensName = `${label}.haven.eth`;
+    const published = await getHavenKey(sepoliaClient, ensName);
+    if (!published || published.toLowerCase() !== spendingPublicKey.toLowerCase()) return null;
+    const resolver = getAddress(
+      await sepoliaClient.readContract({ address: appRegistry, abi: driveRegistryAbi, functionName: "getResolver", args: [label] }),
+    );
+    return { ensName, resolver, driveRoot, driveRootBlock: (await creationBlock(sepoliaClient, driveRoot)).toString(), api: relayer.address };
+  };
+
   app.post("/claim", async (c) => {
     try {
       const r = await verifyClaimRequest(await c.req.json());
@@ -392,10 +409,16 @@ export function createApi(env: ApiEnv) {
       const driveKey = getAddress(r.driveKey);
       const running = claimJobs.get(driveKey);
       if (running) return c.json<ClaimResponse>(await running);
+      const appRegistry = requireDeployed("appRegistry");
+      if (!(await isLabelAvailable(sepoliaClient, appRegistry, label))) {
+        // Taken. If it was taken by this same key with this same public key (an earlier claim whose reply was lost),
+        // hand back that claim, read from the chain, instead of refusing the user their own name.
+        const mine = await existingClaim(appRegistry, label, driveKey, r.spendingPublicKey);
+        if (mine) return c.json<ClaimResponse>(mine);
+        throw new DriveError("NAME_TAKEN");
+      }
       if (!counters.hit(`claim:${r.driveKey}`, 1, 1, DAY)) throw new DriveError("RATE_LIMITED", "one name per key per day");
       if (!counters.hit("claims", 1, LIMITS.claimsPerDay, DAY)) throw new DriveError("RATE_LIMITED", "daily cap reached");
-      const appRegistry = requireDeployed("appRegistry");
-      if (!(await isLabelAvailable(sepoliaClient, appRegistry, label))) throw new DriveError("NAME_TAKEN");
       const job = remember(
         claimJobs,
         driveKey,

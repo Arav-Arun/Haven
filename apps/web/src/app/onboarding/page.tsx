@@ -66,12 +66,13 @@ function SignStep({ client, onSignedIn }: { client: DriveClient; onSignedIn: (i:
   const host = new URL(config.appOrigin).host;
   const mismatch = sigs.length === 2 && sigs[0] !== sigs[1];
 
+  const have = needed !== null && sigs.length >= needed;
   const sign = async () => {
     setPending(true);
     setError(null);
     try {
-      const sig = await signMessageAsync({ message });
-      const next = [...sigs, sig];
+      // Both signatures are in and only the key step failed: try again with them, without asking for a third.
+      const next = have ? sigs : [...sigs, await signMessageAsync({ message })];
       setSigs(next);
       if (next.length === needed && !(next.length === 2 && next[0] !== next[1]))
         onSignedIn(await client.signIn({ kind: "wallet", address, signatures: next }));
@@ -101,8 +102,8 @@ function SignStep({ client, onSignedIn }: { client: DriveClient; onSignedIn: (i:
         <ErrorNote error={{ code: "WALLET_NOT_SUPPORTED" }} />
       ) : (
         <Button variant="primary" className="self-start" pending={pending} onClick={sign}>
-          {sigs.length === 0 ? "Sign" : "Sign again"}
-          {needed === 2 && ` (${sigs.length + 1} of 2)`}
+          {have ? (pending ? "Creating your keys…" : "Try again") : sigs.length === 0 ? "Sign" : "Sign again"}
+          {!have && needed === 2 && ` (${sigs.length + 1} of 2)`}
         </Button>
       )}
       <ErrorNote error={error} />
