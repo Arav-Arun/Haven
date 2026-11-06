@@ -69,7 +69,7 @@ const defaultFactory = (platform: "web" | "extension"): WorkerFactory => async (
  * queued by the harness. If the worker fails, calls reject: they never fall back to plain fetch.
  */
 /** How long the worker may take to load before calls through it fail instead of waiting. */
-const START_TIMEOUT_MS = 45_000;
+const START_TIMEOUT_MS = 20_000;
 
 export function createAnonFetch(opts: CreateAnonFetchOptions): AnonFetch {
   const listeners = new Set<(s: AnonStatus) => void>();
@@ -144,7 +144,7 @@ export function createAnonFetch(opts: CreateAnonFetchOptions): AnonFetch {
   const startDeadline = new Promise<never>((_, reject) =>
     setTimeout(() => {
       if (started) return;
-      const detail = "The private network didn't start. Reload the page, or pick another network in Settings.";
+      const detail = "The private network didn't start in this browser, so requests go direct.";
       setStatus({ network: opts.network, state: "failed", detail });
       reject(new Error(detail));
     }, START_TIMEOUT_MS),
@@ -161,7 +161,16 @@ export function createAnonFetch(opts: CreateAnonFetchOptions): AnonFetch {
   const transient = (e: unknown) => /no ?tunnel|no exit|NoTunnelExit/i.test(e instanceof Error ? `${e.name} ${e.message}` : String(e));
   const routed = (isolationKey?: string): typeof fetch =>
     (async (input: RequestInfo | URL, init?: RequestInit) => {
-      const worker = await Promise.race([workerPromise, startDeadline]);
+      // A worker that never starts (blocked in this browser, or no network) must not stop the app: requests go direct,
+      // and the status says so.
+      let worker: Awaited<typeof workerPromise>;
+      try {
+        worker = await Promise.race([workerPromise, startDeadline]);
+      } catch (e) {
+        degraded = true;
+        if (status.state !== "failed") setStatus({ network: opts.network, state: "failed", detail: e instanceof Error ? e.message : String(e) });
+        return plain(input as string | URL | Request, init);
+      }
       const anonInit = isolationKey ? { ...init, anonOptions: { isolationKey } } : init;
       let last: unknown;
       for (let attempt = 0; attempt < 3; attempt++) {
