@@ -1,4 +1,5 @@
-import { doorbellTopic, mineGsocKey, sealDoorbell, signRing } from "@haven/core";
+import { doorbellTopic, mineGsocKey, sealDoorbell, sha256, signRing, ZK_ARTIFACTS, zkIdentity, zkJoinTypedData } from "@haven/core";
+import { toHex } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { afterAll, describe, expect, it } from "vitest";
 
@@ -104,5 +105,41 @@ describe("swarm gateway", () => {
   it("refuses anything that isn't a Swarm reference", async () => {
     expect((await api.app.request("/bytes/not-a-ref")).status).toBe(404);
     expect((await api.app.request("/bytes/../../stamps")).status).toBe(404);
+  });
+});
+
+describe("anonymous writes (add-on Z1)", () => {
+  const folder = "0x1111111111111111111111111111111111111111";
+
+  it("serves the pinned proving files and nothing else", async () => {
+    for (const a of Object.values(ZK_ARTIFACTS)) {
+      const res = await api.app.request(a.path);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("cache-control")).toContain("immutable");
+      expect(toHex(sha256(new Uint8Array(await res.arrayBuffer())))).toBe(a.sha256);
+    }
+    expect((await api.app.request("/zk/semaphore-6.zkey")).status).toBe(404);
+    expect((await api.app.request("/zk/..%2Fpackage.json")).status).toBe(404);
+  });
+
+  it("refuses malformed or unsigned joins before touching the network", async () => {
+    const member = privateKeyToAccount(generatePrivateKey());
+    const commitment = zkIdentity(generatePrivateKey(), folder).commitment.toString();
+    expect((await post("/zk/join", { folder, member: member.address, commitment: "0", sig: "0x00" })).status).toBe(403);
+    // signed by someone else
+    const other = privateKeyToAccount(generatePrivateKey());
+    const sig = await other.signTypedData(zkJoinTypedData({ folder, member: member.address, commitment }));
+    const res = await post("/zk/join", { folder, member: member.address, commitment, sig });
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { error: { message: string } }).error.message).toMatch(/not signed by the member/);
+  });
+
+  it("refuses uploads and entries without a well-formed proof", async () => {
+    expect((await api.app.request("/zk/upload", { method: "POST", body: new Uint8Array(65536) })).status).toBe(403);
+    const stale = { "x-haven-folder": folder, "x-haven-time": "1", "x-haven-zk-proof": "0x00" };
+    expect((await api.app.request("/zk/upload", { method: "POST", headers: stale, body: new Uint8Array(65536) })).status).toBe(403);
+    const entry = { folder, fileId: "00".repeat(16), version: 1, epoch: 0, swarmRef: `0x${"ab".repeat(32)}`, meta: "0x00", proof: "0x00" };
+    expect((await post("/zk/file", entry)).status).toBe(403);
+    expect((await post("/zk/file", { ...entry, fileId: "../x" })).status).toBe(403);
   });
 });

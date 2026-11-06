@@ -7,12 +7,37 @@
 //   GET  /bytes/:ref  read-only Swarm gateway (the Bee node itself stays private)
 //   POST /keylog      add-on F1: relays a signed public key-log or device entry to Arkiv (the signature is checked)
 //   POST /doorbell    add-on F4: stamps a signed GSOC chunk and hands it to Bee (main.ts proxies the subscriptions)
+//   POST /zk/join     add-on Z1: relays a writer's signed Semaphore commitment for a folder
+//   POST /zk/upload   add-on Z1: an upload authorised by a zero-knowledge proof instead of a signer
+//   POST /zk/file     add-on Z1: relays an anonymous file entry once its proof checks out
+//   GET  /zk/:file    add-on Z1: the circuit's proving files (pinned by hash in @haven/core)
 //   GET  /config, /health
 // It logs nothing about users: only in-memory rate-limit counters, reset daily.
 
 import {
   accessOf,
   arkivEndpoint,
+  BlockClock,
+  checkJoins,
+  currentWriterGroup,
+  isCommitment,
+  listZkJoins,
+  normalizeRef,
+  readZkUpload,
+  registryHistory,
+  unpackProof,
+  verifyWrite,
+  ZK_ARTIFACTS,
+  ZK_HEADERS,
+  zkFileMessage,
+  zkFileOp,
+  zkJoinOp,
+  zkJoinTypedData,
+  type SemaphoreProof,
+  type ZkFileRequest,
+  type ZkFileResponse,
+  type ZkJoinRequest,
+  type ZkJoinResponse,
   arkivReader,
   arkivWriter,
   checkDevices,
@@ -59,6 +84,8 @@ import {
   type SepoliaWriter,
 } from "@haven/core";
 import { DriveError, type Address, type Hex } from "@haven/types";
+import { readFile } from "node:fs/promises";
+
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import {
@@ -150,6 +177,9 @@ const LIMITS = {
   keylogPerDay: 3000,
   ringsPerAddressPerHour: 240,
   ringsPerDay: 50_000,
+  zkJoinsPerFolderPerDay: 100,
+  zkUploadBytesPerFolderPerDay: 512 * 1024 * 1024,
+  zkFilesPerFolderPerDay: 2000,
 };
 
 /** In-memory counters that reset on their own: the only state the API keeps. */
@@ -203,6 +233,8 @@ export function createApi(env: ApiEnv) {
   const arkiv = arkivReader({ rpcUrl: env.ARKIV_RPC_URL, accessKey: env.ARKIV_ACCESS_KEY, anon: passthroughAnon() });
   const counters = new Counters();
   const queue = new Queue();
+  const history = registryHistory(sepoliaClient);
+  const arkivClock = new BlockClock(arkiv);
 
   // ---------------- drips: queued, then sent together every DRIP_BATCH_SECONDS
   const pending = new Map<string, Address>();
@@ -241,7 +273,7 @@ export function createApi(env: ApiEnv) {
 
   const app = new Hono();
   // No cookies or credentials anywhere, so any origin may call (the website, the extension, the Swarm copy).
-  app.use("*", cors({ origin: "*", exposeHeaders: ["content-length"], allowHeaders: ["content-type", "x-haven-folder", "x-haven-signer", "x-haven-time", "x-haven-signature"] }));
+  app.use("*", cors({ origin: "*", exposeHeaders: ["content-length"], allowHeaders: ["content-type", "x-haven-folder", "x-haven-signer", "x-haven-time", "x-haven-signature", ZK_HEADERS.proof] }));
 
   app.get("/health", (c) => c.json({ ok: true }));
 
@@ -461,6 +493,107 @@ export function createApi(env: ApiEnv) {
     } catch (e) {
       return fail(c, e);
     }
+  });
+
+  // ---------------- add-on Z1: anonymous writes. A proof counts only against the folder's writer group right now (the
+  // same group every reader rebuilds), and each nullifier is accepted once, so a proof can't be replayed.
+  const nullifiers = new Map<string, number>();
+  const spend = (proof: SemaphoreProof) => {
+    const t = Math.floor(Date.now() / 1000);
+    if (nullifiers.size > 50_000) for (const [n, at] of nullifiers) if (at < t - DAY) nullifiers.delete(n);
+    if (nullifiers.has(proof.nullifier)) throw new DriveError("NOT_AUTHORIZED", "that proof was already used");
+    nullifiers.set(proof.nullifier, t);
+  };
+  const checkGroupProof = async (folder: Address, proof: SemaphoreProof) => {
+    if (!(await isOurRegistry(folder))) throw new DriveError("NOT_FOUND", "not a Haven folder");
+    const t = Number((await sepoliaClient.getBlock()).timestamp);
+    const group = await currentWriterGroup(arkiv, history, arkivClock, folder, t);
+    if (BigInt(proof.merkleTreeRoot) !== group.root) throw new DriveError("NOT_AUTHORIZED", "this folder's writer group changed; try again");
+    if (!(await verifyWrite(proof, { root: group.root, message: BigInt(proof.message) }))) throw new DriveError("NOT_AUTHORIZED", "the proof doesn't verify");
+  };
+
+  app.post("/zk/join", async (c) => {
+    try {
+      const r = (await c.req.json()) as ZkJoinRequest;
+      if (!isAddress(r?.folder) || !isAddress(r.member) || typeof r.commitment !== "string" || !isCommitment(r.commitment)) {
+        throw new DriveError("NOT_AUTHORIZED", "malformed join");
+      }
+      if (!isHex(r.sig) || hexToBytes(r.sig).length !== 65) throw new DriveError("NOT_AUTHORIZED", "malformed signature");
+      const folder = getAddress(r.folder);
+      const member = getAddress(r.member);
+      const signer = await recoverTypedDataAddress({ ...zkJoinTypedData({ folder, member, commitment: r.commitment }), signature: r.sig });
+      if (!isAddressEqual(signer, member)) throw new DriveError("NOT_AUTHORIZED", "not signed by the member");
+      if (!(await isOurRegistry(folder))) throw new DriveError("NOT_FOUND", "not a Haven folder");
+      const t = Number((await sepoliaClient.getBlock()).timestamp);
+      if (!(await wasAllowed(sepoliaClient, folder, member, ROLE_DRIVE_WRITE, t))) throw new DriveError("NOT_AUTHORIZED", "the member can't write to this folder now");
+      const { writers } = await checkJoins((await listZkJoins(arkiv, folder)).records, folder, history, arkivClock);
+      const joined = writers.find((w) => isAddressEqual(w.member, member));
+      if (joined) return c.json<ZkJoinResponse>({ entityKey: joined.key, txHash: null });
+      if (!counters.hit(`zkjoin:${folder}`, 1, LIMITS.zkJoinsPerFolderPerDay, DAY)) throw new DriveError("RATE_LIMITED", "too many joins for this folder today");
+      const { txHash, keys } = await queue.run(() => writeEntities(arkivRelayer, [zkJoinOp({ folder, member, commitment: r.commitment, sig: r.sig })], "Writer group join"));
+      return c.json<ZkJoinResponse>({ entityKey: keys[0]!, txHash });
+    } catch (e) {
+      return fail(c, e);
+    }
+  });
+
+  app.post("/zk/upload", async (c) => {
+    try {
+      storageReady();
+      const declared = Number(c.req.header("content-length") ?? "0");
+      if (declared > MAX_UPLOAD_BYTES) throw new DriveError("TOO_LARGE");
+      const body = new Uint8Array(await c.req.arrayBuffer());
+      const { folder, proof } = readZkUpload(c.req.raw.headers, body);
+      await checkGroupProof(folder, proof);
+      spend(proof);
+      if (!counters.hit(`zkupload:${folder}`, body.length, LIMITS.zkUploadBytesPerFolderPerDay, DAY)) {
+        throw new DriveError("RATE_LIMITED", "daily upload quota reached for this folder");
+      }
+      return c.json({ reference: await storeOnBee(env.BEE_URL, env.POSTAGE_BATCH_ID, body) });
+    } catch (e) {
+      return fail(c, e);
+    }
+  });
+
+  app.post("/zk/file", async (c) => {
+    try {
+      const r = (await c.req.json()) as ZkFileRequest;
+      if (!isAddress(r?.folder) || typeof r.fileId !== "string" || !/^[0-9a-f]{32}$/.test(r.fileId)) throw new DriveError("NOT_AUTHORIZED", "malformed entry");
+      if (!Number.isSafeInteger(r.version) || r.version < 1 || !Number.isSafeInteger(r.epoch) || r.epoch < 0) throw new DriveError("NOT_AUTHORIZED", "malformed entry");
+      if (!isHex(r.meta) || hexToBytes(r.meta).length > 1024 || !isHex(r.proof) || typeof r.swarmRef !== "string") throw new DriveError("NOT_AUTHORIZED", "malformed entry");
+      let fields;
+      let proof: SemaphoreProof;
+      try {
+        fields = { folder: getAddress(r.folder), fileId: r.fileId, version: r.version, epoch: r.epoch, swarmRef: normalizeRef(r.swarmRef), meta: hexToBytes(r.meta) };
+        proof = unpackProof(hexToBytes(r.proof), zkFileMessage(fields));
+      } catch {
+        throw new DriveError("NOT_AUTHORIZED", "malformed entry or proof");
+      }
+      await checkGroupProof(fields.folder, proof);
+      spend(proof);
+      if (!counters.hit(`zkfile:${fields.folder}`, 1, LIMITS.zkFilesPerFolderPerDay, DAY)) throw new DriveError("RATE_LIMITED", "too many entries for this folder today");
+      const { txHash, keys } = await queue.run(() => writeEntities(arkivRelayer, [zkFileOp({ ...fields, proof: hexToBytes(r.proof) })], "Anonymous file entry"));
+      return c.json<ZkFileResponse>({ entityKey: keys[0]!, txHash });
+    } catch (e) {
+      return fail(c, e);
+    }
+  });
+
+  const zkFiles = new Map<string, Promise<Uint8Array>>();
+  app.get("/zk/:file", async (c) => {
+    const artifact = Object.values(ZK_ARTIFACTS).find((a) => a.path === `/zk/${c.req.param("file")}`);
+    if (!artifact) return c.json({ error: { code: "NOT_FOUND", message: "no such file" } }, 404);
+    const name = artifact.path.slice("/zk/".length);
+    let bytes = zkFiles.get(name);
+    if (!bytes) {
+      bytes = readFile(new URL(`../zk/${name}`, import.meta.url)).then((b) => new Uint8Array(b));
+      bytes.catch(() => zkFiles.delete(name));
+      zkFiles.set(name, bytes);
+    }
+    return c.body((await bytes) as Uint8Array<ArrayBuffer>, 200, {
+      "content-type": name.endsWith(".wasm") ? "application/wasm" : "application/octet-stream",
+      "cache-control": "public, max-age=31536000, immutable",
+    });
   });
 
   return { app, relayer: relayer.address, close: () => clearInterval(timer), sendBatch, deployment: haven, doorbellsOn: env.DOORBELL_PROXIMITY !== null };

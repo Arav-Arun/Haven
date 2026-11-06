@@ -73,6 +73,23 @@ reference for the code as built.
   next epoch's topics and resubscribe at each epoch end; every ring is checked by re-reading Arkiv. No config or a
   dropped socket: re-read Arkiv every 30 s.
 
+## Add-on Z1: anonymous writes (`zk.ts`)
+- Each writer (K, K_room or a stealth member S) derives a Semaphore v4 identity `HKDF(key, "haven/zk-identity/<folder>")`
+  and joins once: a `haven.zkjoin` entry with its commitment, EIP-712 signed by its member address, relayed by
+  `POST /zk/join`. Only the member knows S's key, so not even the sharer can make its proofs.
+- Writer group at time t: commitments of valid joins whose member held WRITE at t (`wasAllowedMany`), in join order.
+  Nobody maintains it; removal and end dates apply by themselves.
+- Upload: a proof (depth 5, fresh random scope) with message `keccak256("haven.zkupload v1", folder, sha256(body), time)`
+  authorises `POST /zk/upload` with no signer; a second proof with message `keccak256("haven.zkfile v1", folder, fileId,
+  version, epoch, swarmRef, keccak256(meta))` goes in a `haven.zkfile` entry relayed by `POST /zk/file`. The API checks
+  both against the current group root and accepts each nullifier once.
+- Read: proof valid, message from the entry's own fields, root = the group's root at the entry's creation time; then the
+  file rules, never with the manager exception. The writer recognises its own entries by recomputing the nullifier.
+- Needs at least 2 writers in the group. Proving files (`apps/api/zk`, served at `/zk/*`) are checked against sha256
+  hashes pinned in `zk.ts`; the verification key ships inside `@semaphore-protocol/proof`.
+- Still visible: which member addresses joined (they hold WRITE onchain anyway), group size, timing, and the requester's
+  IP to our API when the request isn't routed.
+
 ## Groups and inherited subfolders (`client.ts`)
 - A group is a `g-<random>` DriveRegistry whose sealed roster lists people by ENS name. Sharing a folder with it stores
   the rule `group:<registry>` in the folder's sealed roster and makes one stealth share per person; each sync compares

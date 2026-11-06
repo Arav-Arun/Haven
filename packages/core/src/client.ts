@@ -45,7 +45,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { sepolia } from "viem/chains";
 import { normalize } from "viem/ens";
 
-import { EXPLORERS, requireDeployed, haven } from "./addresses";
+import { EXPLORERS, requireDeployed, haven, txUrl } from "./addresses";
 import { signClaim, solveRoomPow, type ApiInfo, type ClaimResponse, type DripResponse, type RoomResponse } from "./api";
 import {
   arkivReader,
@@ -67,6 +67,8 @@ import {
   listRotations,
   listTombs,
   listWelcomes,
+  listZkFiles,
+  listZkJoins,
   rosterOp,
   rotationOp,
   sendGlm,
@@ -80,9 +82,11 @@ import {
   type FileRecord,
   type RosterRecord,
 } from "./arkiv";
-import { randomBytes, toPrivateKey, utf8 } from "./crypto";
+import { randomBytes, sha256, toPrivateKey, utf8 } from "./crypto";
 import { doorbellTopic, mineGsocKey, openDoorbell, sealDoorbell, signRing, type DoorbellConfig, type DoorbellEvent, type GsocKey } from "./doorbell";
 import type {
+  AnonymousWriters,
+  FileProof,
   HavenClient,
   DeviceInfo,
   KeyInfo,
@@ -180,9 +184,27 @@ import {
   type SubtreeRuleData,
 } from "./records";
 import { createWelcome, openWelcome } from "./stealth";
-import { downloadEncrypted, downloadFolderBlobs, uploadEncrypted, type SwarmConfig } from "./swarm";
+import { downloadEncrypted, downloadFolderBlobs, normalizeRef, uploadEncrypted, type SwarmConfig } from "./swarm";
 import { anonCanReach, anonTransport, isAnonymous, type RouteStep } from "./transport";
 import { registryHistory, scheduleOf, Validator, type FolderReading } from "./validator";
+import {
+  currentWriterGroup,
+  loadZkArtifacts,
+  madeBy,
+  packProof,
+  proveWrite,
+  zkFileMessage,
+  zkIdentity,
+  zkJoinTypedData,
+  ZK_MIN_WRITERS,
+  zkUploadHeaders,
+  zkUploadMessage,
+  type ZkFileRequest,
+  type ZkFileResponse,
+  type ZkJoinRequest,
+  type ZkJoinResponse,
+  type ZkWriteInfo,
+} from "./zk";
 
 // ---------------------------------------------------------------- constants
 
@@ -397,23 +419,27 @@ class Client implements HavenClient {
   }
 
   /** Calls our API: through the private network when it carries any HTTPS request, otherwise direct (and said so). */
-  private async api<T>(path: string, body: unknown, step?: StepSink, method: "GET" | "POST" = "POST"): Promise<T> {
+  private async apiFetch(path: string, init: RequestInit, step?: StepSink): Promise<Response> {
     const anon = this.cfg.anon;
     const routed = anon.supportsAnyHttps && isAnonymous(anon.status()) && anonCanReach(this.cfg.apiUrl);
     const label = `Haven API ${path}`;
     if (!routed) this.direct.add(label);
     step?.({ kind: "route", label, route: routed ? "anon" : "direct", network: anon.status().network });
     const doFetch = routed ? anon.fetch : globalThis.fetch.bind(globalThis);
-    let res: Response;
     try {
-      res = await doFetch(`${this.cfg.apiUrl.replace(/\/+$/, "")}${path}`, {
-        method,
-        headers: { "content-type": "application/json" },
-        ...(method === "POST" ? { body: JSON.stringify(body) } : {}),
-      });
+      return await doFetch(`${this.cfg.apiUrl.replace(/\/+$/, "")}${path}`, init);
     } catch (e) {
       throw new DriveError("NETWORK", `${label}: ${e instanceof Error ? e.message : String(e)}`);
     }
+  }
+
+  private async api<T>(path: string, body: unknown, step?: StepSink, method: "GET" | "POST" = "POST", init?: RequestInit): Promise<T> {
+    const label = `Haven API ${path}`;
+    const res = await this.apiFetch(
+      path,
+      init ?? { method, headers: { "content-type": "application/json" }, ...(method === "POST" ? { body: JSON.stringify(body) } : {}) },
+      step,
+    );
     const payload = (await res.json().catch(() => ({}))) as T & { error?: { code?: string; message?: string } };
     if (!res.ok) {
       const code = payload.error?.code as DriveError["code"] | undefined;
@@ -688,12 +714,14 @@ class Client implements HavenClient {
 
   private async readFolder(folder: Address, h: Holding, step?: StepSink): Promise<FolderKeys> {
     const reader = this.arkiv(step, h.address);
-    const [rotations, refreshes, files, tombs, copies] = await Promise.all([
+    const [rotations, refreshes, files, tombs, copies, zkFiles, zkJoins] = await Promise.all([
       listRotations(reader, folder),
       listRefreshes(reader, folder),
       arkivListFiles(reader, folder),
       listTombs(reader, folder),
       listKeyCopies(reader, folder, h.address),
+      listZkFiles(reader, folder),
+      listZkJoins(reader, folder),
     ]);
     const validator = this.validator(step, h.address);
     const reading = await validator.folder({
@@ -702,7 +730,8 @@ class Client implements HavenClient {
       refreshes: refreshes.records,
       files: files.records,
       tombs: tombs.records,
-      malformed: rotations.malformed + refreshes.malformed + files.malformed + tombs.malformed,
+      zk: { files: zkFiles.records, joins: zkJoins.records },
+      malformed: rotations.malformed + refreshes.malformed + files.malformed + tombs.malformed + zkFiles.malformed + zkJoins.malformed,
     });
     const checked = await validator.shareRecords(copies.records);
     const mine = new Map<number, KeyCopy>();
@@ -961,6 +990,7 @@ class Client implements HavenClient {
     for (const f of fk.reading.files) byFile.set(f.fileId, [...(byFile.get(f.fileId) ?? []), f]);
     const out: FileEntry[] = [];
     const labels = new Map<string, string>();
+    const me = zkIdentity(h.key, folder);
     for (const [, revisions] of byFile) {
       revisions.forEach((record, i) => (record as { revision?: number }).revision = i + 1);
       for (const record of revisions) {
@@ -975,7 +1005,11 @@ class Client implements HavenClient {
         }
         this.fileCache.set(lower(record.key), { record, meta });
         const c = lower(record.creator);
-        if (!labels.has(c)) labels.set(c, await this.uploaderLabel(folder, h, record.creator, roster));
+        const zk = (record as { zk?: ZkWriteInfo }).zk;
+        // An anonymous entry's creator is our relayer: the proof says only "one of N writers", and only its writer can
+        // tell it's theirs.
+        const anonymousLabel = zk ? (madeBy(me, { scope: zk.scope.toString(), nullifier: zk.nullifier.toString() }) ? "you (anonymously)" : `anonymous writer (one of ${zk.writers})`) : null;
+        if (!anonymousLabel && !labels.has(c)) labels.set(c, await this.uploaderLabel(folder, h, record.creator, roster));
         out.push({
           fileId: record.fileId,
           folder,
@@ -986,7 +1020,7 @@ class Client implements HavenClient {
           version: (record as { revision?: number }).revision ?? 1,
           epoch: record.epoch,
           uploadedAt: record.createdAt,
-          uploadedBy: { address: record.creator, label: labels.get(c)! },
+          uploadedBy: { address: record.creator, label: anonymousLabel ?? labels.get(c)! },
           swarmRef: record.swarmRef,
           arkivKey: record.key,
         });
@@ -1011,15 +1045,25 @@ class Client implements HavenClient {
   }
 
   async upload(folder: Address, file: Blob, name: string, onProgress?: (fraction: number) => void): Promise<FileEntry> {
+    return this.put(folder, file, name, false, onProgress);
+  }
+
+  async uploadAnonymously(folder: Address, file: Blob, name: string, onProgress?: (fraction: number) => void): Promise<FileEntry> {
+    return this.put(folder, file, name, true, onProgress);
+  }
+
+  /** An upload, signed by the member's key, or anonymous: proved to come from one of the folder's writers (zk.ts). */
+  private async put(folder: Address, file: Blob, name: string, anonymous: boolean, onProgress?: (fraction: number) => void): Promise<FileEntry> {
     const f = getAddress(folder);
     if (file.size > MAX_FILE_BYTES) throw new DriveError("TOO_LARGE", "Files can be up to 25 MB.");
-    return this.receipts.run(`Upload ${name}`, async (step) => {
+    return this.receipts.run(anonymous ? `Upload ${name} anonymously` : `Upload ${name}`, async (step) => {
       const h = await this.holding(f);
       onProgress?.(0.05);
       const fk = await this.readFolder(f, h, step);
       const v = fk.reading.latestVersion;
       const copy = fk.copies.get(v);
-      const manager = copy?.kind === "secret";
+      // An anonymous writer could be anyone in the group, so a manager gets no exception during a refresh.
+      const manager = copy?.kind === "secret" && !anonymous;
       if (fk.reading.refreshOpen && !manager) throw new DriveError("REFRESH_PENDING");
       if (!copy) throw new DriveError(fk.reading.refreshOpen ? "REFRESH_PENDING" : "NOT_AUTHORIZED");
       const rotation = fk.reading.versions.get(v)!;
@@ -1029,7 +1073,9 @@ class Client implements HavenClient {
       const key = epochKeyFrom(fk.copies, v, epoch);
       if (!key) throw new DriveError("EXPIRED");
       step({ kind: "check", label: "Write rule", detail: `latest key version ${v}, epoch ${epoch}${fk.reading.refreshOpen ? ", refresh open (manager)" : ""}`, ok: true });
-      await this.ensureGas(h, { arkiv: true }, step);
+      // The anonymous path needs no gas: the join, the upload and the entry are all relayed.
+      const zk = anonymous ? await this.zkReady(h, step) : null;
+      if (!zk) await this.ensureGas(h, { arkiv: true }, step);
 
       // A file with the same name becomes a new version of it.
       const existing = (await this.entries(f, h, fk)).find((e) => e.readable && e.name === name);
@@ -1038,16 +1084,22 @@ class Client implements HavenClient {
       const plain = new Uint8Array(await file.arrayBuffer());
       const padded = await encryptPadded(fileKey, plain);
       onProgress?.(0.25);
-      const swarmRef = await uploadEncrypted(this.swarm(), privateKeyToAccount(h.key), f, padded, step, h.address);
+      const swarmRef = zk
+        ? await this.zkUpload(h, zk, padded, step)
+        : await uploadEncrypted(this.swarm(), privateKeyToAccount(h.key), f, padded, step, h.address);
       onProgress?.(0.7);
       const meta: FileMeta = { name, mime: file.type || "application/octet-stream", size: plain.length, fileKey };
       const sealed = await sealFileMeta(key, { folder: f, fileId, version: v, epoch, swarmRef }, meta);
-      const { keys } = await writeEntities(
-        this.arkivWriter(h.key, step, h.address),
-        [fileOp({ folder: f, fileId, version: v, epoch, swarmRef, meta: sealed })],
-        "File entry",
-        step,
-      );
+      const keys = zk
+        ? [await this.zkFile(zk, { folder: f, fileId, version: v, epoch, swarmRef, meta: sealed }, step)]
+        : (
+            await writeEntities(
+              this.arkivWriter(h.key, step, h.address),
+              [fileOp({ folder: f, fileId, version: v, epoch, swarmRef, meta: sealed })],
+              "File entry",
+              step,
+            )
+          ).keys;
       if (keys[0]) await this.ring(h, fk, { type: "file", arkivKey: keys[0] }, step);
       onProgress?.(1);
       return {
@@ -1060,11 +1112,118 @@ class Client implements HavenClient {
         version: (existing?.version ?? 0) + 1,
         epoch,
         uploadedAt: now(),
-        uploadedBy: { address: h.address, label: "you" },
+        uploadedBy: zk ? { address: (await this.info()).relayer, label: "you (anonymously)" } : { address: h.address, label: "you" },
         swarmRef,
         arkivKey: keys[0] ?? ("0x" as Hex),
       };
     });
+  }
+
+  // ------------------------------------------------------------ anonymous writes (add-on Z1, zk.ts)
+
+  /** This holder's identity and the folder's writer group right now. */
+  private async zkGroup(h: Holding, step?: StepSink) {
+    const identity = zkIdentity(h.key, h.folder);
+    const group = await currentWriterGroup(this.arkiv(step, h.address), registryHistory(this.sepolia(step, h.address)), this.clock, h.folder, now());
+    const joined = group.writers.some((w) => isAddressEqual(w.member, h.address) && w.commitment === identity.commitment);
+    return { identity, ...group, joined, inGroup: group.leaves.includes(identity.commitment) };
+  }
+
+  /** Puts this holder's commitment in the writer group (relayed, so no gas), and waits until readers see it. */
+  private async zkJoin(h: Holding, step: StepSink) {
+    let g = await this.zkGroup(h, step);
+    if (g.joined) return g;
+    const commitment = g.identity.commitment.toString();
+    const sig = await privateKeyToAccount(h.key).signTypedData(zkJoinTypedData({ folder: h.folder, member: h.address, commitment }));
+    const request: ZkJoinRequest = { folder: h.folder, member: h.address, commitment, sig };
+    const res = await this.api<ZkJoinResponse>("/zk/join", request, step);
+    if (res.txHash) step({ kind: "arkiv-tx", label: "Joined the anonymous writer group (relayed)", hash: res.txHash, explorerUrl: txUrl("arkiv", res.txHash), ok: true });
+    for (let i = 0; i < 20; i++) {
+      g = await this.zkGroup(h, step);
+      if (g.joined) return g;
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+    throw new DriveError("NETWORK", "Your join didn't show up on Arkiv in time. Try again in a minute.");
+  }
+
+  /** Joined, with enough writers to hide among, and the proving files loaded: ready to prove. */
+  private async zkReady(h: Holding, step: StepSink) {
+    const g = await this.zkJoin(h, step);
+    if (!g.inGroup) throw new DriveError("NOT_AUTHORIZED", "You can't write to this folder now.");
+    if (g.leaves.length < ZK_MIN_WRITERS) {
+      throw new DriveError("NOT_AUTHORIZED", `You're the only writer here who has turned on anonymous uploads, so it wouldn't hide anything yet. It needs at least ${ZK_MIN_WRITERS}.`);
+    }
+    const files = await loadZkArtifacts(async (path) => {
+      const res = await this.apiFetch(path, { method: "GET" }, step);
+      if (!res.ok) throw new DriveError("NETWORK", `Haven API ${path}: HTTP ${res.status}`);
+      return new Uint8Array(await res.arrayBuffer());
+    });
+    step({ kind: "check", label: "Proving files match their pinned hashes", detail: "Semaphore depth 5 (sha256)", ok: true });
+    return { ...g, files, holding: h };
+  }
+
+  private async zkUpload(h: Holding, zk: Awaited<ReturnType<Client["zkReady"]>>, padded: Uint8Array, step: StepSink): Promise<Hex> {
+    const time = now();
+    const proof = await proveWrite(zk.identity, zk.leaves, zkUploadMessage({ folder: h.folder, bodySha256: toHex(sha256(padded)), time }), zk.files);
+    step({ kind: "check", label: "Zero-knowledge proof for the upload", detail: `one of ${zk.leaves.length} writers, no signer`, ok: true });
+    const { reference } = await this.api<{ reference: string }>("/zk/upload", undefined, step, "POST", {
+      method: "POST",
+      headers: { "content-type": "application/octet-stream", ...zkUploadHeaders(h.folder, time, proof) },
+      body: padded as Uint8Array<ArrayBuffer>,
+    });
+    const ref = normalizeRef(reference);
+    step({ kind: "swarm", label: "Encrypted file stored (anonymous upload)", ref, paddedBytes: padded.length, ok: true });
+    return ref;
+  }
+
+  private async zkFile(
+    zk: Awaited<ReturnType<Client["zkReady"]>>,
+    entry: { folder: Address; fileId: string; version: number; epoch: number; swarmRef: Hex; meta: Uint8Array },
+    step: StepSink,
+  ): Promise<Hex> {
+    const proof = await proveWrite(zk.identity, zk.leaves, zkFileMessage(entry), zk.files);
+    step({ kind: "check", label: "Zero-knowledge proof for the file entry", detail: `one of ${zk.leaves.length} writers; root ${proof.merkleTreeRoot.slice(0, 10)}…`, ok: true });
+    const request: ZkFileRequest = { ...entry, meta: toHex(entry.meta), proof: toHex(packProof(proof)) };
+    const res = await this.api<ZkFileResponse>("/zk/file", request, step);
+    step({ kind: "arkiv-tx", label: "Anonymous file entry (relayed, proof checked)", hash: res.txHash, explorerUrl: txUrl("arkiv", res.txHash), ok: true });
+    return res.entityKey;
+  }
+
+  async anonymousWriters(folder: Address): Promise<AnonymousWriters> {
+    const f = getAddress(folder);
+    const h = await this.holding(f);
+    const [g, a] = await Promise.all([this.zkGroup(h), accessOf(this.sepolia(undefined, h.address), f, h.address)]);
+    const role = roleOf(a.roles);
+    return {
+      folder: f,
+      joined: g.joined,
+      canJoin: a.via === "owner" || role === "editor" || role === "manager",
+      writers: g.leaves.length,
+      minimum: ZK_MIN_WRITERS,
+    };
+  }
+
+  async joinAnonymousWriters(folder: Address): Promise<AnonymousWriters> {
+    const f = getAddress(folder);
+    await this.receipts.run("Turn on anonymous uploads", async (step) => {
+      await this.zkJoin(await this.holding(f), step);
+    });
+    return this.anonymousWriters(f);
+  }
+
+  async fileProof(file: FileEntry): Promise<FileProof | null> {
+    if (!this.fileCache.has(lower(file.arkivKey))) await this.listVersions(file.folder, file.fileId);
+    const record = this.fileCache.get(lower(file.arkivKey))?.record;
+    const zk = (record as { zk?: ZkWriteInfo } | undefined)?.zk;
+    if (!record || !zk) return null;
+    const h = await this.holding(getAddress(file.folder));
+    return {
+      arkivKey: record.key,
+      root: toHex(zk.root, { size: 32 }),
+      nullifier: toHex(zk.nullifier, { size: 32 }),
+      writers: zk.writers,
+      mine: madeBy(zkIdentity(h.key, h.folder), { scope: zk.scope.toString(), nullifier: zk.nullifier.toString() }),
+    };
   }
 
   private async cached(file: FileEntry) {

@@ -140,6 +140,29 @@ export const RebuildSchema = defineSchema("haven.rebuild", {
   matched: u64(),
 });
 
+// ---- add-on Z1: anonymous writes (zk.ts). Both are relayed by our API; validity goes by a signature (joins) or a
+// zero-knowledge proof (files), never by $creator.
+
+/** A writer's Semaphore commitment for one folder, signed (EIP-712) by the member address that holds WRITE. */
+export const ZkJoinSchema = defineSchema("haven.zkjoin", {
+  folder: addr().indexed(),
+  member: addr().indexed(),
+  /** Decimal, below the BN254 field size (at most 77 digits, so it fits a 128-byte str). */
+  commitment: str(),
+  sig: bytes(),
+});
+
+/** A file entry like haven.file, plus a proof that one of the folder's joined writers made it (zk.packProof). */
+export const ZkFileSchema = defineSchema("haven.zkfile", {
+  folder: addr().indexed(),
+  fileId: str().indexed(),
+  version: u64().indexed(),
+  epoch: u64().indexed(),
+  swarmRef: str(),
+  meta: bytes(),
+  proof: bytes(),
+});
+
 /** Written instead of an empty string (Arkiv attributes are either set or absent). */
 export const NONE = "none";
 
@@ -157,6 +180,8 @@ export const SCHEMA_NAMES = [
   "haven.release",
   "haven.unrelease",
   "haven.rebuild",
+  "haven.zkjoin",
+  "haven.zkfile",
 ] as const;
 export type SchemaName = (typeof SCHEMA_NAMES)[number];
 
@@ -309,6 +334,17 @@ export interface UnreleaseRecord extends EntityInfo {
 export interface RebuildRecord extends EntityInfo {
   rootHash: Hex;
   matched: boolean;
+}
+
+export interface ZkJoinRecord extends EntityInfo {
+  folder: Address;
+  member: Address;
+  commitment: string;
+  sig: Hex;
+}
+
+export interface ZkFileRecord extends FileRecord {
+  proof: Uint8Array;
 }
 
 /** A query's rows plus how many matching entities didn't fit the schema (planted junk counts as hidden). */
@@ -543,6 +579,28 @@ export function rebuildOp(v: { rootHash: Hex; matched: boolean }): CreateOp {
     expiration: ExpirationTime.max(),
     flags: RENEWED,
   };
+}
+
+export function zkJoinOp(v: { folder: Address; member: Address; commitment: string; sig: Hex }): CreateOp {
+  return {
+    schema: ZkJoinSchema,
+    values: { folder: addr(v.folder), member: addr(v.member), commitment: str(v.commitment), sig: hexToBytes(v.sig) },
+    expiration: ExpirationTime.max(),
+    flags: RENEWED,
+  };
+}
+
+export function zkFileOp(v: {
+  folder: Address;
+  fileId: string;
+  version: number;
+  epoch: number;
+  swarmRef: string;
+  meta: Uint8Array;
+  proof: Uint8Array;
+}): CreateOp {
+  const file = fileOp(v);
+  return { ...file, schema: ZkFileSchema, values: { ...file.values, proof: v.proof } };
 }
 
 /** Writes several entities in ONE transaction (all or nothing), e.g. a share's welcome, key copy and roster. */
@@ -850,6 +908,30 @@ export function listRebuilds(reader: ArkivReader, rootHash: Hex): Promise<Page<R
     ...info(r),
     rootHash: hex(r.rootHash!),
     matched: num(r.matched!) === 1,
+  }));
+}
+
+/** Every join claiming to be for `folder` (forged ones included: zk.checkJoins sorts them out). */
+export function listZkJoins(reader: ArkivReader, folder: Address): Promise<Page<ZkJoinRecord>> {
+  return fetchAll(reader, ZkJoinSchema, eq("folder", addr(folder)), (r) => ({
+    ...info(r),
+    folder: address(r.folder!),
+    member: address(r.member!),
+    commitment: text(r.commitment!),
+    sig: hex(r.sig!),
+  }));
+}
+
+export function listZkFiles(reader: ArkivReader, folder: Address): Promise<Page<ZkFileRecord>> {
+  return fetchAll(reader, ZkFileSchema, eq("folder", addr(folder)), (r) => ({
+    ...info(r),
+    folder: address(r.folder!),
+    fileId: text(r.fileId!),
+    version: num(r.version!),
+    epoch: num(r.epoch!),
+    swarmRef: hex(r.swarmRef!),
+    meta: blob(r.meta!),
+    proof: blob(r.proof!),
   }));
 }
 

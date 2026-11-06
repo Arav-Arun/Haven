@@ -1,7 +1,7 @@
 "use client";
 
 import type { FileEntry, Folder, Timestamp } from "@haven/types";
-import { ChevronRight, Download, Eye, FileText, Folder as FolderIcon, History, Link2, Lock, Trash2, Users } from "lucide-react";
+import { ChevronRight, Download, Eye, FileText, Folder as FolderIcon, History, Link2, Lock, ShieldCheck, Trash2, Users } from "lucide-react";
 import type { ReactNode } from "react";
 import { cx, formatAgo, formatBytes, formatDate, formatUntil, ROLE_LABEL } from "./format";
 
@@ -54,10 +54,15 @@ export interface FileActions {
   onVersions?: (f: FileEntry) => void;
   onLink?: (f: FileEntry) => void;
   onDelete?: (f: FileEntry) => void;
+  /** Shows the zero-knowledge proof behind an anonymous file (add-on Z1). */
+  onProof?: (f: FileEntry) => void;
 }
 
-/** Files in a folder. Files you have no key for are shown, locked, with the reason. */
-export function FileRows({ files, now, ...actions }: { files: FileEntry[]; now: Timestamp } & FileActions) {
+/**
+ * Files in a folder. Files you have no key for are shown, locked, with the reason. `proved` holds the Arkiv keys of
+ * anonymous files, whose entries carry a zero-knowledge proof instead of the writer's signature.
+ */
+export function FileRows({ files, now, proved, ...actions }: { files: FileEntry[]; now: Timestamp; proved?: ReadonlySet<string> } & FileActions) {
   if (!files.length) return null;
   return (
     <ul className="rounded-lg border border-line bg-card px-3">
@@ -80,6 +85,11 @@ export function FileRows({ files, now, ...actions }: { files: FileEntry[]; now: 
               </span>
             </button>
             <div className="flex shrink-0 items-center">
+              {actions.onProof && proved?.has(f.arkivKey.toLowerCase()) && (
+                <IconButton label={`Proof behind ${f.name}`} onClick={() => actions.onProof!(f)}>
+                  <ShieldCheck size={18} aria-hidden />
+                </IconButton>
+              )}
               {actions.onPreview && (
                 <span className="hidden sm:inline">
                   <IconButton label={`Open ${f.name}`} onClick={() => actions.onPreview!(f)}>

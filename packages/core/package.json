@@ -19,10 +19,12 @@
   },
   "dependencies": {
     "@arkiv-network/sdk": "1.0.1",
-    "@haven/types": "workspace:*",
     "@fluidkey/stealth-account-kit": "1.1.1",
+    "@haven/types": "workspace:*",
     "@noble/curves": "1.9.1",
     "@noble/hashes": "1.8.0",
+    "@semaphore-protocol/core": "4.14.5",
+    "poseidon-lite": "0.3.0",
     "viem": "2.57.16"
   },
   "devDependencies": {

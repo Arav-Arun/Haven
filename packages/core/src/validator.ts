@@ -11,6 +11,9 @@
 //   - its version was the latest rotation's version when it was created (no stale version);
 //   - its epoch is within one epoch of its creation time under that version's schedule (no back-dating);
 //   - if the writer isn't a manager, no refresh request was open when it was created.
+// Anonymous file entries (haven.zkfile, add-on Z1) have no creator to check: they count if their zero-knowledge proof
+// verifies against the folder's writer group at their creation time (zk.ts), then go through the same file rules as
+// an editor who doesn't manage the folder.
 // Ordering between Arkiv entities uses block numbers (exact); role checks use the block's timestamp (Arkiv's
 // $createdAt is a block number, so BlockClock turns it into a time).
 
@@ -26,9 +29,12 @@ import type {
   RotationRecord,
   TombRecord,
   WelcomeRecord,
+  ZkFileRecord,
+  ZkJoinRecord,
 } from "./arkiv";
 import { ROLE_DRIVE_READ, ROLE_DRIVE_SHARE, ROLE_DRIVE_WRITE, wasAllowedMany, type SepoliaReader } from "./ens";
 import { DEMO_EPOCH_SECONDS, EPOCH_SECONDS, EPOCHS, isEpochPlausible, type EpochSchedule } from "./epochs";
+import { checkZkFiles, type ZkWriteInfo } from "./zk";
 
 export type HiddenReason =
   | "not-readonly" // attributes could have been changed after creation
@@ -37,7 +43,9 @@ export type HiddenReason =
   | "unknown-version" // no rotation (yet) for the version it claims
   | "back-dated" // claims an epoch more than one away from its creation time
   | "refresh-open" // written by a non-manager while a refresh request was open
-  | "bad-rotation"; // a rotation with an implausible schedule
+  | "bad-rotation" // a rotation with an implausible schedule
+  | "bad-proof" // an anonymous entry whose proof doesn't verify or isn't about its own fields
+  | "not-a-writer"; // an anonymous entry proved against a group that wasn't the folder's writers at the time
 
 export interface Hidden<R> {
   record: R;
@@ -146,6 +154,8 @@ export class Validator {
     refreshes: RefreshRecord[];
     files: FileRecord[];
     tombs: TombRecord[];
+    /** Add-on Z1: anonymous file entries and the writer group's joins. */
+    zk?: { files: ZkFileRecord[]; joins: ZkJoinRecord[] };
     /** Entities that didn't even fit their schema (from the queries' `malformed` counts). */
     malformed?: number;
   }): Promise<FolderReading> {
@@ -174,14 +184,16 @@ export class Validator {
       })),
     );
 
-    // 3. Files: WRITE at creation; then version, epoch and refresh rules.
+    // 3. Files: WRITE at creation (or a valid proof, for anonymous entries); then version, epoch and refresh rules.
     const files = await this.checkRoles(input.files.map((record) => ({ record, registry: folder, role: ROLE_DRIVE_WRITE })));
-    const hiddenFiles: Hidden<FileRecord>[] = [...files.hidden];
+    const anonymous = input.zk ? await checkZkFiles(input.zk.files, input.zk.joins, folder, this.history, this.clock) : { valid: [], hidden: [] };
+    const hiddenFiles: Hidden<FileRecord>[] = [...files.hidden, ...anonymous.hidden];
+    // Anonymous writers could be anyone in the group, so they never count as managers.
     const writersWhoManage = await this.managersAt(folder, files.valid);
     const rotationsInOrder = [...versions.values()].sort(byBlockThenKey);
     const refreshesInOrder = [...ref.valid].sort(byBlockThenKey);
-    const kept: (FileRecord & { createdAt: number })[] = [];
-    for (const f of files.valid) {
+    const kept: (FileRecord & { createdAt: number; zk?: ZkWriteInfo })[] = [];
+    for (const f of [...files.valid, ...anonymous.valid]) {
       // the latest version at the file's block (a rotation in the same block counts as earlier)
       let latest: (RotationRecord & { createdAt: number }) | undefined;
       for (const r of rotationsInOrder) {
@@ -250,8 +262,8 @@ export class Validator {
 }
 
 export interface FolderReading {
-  /** Files that count, oldest first, without deleted ones. */
-  files: (FileRecord & { createdAt: number })[];
+  /** Files that count, oldest first, without deleted ones. Anonymous entries carry what their proof showed. */
+  files: (FileRecord & { createdAt: number; zk?: ZkWriteInfo })[];
   /** The rotation that counts for each version. */
   versions: Map<number, RotationRecord & { createdAt: number }>;
   latestVersion: number;

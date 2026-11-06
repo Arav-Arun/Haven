@@ -29,6 +29,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { config } from "@/lib/config";
 import { useDrive, useLoad } from "@/lib/drive";
+import { AnonymousUploads, ProofDialog } from "./AnonymousUploads";
 
 /** The padded size anyone can see for an upload, read from its Swarm receipt step. */
 function paddedFor(receipts: Receipt[], ref: string): number | undefined {
@@ -194,6 +195,13 @@ export function FolderView({ client, folder }: { client: HavenClient; folder: Ad
   const [zipProgress, setZipProgress] = useState<number | null>(null);
   const [zipError, setZipError] = useState<unknown>(null);
   const [fileError, setFileError] = useState<unknown>(null);
+  const [anonymous, setAnonymous] = useState(false);
+  const [proofOf, setProofOf] = useState<FileEntry | null>(null);
+  // Anonymous files (add-on Z1): read from the entries the client already checked, so no extra network calls.
+  const proved = useLoad(
+    files.data ? async (c) => new Set((await Promise.all(files.data!.map((x) => c.fileProof(x)))).flatMap((p) => (p ? [p.arkivKey.toLowerCase()] : []))) : null,
+    [files.data],
+  );
 
   const onFiles = useCallback(
     async (list: File[]) => {
@@ -201,9 +209,8 @@ export function FolderView({ client, folder }: { client: HavenClient; folder: Ad
         const id = crypto.randomUUID();
         setUploads((u) => [{ id, name: file.name, size: file.size, fraction: 0, state: "uploading" }, ...u]);
         try {
-          const entry = await client.upload(folder, file, file.name, (fraction) =>
-            setUploads((u) => u.map((x) => (x.id === id ? { ...x, fraction } : x))),
-          );
+          const progress = (fraction: number) => setUploads((u) => u.map((x) => (x.id === id ? { ...x, fraction } : x)));
+          const entry = anonymous ? await client.uploadAnonymously(folder, file, file.name, progress) : await client.upload(folder, file, file.name, progress);
           setUploads((u) => u.map((x) => (x.id === id ? { ...x, fraction: 1, state: "done", ref: entry.swarmRef } : x)));
           files.reload();
         } catch (error) {
@@ -211,7 +218,7 @@ export function FolderView({ client, folder }: { client: HavenClient; folder: Ad
         }
       }
     },
-    [client, folder, files],
+    [client, folder, files, anonymous],
   );
 
   const open = async (file: FileEntry) => {
@@ -287,6 +294,8 @@ export function FolderView({ client, folder }: { client: HavenClient; folder: Ad
 
       {f.refreshPending && <RefreshPendingBanner />}
 
+      {canWrite && f.kind !== "group" && <AnonymousUploads client={client} folder={folder} on={anonymous} onChange={setAnonymous} />}
+
       {canWrite && f.kind !== "group" && (
         <UploadDropzone
           onFiles={onFiles}
@@ -322,6 +331,8 @@ export function FolderView({ client, folder }: { client: HavenClient; folder: Ad
               onVersions={setVersionsOf}
               onLink={canManage ? setLinkFor : undefined}
               onDelete={canManage ? setDeleting : undefined}
+              proved={proved.data ?? undefined}
+              onProof={setProofOf}
             />
           )}
         </section>
@@ -419,6 +430,7 @@ export function FolderView({ client, folder }: { client: HavenClient; folder: Ad
           )}
         </Dialog>
       )}
+      {proofOf && <ProofDialog client={client} file={proofOf} onClose={() => setProofOf(null)} />}
       {versionsOf && <VersionsDialog client={client} file={versionsOf} onClose={() => setVersionsOf(null)} />}
       {linkFor && <LinkDialog client={client} file={linkFor} onClose={() => setLinkFor(null)} />}
       {deleting && (
