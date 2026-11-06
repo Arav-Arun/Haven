@@ -3,20 +3,21 @@
 // The rest of the landing page: the four networks (and prize tracks), privacy, apps, questions, the closing call.
 // Every sentence describes what the code does today.
 
-import { ArrowRight, Check, Eye, EyeOff, Monitor, Plus, Puzzle, Smartphone } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Check, Eye, EyeOff, Monitor, Plus, Puzzle, Smartphone } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { useInView } from "./hooks";
 import { FxLabel } from "@haven/ui";
 import { FrontClouds } from "./Sky";
+import { haven } from "@haven/core";
+import { config } from "@/lib/config";
 
 export const NETWORKS = [
   { name: "ENS", logo: "/ens.webp" },
   { name: "Arkiv", logo: "/arkive.png" },
   { name: "Swarm", logo: "/swarm.png" },
   { name: "Ethereum", logo: "/eth.png" },
-  { name: "Anon-RPC", logo: "/eth.png" },
 ];
 
 /** A slow, edge-faded strip of the networks Haven runs on. */
@@ -118,10 +119,48 @@ export function Tracks() {
                 </li>
               ))}
             </ul>
+            {t.dark && <OnChain />}
           </article>
         ))}
       </div>
     </section>
+  );
+}
+
+/** The deployed contracts behind the ENS card, from contracts/deployments/sepolia.json, each opened on Etherscan. */
+const CONTRACTS = [
+  { label: "haven.eth", note: "Where every name is claimed", address: haven.appRegistry, code: false },
+  { label: "rooms.haven.eth", note: "Where data rooms are made", address: haven.roomsRegistry, code: false },
+  { label: "DriveRegistry", note: "Each folder's registry, source verified", address: haven.driveRegistryImpl, code: true },
+].filter((c): c is { label: string; note: string; address: `0x${string}`; code: boolean } => !!c.address);
+
+function OnChain() {
+  if (!CONTRACTS.length) return null;
+  return (
+    <div className="mt-auto pt-8">
+      <p className="text-[14px] font-medium text-white/75">Live on Sepolia. Check it yourself.</p>
+      <ul className="mt-3 grid gap-2 sm:grid-cols-3">
+        {CONTRACTS.map((c) => (
+          <li key={c.label}>
+            <a
+              href={`${config.explorerUrl}/address/${c.address}${c.code ? "#code" : ""}`}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="group flex h-full flex-col rounded-2xl bg-white/12 p-4 ring-1 ring-white/20 transition-colors hover:bg-white/20"
+            >
+              <span className="flex items-center justify-between gap-2 font-semibold">
+                {c.label}
+                <ArrowUpRight size={16} className="opacity-70 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" aria-hidden />
+              </span>
+              <span className="mt-1 text-[13px] text-white/70">{c.note}</span>
+              <span className="mt-3 font-mono text-[12px] text-white/60">
+                {c.address.slice(0, 6)}…{c.address.slice(-4)}
+              </span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -179,9 +218,14 @@ export function Privacy() {
 }
 
 const APPS = [
-  { icon: Monitor, name: "Website", body: "Your drive, rooms and shares in any browser. Nothing to install." },
-  { icon: Smartphone, name: "Phone app", body: "Add it to your home screen. On Android, share files to Haven from any app." },
-  { icon: Puzzle, name: "Browser extension", body: "Save files with a right-click, hear about new shares, and keep your keys away from any page that isn't the real one." },
+  { icon: Monitor, name: "Website", body: "Your drive, rooms and shares in any browser. Nothing to install.", link: { href: "/onboarding/", label: "Start sharing" } },
+  { icon: Smartphone, name: "Phone app", body: "Open Haven in your phone's browser and add it to your home screen. On Android, share files to Haven from any app." },
+  {
+    icon: Puzzle,
+    name: "Browser extension",
+    body: "Save files with a right-click, get a reminder before access ends, and keep your keys away from any page that isn't the real one.",
+    link: { href: "/extension/", label: "Add to Chrome" },
+  },
 ];
 
 export function Apps() {
@@ -189,13 +233,18 @@ export function Apps() {
     <section className="mx-auto max-w-6xl px-5 py-24 lg:py-32">
       <h2 className="display text-center text-5xl text-[#0d1b33] sm:text-6xl">Wherever you are.</h2>
       <div className="mt-12 grid gap-4 md:grid-cols-3">
-        {APPS.map(({ icon: I, name, body }) => (
-          <div key={name} className="rounded-[28px] bg-white p-7 shadow-[0_18px_44px_-28px_rgb(13_27_51_/_0.4)]">
+        {APPS.map(({ icon: I, name, body, link }) => (
+          <div key={name} className="flex flex-col rounded-[28px] bg-white p-7 shadow-[0_18px_44px_-28px_rgb(13_27_51_/_0.4)]">
             <span className="flex size-12 items-center justify-center rounded-2xl bg-[#1f4fd1]/10 text-[#1f4fd1]">
               <I size={22} />
             </span>
             <h3 className="mt-5 text-xl font-semibold tracking-[-0.02em]">{name}</h3>
             <p className="mt-2 text-[16px] leading-relaxed text-[#0d1b33]/65">{body}</p>
+            {link && (
+              <Link href={link.href} className="mt-auto inline-flex items-center gap-1.5 self-start pt-5 text-[15px] font-semibold text-[#1f4fd1] hover:underline">
+                {link.label} <ArrowRight size={16} aria-hidden />
+              </Link>
+            )}
           </div>
         ))}
       </div>

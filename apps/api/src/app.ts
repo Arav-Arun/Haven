@@ -169,8 +169,11 @@ export const ARKIV_METHODS = new Set([
 
 const DAY = 86_400;
 const LIMITS = {
-  claimsPerDay: 300,
-  roomsPerDay: 300,
+  claimsPerDay: 100,
+  // Every drip costs the relayer DRIP_SEPOLIA_WEI and DRIP_ARKIV_WEI. Without a total, a script making fresh keys could
+  // empty the relayer in a day and stop sign-ups for everyone; with it, the most a day can cost is known in advance.
+  dripsPerDay: 60,
+  roomsPerDay: 150,
   uploadBytesPerKeyPerDay: 512 * 1024 * 1024,
   arkivCallsPerMinute: 600,
   keylogPerNamePerDay: 30,
@@ -434,7 +437,11 @@ export function createApi(env: ApiEnv) {
       if (!(await isOurRegistry(registry))) throw new DriveError("NOT_AUTHORIZED", "not a Haven registry");
       const [owner, access] = await Promise.all([driveOwner(sepoliaClient, registry), accessOf(sepoliaClient, registry, address)]);
       if (!isAddressEqual(owner, address) || access.via !== "owner") throw new DriveError("NOT_AUTHORIZED", "only a registry's owner key gets gas");
-      if (!pending.has(address) && !counters.hit(`drip:${address}`, 1, 1, DAY)) throw new DriveError("RATE_LIMITED", "one drip per key per day");
+      if (!pending.has(address)) {
+        // The per-key check comes first, so a key asking again can't use up everyone's daily total.
+        if (!counters.hit(`drip:${address}`, 1, 1, DAY)) throw new DriveError("RATE_LIMITED", "one drip per key per day");
+        if (!counters.hit("drips", 1, LIMITS.dripsPerDay, DAY)) throw new DriveError("RATE_LIMITED", "today's free test gas is used up; try again tomorrow");
+      }
       pending.set(address, address);
       return c.json({ sendsAt: nextBatch });
     } catch (e) {

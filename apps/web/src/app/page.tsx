@@ -39,7 +39,7 @@ export default function Home() {
                 Haven encrypts files on your device and shares them with any ENS name. Each person gets a private ticket, and
                 their access ends on the date you pick.
               </p>
-              <div className="mt-10 flex justify-center">
+              <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
                 <Link href={primary.href} className="btn-clay fx inline-flex items-center gap-3 rounded-full py-2 pl-7 pr-2 text-[17px] font-semibold">
                   <FxLabel>
                     {primary.label}
@@ -48,10 +48,13 @@ export default function Home() {
                     </span>
                   </FxLabel>
                 </Link>
+                <Link
+                  href="/extension/"
+                  className="inline-flex h-14 items-center gap-2.5 rounded-full bg-[#0d1b33] px-6 text-[17px] font-semibold text-white shadow-[0_14px_30px_-14px_rgb(13_27_51/0.7)] transition-colors hover:bg-[#1f4fd1]"
+                >
+                  <Puzzle size={19} aria-hidden /> Add to Chrome
+                </Link>
               </div>
-              <Link href="/extension/" className="mt-5 inline-flex items-center gap-2 text-[15px] font-medium text-[#0d1b33]/75 underline-offset-4 hover:text-[#0d1b33] hover:underline">
-                <Puzzle size={16} aria-hidden /> Add Haven to Chrome
-              </Link>
             </div>
           </section>
         </div>

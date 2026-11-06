@@ -262,3 +262,25 @@ rename).
 - The xBZZ token on Gnosis is `0xdBF3Ea6F5beE45c02255B2c26a16F300502F68da` (16 decimals).
 - After Harshad's (teammate's) rebrand, package filters are `@haven/*`. Old `@cloakroom/*` commands fail.
 - `.env` files must end with a newline, or the last two lines merge.
+
+## 9. Audit, 2026-11-07
+
+Fixed and pushed:
+- The API's free gas could be drained: up to 300 claims and unlimited drips a day against ~0.24 Sepolia ETH. Now 100
+  claims, 150 rooms and 60 drips a day in total (`LIMITS` in `apps/api/src/app.ts`), per-key checks first.
+- The footer linked "Extension" as `//extension/` off the home page (a different host). The footer now has its own
+  links and no longer repeats the nav's sections. The giant footer mark and every icon use the shield.
+- The live API now serves the ZK files (`/zk/*`): anonymous uploads work in production.
+
+Still open (not code):
+- **Repo is private**, while the site says "Open source, MIT". Make it public before judging.
+- **"A verified copy of the website" / "runs from its Swarm copy"** (landing + FAQ) is true only after
+  `pnpm --filter @haven/core release publish <version>` (needs the user's OK: sets `haven.eth` contenthash and writes
+  a signed release to Arkiv). Until then the extension reports every page as "unknown".
+- **Landing "Features" panels are illustrations** (example names like investor.eth). Replace with real screenshots
+  once real data exists (needs the e2e or Try-it run, which moves testnet funds: user's OK).
+- **ZK nullifiers live in API memory**: a restart forgets them, so an old proof could be replayed once. Harmless for
+  files (same fields), but persist them (e.g. on Arkiv) for production.
+- **Swarm batch** lasts until about 2026-11-14; top up before then (7 xBZZ left, spend needs the user's OK).
+- **Domain:** nameservers at the .xyz registry are Vercel's (checked 2026-11-07); public resolvers were still caching
+  the parking answer. Vercel issues HTTPS once they refresh. Then add the domain to WalletConnect's allowlist.

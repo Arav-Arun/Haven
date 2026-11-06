@@ -11,10 +11,10 @@
 import { FxLabel } from "@haven/ui";
 import { ArrowUp } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { HavenLogo } from "./landing/Logo";
-import { NAV } from "./landing/Nav";
+import { haven } from "@haven/core";
+import { config } from "@/lib/config";
 import "./site-footer.css";
 
 /** Pixels of scroll, at the very end of the page, over which the page pulls up (less on a page with less scroll). */
@@ -87,9 +87,15 @@ export function PullUpFooter({ children, surface = "page-surface" }: { children:
   );
 }
 
+/** Where to go next. The landing page's sections are in its own nav, so the footer doesn't repeat them. */
+const LINKS = [
+  { label: "Open Haven", href: "/drive/" },
+  { label: "Chrome extension", href: "/extension/" },
+  ...(haven.appRegistry ? [{ label: "Contracts on Etherscan", href: `${config.explorerUrl}/address/${haven.appRegistry}`, external: true }] : []),
+  { label: "Source code", href: "https://github.com/Arav-Arun/ETHGlobalMumbai", external: true },
+] as { label: string; href: string; external?: boolean }[];
+
 function SiteFooter({ progress }: { progress: number }) {
-  // The landing page's sections, from wherever the footer is.
-  const onLanding = usePathname() === "/";
   return (
     // Short enough that the lifted page keeps its lower half on screen at the very end of the scroll.
     <footer className="haven-footer sticky bottom-0 z-[5] flex min-h-[clamp(360px,50svh,420px)] flex-col overflow-hidden text-white">
@@ -120,14 +126,17 @@ function SiteFooter({ progress }: { progress: number }) {
           </p>
         </div>
         <nav aria-label="Footer" className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[15px]">
-          {NAV.map(([label, hash]) => (
-            <a key={hash} href={onLanding ? hash : `/${hash}`} className="text-white/65 transition-colors hover:text-white">
-              {label}
-            </a>
-          ))}
-          <a href="https://github.com/Arav-Arun/ETHGlobalMumbai" rel="noreferrer" className="text-white/65 transition-colors hover:text-white">
-            Source code
-          </a>
+          {LINKS.map(({ label, href, external }) =>
+            external ? (
+              <a key={label} href={href} target="_blank" rel="noreferrer noopener" className="text-white/65 transition-colors hover:text-white">
+                {label}
+              </a>
+            ) : (
+              <Link key={label} href={href} className="text-white/65 transition-colors hover:text-white">
+                {label}
+              </Link>
+            ),
+          )}
           <button
             onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
             className="btn-clay fx inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold"
@@ -142,23 +151,13 @@ function SiteFooter({ progress }: { progress: number }) {
   );
 }
 
-/** Haven's mark as a ghost in the same fade as the giant word (the two are the same height, so the fades line up). */
+/** Haven's shield as a ghost in the same fade as the giant word (the two are the same height, so the fades line up). */
 function GhostMark() {
+  const mask = "url(/haven-mark.webp) center / contain no-repeat";
   return (
-    <svg viewBox="0 0 64 64" className="h-[0.7em] w-[0.7em] shrink-0">
-      <defs>
-        <linearGradient id="footer-ghost" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="rgb(190 212 250)" stopOpacity="0.42" />
-          <stop offset="0.9" stopColor="rgb(143 181 242)" stopOpacity="0" />
-        </linearGradient>
-        <mask id="footer-ghost-cut">
-          <rect width="64" height="64" rx="18" fill="#fff" />
-          <path d="M17 50V30a15 15 0 0 1 30 0v20" fill="none" stroke="#000" strokeWidth="6.5" strokeLinecap="round" />
-          <circle cx="32" cy="32" r="5" fill="#000" />
-          <path d="M29.6 34.5h4.8l1.6 9.5h-8z" fill="#000" />
-        </mask>
-      </defs>
-      <rect width="64" height="64" rx="18" fill="url(#footer-ghost)" mask="url(#footer-ghost-cut)" />
-    </svg>
+    <span
+      className="inline-block h-[0.7em] w-[0.7em] shrink-0 bg-[linear-gradient(to_bottom,rgb(190_212_250/0.42),rgb(143_181_242/0)_90%)]"
+      style={{ WebkitMask: mask, mask }}
+    />
   );
 }
