@@ -7,4 +7,7 @@ COPY . .
 RUN pnpm install --frozen-lockfile --filter "@haven/api..."
 ENV NODE_ENV=production PORT=8787
 EXPOSE 8787
-CMD ["pnpm", "--filter", "@haven/api", "start"]
+# Start the TypeScript entry point directly: pnpm and the tsx CLI each add a
+# Node process, exhausting the small Fly machine before the API can listen.
+WORKDIR /app/apps/api
+CMD ["node", "--import", "tsx", "src/main.ts"]

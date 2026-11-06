@@ -23,9 +23,12 @@ to what was uploaded", with the Swarm reference and padded size printed for each
 (Bee URL and postage batch) and a funded relayer.
 
 **Filled in after the live run** (we don't write values we haven't produced):
-- Postage batch ID: _from `POSTAGE_BATCH_ID`, recorded at deploy_
-- Who bought it or gave it: _recorded at deploy_
-- Bee node or service: _our light node from `infra/bee/fly.toml`, or the Swarm team's node, recorded at deploy_
+- Postage batch ID: `cbbfb329338e20fb1d13171a20dc2da5f964daf85f939b7cefbec6568c63d1e9` (depth 20, amount 28610229492,
+  immutable), bought 2026-11-06 on Gnosis at block 49141474, tx
+  [`0xcf9fd2e0…96d0fb`](https://gnosisscan.io/tx/0xcf9fd2e0aaf861c181d99aabd5925d26f9cd66d3e8c99ce684a043114a96d0fb)
+- Who bought it or gave it: our node bought it with 3 xBZZ from the ETHGlobal Mumbai Swarm bot's gift code
+- Bee node or service: our own Bee 2.8.3 light node on Fly (`infra/bee/fly.toml`, app `haven-bee`, private), wallet
+  [`0xec074829fB5dd8090178f9f667359DD4Ec82A04f`](https://gnosisscan.io/address/0xec074829fB5dd8090178f9f667359DD4Ec82A04f)
 - One Arkiv entity key and its Swarm reference, with an openable link: _from `docs/evidence.md` after the e2e run_
 - Timestamp in the demo video where Swarm is used: _added after recording_
 
