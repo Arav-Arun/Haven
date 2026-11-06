@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { NETWORKS } from "@haven/platform";
 import type { AnonStatus, PrivateNetwork, Receipt } from "@haven/types";
 import { Button, ErrorNote, shortAddress } from "@haven/ui";
@@ -46,8 +48,9 @@ function ConnectExtension() {
       <h2 className="font-medium">Browser extension</h2>
       {!present ? (
         <p className="mt-1 text-muted">
-          Install the Haven extension for Chrome, then reload this page. It adds right-click &quot;Save to Haven&quot;, and
-          a badge when something is shared with you.
+          <Link href="/extension/" className="font-medium text-action underline underline-offset-4">Install the Haven extension for Chrome</Link>, then reload
+          this page. It adds right-click &quot;Save to Haven&quot;, a badge when something is shared with you, and a reminder
+          before access ends.
         </p>
       ) : result?.ok ? (
         <p className="mt-1 text-private">Connected. The extension is signed in as {result.ensName ?? "you"}.</p>

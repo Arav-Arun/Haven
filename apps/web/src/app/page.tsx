@@ -1,7 +1,7 @@
 "use client";
 
 import { FxLabel } from "@haven/ui";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Puzzle } from "lucide-react";
 import Link from "next/link";
 import "./landing.css";
 import { Apps, BuiltOn, Closing, Faq, Privacy, Tracks } from "@/components/landing/More";
@@ -49,6 +49,9 @@ export default function Home() {
                   </FxLabel>
                 </Link>
               </div>
+              <Link href="/extension/" className="mt-5 inline-flex items-center gap-2 text-[15px] font-medium text-[#0d1b33]/75 underline-offset-4 hover:text-[#0d1b33] hover:underline">
+                <Puzzle size={16} aria-hidden /> Add Haven to Chrome
+              </Link>
             </div>
           </section>
         </div>

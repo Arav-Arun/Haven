@@ -11,6 +11,7 @@ export const NAV = [
   ["Tracks", "#tracks"],
   ["Privacy", "#privacy"],
   ["FAQ", "#faq"],
+  ["Extension", "/extension/"],
 ] as const;
 
 /** On the sky at the top of the page; a floating white pill once you scroll past the hero's first screen. */

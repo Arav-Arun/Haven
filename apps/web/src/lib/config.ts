@@ -17,6 +17,8 @@ const raw = {
   NEXT_PUBLIC_ARKIV_RPC_URL: process.env.NEXT_PUBLIC_ARKIV_RPC_URL,
   NEXT_PUBLIC_PRIVATE_NETWORK: process.env.NEXT_PUBLIC_PRIVATE_NETWORK,
   NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID,
+  /** Optional: the extension's Chrome Web Store page, once listed. Until then /extension offers the zip. */
+  NEXT_PUBLIC_EXTENSION_STORE_URL: process.env.NEXT_PUBLIC_EXTENSION_STORE_URL,
 } as const;
 
 type Key = keyof typeof raw;
@@ -50,6 +52,7 @@ export const config = {
   arkivAccessKey: "",
   network: (raw.NEXT_PUBLIC_PRIVATE_NETWORK ?? "off") as PrivateNetwork,
   walletConnectProjectId: raw.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? "",
+  extensionStoreUrl: raw.NEXT_PUBLIC_EXTENSION_STORE_URL ?? "",
   /** Sepolia's block explorer, from viem's chain definition. */
   explorerUrl: sepolia.blockExplorers.default.url,
   /** The parent of every claimed name (HAVEN_PLAN.md section 5): alice.haven.eth. */
