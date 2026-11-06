@@ -111,7 +111,7 @@ export function PublicViewPanel({
           {view.ignoredWrites > 0 && (
             <p className="text-sm text-muted">
               {view.ignoredWrites} record{view.ignoredWrites === 1 ? " was" : "s were"} written here by addresses without access.
-              Cloakroom ignores them.
+              Haven ignores them.
             </p>
           )}
         </Column>

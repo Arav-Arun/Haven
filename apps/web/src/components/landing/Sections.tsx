@@ -2,6 +2,7 @@
 // Every sentence describes what the code does today.
 
 import Link from "next/link";
+import Image from "next/image";
 import { FrontClouds } from "./Sky";
 import type { ComponentType, ReactNode, SVGProps } from "react";
 import {
@@ -26,27 +27,35 @@ import {
 
 type Icon = ComponentType<SVGProps<SVGSVGElement>>;
 
-export const BUILT_ON: { name: string; role: string; icon: Icon }[] = [
-  { name: "ENS", role: "names and access", icon: Tag },
-  { name: "Arkiv", role: "file records", icon: Layers },
-  { name: "Swarm", role: "encrypted storage", icon: Hexagon },
-  { name: "Ethereum", role: "Sepolia testnet", icon: Key },
-  { name: "Anon-RPC", role: "private lookups", icon: Net },
+const TRACKS = [
+  { name: "ENS", track: "Best Use of ENSv2", feature: "Names & expiring access", logo: "/ens.webp" },
+  { name: "Arkiv", track: "Build on Arkiv", feature: "Encrypted, queryable file records", logo: "/arkive.png" },
+  { name: "Swarm", track: "Arkiv + Swarm bonus", feature: "Storage for encrypted files", logo: "/swarm.png" },
+  { name: "Ethereum Foundation", track: "Best Use of Anon-RPC", feature: "Private network lookups", logo: "/eth.png" },
 ];
 
 export function BuiltOn() {
   return (
-    <div className="grid grid-cols-2 gap-y-6 px-6 py-7 sm:grid-cols-3 lg:grid-cols-5 lg:divide-x lg:divide-[#0d1b33]/8 lg:px-2">
-      {BUILT_ON.map(({ name, role, icon: I }) => (
-        <div key={name} className="flex items-center justify-center gap-3 text-[#0d1b33]/70">
-          <I width={22} height={22} className="text-[#3a6fd8]" />
-          <div className="leading-tight">
-            <div className="text-[17px] font-semibold tracking-tight text-[#0d1b33]/85">{name}</div>
-            <div className="text-xs">{role}</div>
-          </div>
-        </div>
-      ))}
-    </div>
+    <section aria-labelledby="tracks-heading" className="relative z-10 mx-auto max-w-6xl px-5 pb-10 sm:px-8 sm:pb-14">
+      <div className="mb-5 flex flex-col gap-1 text-center">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#4b70ad]">Built for ETHGlobal Mumbai</p>
+        <h2 id="tracks-heading" className="text-lg font-semibold tracking-tight text-[#0d1b33]">The technology behind Haven</h2>
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {TRACKS.map(({ name, track, feature, logo }) => (
+          <article key={name} className="flex min-h-[120px] items-start gap-3.5 rounded-2xl border border-white/90 bg-white/75 p-4 shadow-[0_8px_24px_-14px_rgb(28_64_140_/_0.22)] backdrop-blur-sm">
+            <div className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[#0d1b33]/5 bg-white">
+              <Image src={logo} width={44} height={44} alt="" className="size-full object-contain" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold leading-snug text-[#0d1b33]">{name}</h3>
+              <p className="mt-0.5 text-[11px] font-medium leading-snug text-[#4772ba]">{track}</p>
+              <p className="mt-2 text-xs leading-relaxed text-[#0d1b33]/60">{feature}</p>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -94,7 +103,7 @@ const STEPS: { icon: Icon; title: string; body: string; tech: string }[] = [
   {
     icon: Shuffle,
     title: "Share with an ENS name",
-    body: "Type investor.eth. Cloakroom makes a new random address for them, gives it access until the date you pick, and leaves a sealed note only they can open.",
+    body: "Type investor.eth. Haven makes a new random address for them, gives it access until the date you pick, and leaves a sealed note only they can open.",
     tech: "ENSv2 + Arkiv",
   },
   {
@@ -158,7 +167,7 @@ export function Privacy() {
       <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-transparent via-[#dce8fb] to-transparent" />
       <div className="relative mx-auto max-w-6xl px-5 py-24 lg:py-32">
         <SectionHead id="privacy" kicker="Privacy" title={<>What the world sees, and what it doesn&apos;t</>}>
-          Everything Cloakroom writes is public, so we designed what that public record says. Every folder has a Public view
+          Everything Haven writes is public, so we designed what that public record says. Every folder has a Public view
           that shows exactly this, read live from the chain.
         </SectionHead>
         <div className="mt-12 grid gap-5 md:grid-cols-2">
@@ -288,27 +297,24 @@ export function Apps() {
 export function FinalCall({ href, label }: { href: string; label: string }) {
   return (
     <section className="px-2 pb-2 sm:px-4 sm:pb-4">
-      <div className="relative overflow-hidden rounded-[28px] bg-gradient-to-b from-[#3f78e3] via-[#5b8eec] to-[#8fb5f2] px-6 pb-36 pt-20 text-center sm:pb-44 sm:pt-28">
+      <div className="relative overflow-hidden rounded-[28px] bg-gradient-to-b from-[#3f78e3] via-[#5b8eec] to-[#8fb5f2] px-6 pb-24 pt-14 text-center sm:pb-28 sm:pt-16">
         <FrontClouds />
         <div className="relative z-30 mx-auto max-w-3xl">
-          <span className="glass-soft mx-auto mb-7 flex size-14 items-center justify-center rounded-2xl text-[#2563eb]">
-            <Doc width={26} height={26} />
-          </span>
           <h2 className="headline text-5xl text-white drop-shadow-[0_2px_20px_rgb(20_60_150_/_0.35)] sm:text-7xl lg:text-[84px]">
             Hand over a file. Keep the names to yourself.
           </h2>
-          <Link href={href} className="pill-action mt-10 inline-flex items-center gap-2.5 rounded-full px-7 py-3.5 text-[15px] font-medium">
+          <Link href={href} className="pill-action mt-8 inline-flex items-center gap-2.5 rounded-full px-7 py-3.5 text-[15px] font-medium">
             {label}
             <Arrow width={18} height={18} />
           </Link>
         </div>
       </div>
-      <footer className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-8 text-sm text-[#0d1b33]/55">
+      <footer className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-4 text-sm text-[#0d1b33]/55">
         <span className="flex items-center gap-2 text-[#0d1b33]/80">
           <Hanger width={18} height={18} />
-          Cloakroom
+          Haven
         </span>
-        <span>Built at ETHGlobal Mumbai 2026. Runs on the Sepolia test network.</span>
+        <span>Built at ETHGlobal Mumbai 2026 by Team <strong>Deploy For Good</strong></span>
         <a className="underline-offset-4 hover:underline" href="https://github.com/Arav-Arun/ETHGlobalMumbai" rel="noreferrer">
           Source code
         </a>

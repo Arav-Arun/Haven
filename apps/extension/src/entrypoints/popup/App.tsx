@@ -21,7 +21,7 @@ import { getAnon, makeClient, unavailableReason } from "@/lib/client";
 import { config } from "@/lib/config";
 import { verifiedCopyUrl } from "@/lib/verify";
 
-/** Add-on F3: how the active Cloakroom tab checked out against the published releases. */
+/** Add-on F3: how the active Haven tab checked out against the published releases. */
 function ThisTab() {
   const [result, setResult] = useState<VerificationResult | null | undefined>(undefined);
   useEffect(() => {
@@ -204,14 +204,14 @@ export function App() {
       <ThisTab />
       {client === undefined && <Skeleton rows={3} />}
       {client === null && (
-        <EmptyState icon={<Plug size={22} />} title="Not connected to Cloakroom yet">
+        <EmptyState icon={<Plug size={22} />} title="Not connected to Haven yet">
           <p>{unavailableReason()}</p>
         </EmptyState>
       )}
       {client && identity === undefined && <Skeleton rows={3} />}
       {client && identity === null && (
         <EmptyState icon={<KeyRound size={22} />} title="Connect your account">
-          <p>On the Cloakroom website, open Settings and choose &quot;Connect extension&quot;. Your keys come across after you confirm there.</p>
+          <p>On the Haven website, open Settings and choose &quot;Connect extension&quot;. Your keys come across after you confirm there.</p>
           <Button variant="primary" onClick={() => openSite("/settings/")}>
             Open Settings
           </Button>
@@ -219,7 +219,7 @@ export function App() {
       )}
       {client && identity && (
         <>
-          <p className="text-sm text-muted">Signed in as {identity.ensName ?? "your Cloakroom account"}.</p>
+          <p className="text-sm text-muted">Signed in as {identity.ensName ?? "your Haven account"}.</p>
           <Inbox client={client} folders={folders} onChange={() => loadData(client)} />
           <section className="flex flex-col gap-2">
             <h2 className="text-sm font-medium">Shared with me</h2>
@@ -236,7 +236,7 @@ export function App() {
 
       <footer className="flex items-center justify-between border-t border-line pt-3 text-sm">
         <button className="inline-flex items-center gap-1 underline" onClick={() => openSite("/drive/")} disabled={!config.appOrigin}>
-          Open Cloakroom <ExternalLink size={12} aria-hidden />
+          Open Haven <ExternalLink size={12} aria-hidden />
         </button>
         {identity && (
           <button className="text-muted underline" onClick={() => chrome.runtime.sendMessage({ type: "check-now" })}>

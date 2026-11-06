@@ -42,7 +42,7 @@ async function check() {
   }
   const done = await client.maintain();
   void ensureLive().catch(() => undefined);
-  if (done.length) notify("Cloakroom housekeeping", done.map((r) => r.action).join(", "));
+  if (done.length) notify("Haven housekeeping", done.map((r) => r.action).join(", "));
   await updateBadge();
 }
 
@@ -69,7 +69,7 @@ async function verifyTab(tabId: number, urls: string[]): Promise<VerificationRes
 async function releaseKeys(tabId: number, urls: string[]): Promise<KeysReply> {
   const result = await verifyTab(tabId, urls);
   if (result.status !== "verified") {
-    return { ok: false, reason: result.status === "mismatch" ? "This page's code doesn't match any published Cloakroom release." : (result.detail ?? "This page couldn't be checked.") };
+    return { ok: false, reason: result.status === "mismatch" ? "This page's code doesn't match any published Haven release." : (result.detail ?? "This page couldn't be checked.") };
   }
   const client = await makeClient();
   if (!client || !(await client.restore())) return { ok: false, reason: "The extension isn't signed in. Connect it from the website's Settings first." };
@@ -96,17 +96,17 @@ async function ensureLive() {
     if (now - lastNotice < 10_000) return; // one notice per burst
     lastNotice = now;
     const name = folders.get(e.folder) ?? "a folder";
-    notify(e.type === "file" ? `New file in ${name}` : `Members changed in ${name}`, "Checked against Arkiv. Open Cloakroom to see it.");
+    notify(e.type === "file" ? `New file in ${name}` : `Members changed in ${name}`, "Checked against Arkiv. Open Haven to see it.");
   });
 }
 
 async function pair(seed: number[], persist: boolean): Promise<PairReply> {
   await setPersist(persist);
   const client = await makeClient();
-  if (!client) return { ok: false, error: "The Cloakroom client isn't in this build of the extension yet." };
+  if (!client) return { ok: false, error: "The Haven client isn't in this build of the extension yet." };
   try {
     const me = await client.signIn({ kind: "seed", seed: Uint8Array.from(seed) });
-    notify("Extension connected", `Signed in as ${me.ensName ?? "your Cloakroom account"}.`);
+    notify("Extension connected", `Signed in as ${me.ensName ?? "your Haven account"}.`);
     void check();
     return { ok: true, ensName: me.ensName };
   } catch (e) {
@@ -123,7 +123,7 @@ function fileName(url: URL, type: string): string {
 
 export default defineBackground(() => {
   chrome.runtime.onInstalled.addListener(() => {
-    chrome.contextMenus.create({ id: MENU_ID, title: "Save to Cloakroom", contexts: ["image", "link", "page"] });
+    chrome.contextMenus.create({ id: MENU_ID, title: "Save to Haven", contexts: ["image", "link", "page"] });
     chrome.alarms.create(CHECK_ALARM, { periodInMinutes: 15, delayInMinutes: 1 });
     chrome.alarms.create(LIVE_ALARM, { periodInMinutes: 1 });
     void updateBadge();
@@ -135,7 +135,7 @@ export default defineBackground(() => {
   });
 
   chrome.alarms.onAlarm.addListener((a) => {
-    if (a.name === CHECK_ALARM) check().catch((e) => console.warn("Cloakroom check failed:", describeError(e).title));
+    if (a.name === CHECK_ALARM) check().catch((e) => console.warn("Haven check failed:", describeError(e).title));
     // A service worker that was stopped loses its subscriptions; this brings them back within a minute.
     if (a.name === LIVE_ALARM) ensureLive().catch(() => undefined);
   });
@@ -181,7 +181,7 @@ export default defineBackground(() => {
     return false;
   });
 
-  // "Save to Cloakroom": fetch what was clicked and park it in the inbox; the popup encrypts it into a folder.
+  // "Save to Haven": fetch what was clicked and park it in the inbox; the popup encrypts it into a folder.
   chrome.contextMenus.onClicked.addListener((info) => {
     if (info.menuItemId !== MENU_ID) return;
     const raw = info.srcUrl ?? info.linkUrl ?? info.pageUrl;
@@ -192,13 +192,13 @@ export default defineBackground(() => {
     const allowed = needsHost ? chrome.permissions.request({ origins: [`${url.origin}/*`] }) : Promise.resolve(url.protocol === "data:");
     allowed
       .then(async (ok) => {
-        if (!ok) return notify("Not saved", `Cloakroom needs permission to read ${url.hostname} to save from it.`);
+        if (!ok) return notify("Not saved", `Haven needs permission to read ${url.hostname} to save from it.`);
         const res = await fetch(url, { credentials: "omit" });
         if (!res.ok) throw new Error(`${url.hostname} answered ${res.status}`);
         const blob = await res.blob();
         await addToInbox([{ name: fileName(url, blob.type), type: blob.type, blob }]);
         await updateBadge();
-        notify("Saved to Cloakroom", "Open Cloakroom from the toolbar to choose a folder. It's encrypted when you do.");
+        notify("Saved to Haven", "Open Haven from the toolbar to choose a folder. It's encrypted when you do.");
       })
       .catch((e) => notify("Not saved", e instanceof Error ? e.message : String(e)));
   });

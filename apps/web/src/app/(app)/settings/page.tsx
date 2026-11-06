@@ -46,7 +46,7 @@ function ConnectExtension() {
       <h2 className="font-medium">Browser extension</h2>
       {!present ? (
         <p className="mt-1 text-muted">
-          Install the Cloakroom extension for Chrome, then reload this page. It adds right-click &quot;Save to Cloakroom&quot;, and
+          Install the Haven extension for Chrome, then reload this page. It adds right-click &quot;Save to Haven&quot;, and
           a badge when something is shared with you.
         </p>
       ) : result?.ok ? (
@@ -54,7 +54,7 @@ function ConnectExtension() {
       ) : (
         <div className="mt-2 flex flex-col items-start gap-2">
           <p className="text-muted">
-            Connecting gives the extension in this browser your Cloakroom keys, so it can check for shares and save files.
+            Connecting gives the extension in this browser your Haven keys, so it can check for shares and save files.
             Only do this on your own computer.
           </p>
           <label className="flex items-center gap-2">
@@ -93,10 +93,10 @@ function Install() {
   return (
     <section className="rounded-lg border border-line bg-card p-5 text-sm">
       <h2 className="font-medium">Phone app</h2>
-      {state === "installed" && <p className="mt-1 text-muted">Installed. Cloakroom opens from your home screen, even offline.</p>}
+      {state === "installed" && <p className="mt-1 text-muted">Installed. Haven opens from your home screen, even offline.</p>}
       {state === "can-install" && (
         <div className="mt-2 flex flex-col items-start gap-2">
-          <p className="text-muted">Install Cloakroom to open it from your home screen and share files into it from other apps.</p>
+          <p className="text-muted">Install Haven to open it from your home screen and share files into it from other apps.</p>
           <Button variant="primary" onClick={install}>
             Install the app
           </Button>

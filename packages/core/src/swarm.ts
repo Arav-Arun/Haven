@@ -196,7 +196,7 @@ export async function downloadEncrypted(
   if (!response.ok) throw httpError(response.status, "download");
   const bytes = new Uint8Array(await response.arrayBuffer());
   if (!(PAD_BUCKETS as readonly number[]).includes(bytes.length)) {
-    throw new DriveError("UNKNOWN", "downloaded blob is not a padded Cloakroom file");
+    throw new DriveError("UNKNOWN", "downloaded blob is not a padded Haven file");
   }
   step({ kind: "swarm", label: "Encrypted file fetched", ref: normalizeRef(ref), paddedBytes: bytes.length, ok: true });
   return bytes;

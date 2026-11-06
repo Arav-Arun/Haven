@@ -51,7 +51,7 @@ function Profile({ name }: { name: string }) {
           </p>
         ) : !k.current ? (
           <p className="inline-flex items-center gap-1.5 text-sm text-muted">
-            <CircleSlash size={16} aria-hidden /> No public key log yet: this name hasn&apos;t set up Cloakroom.
+            <CircleSlash size={16} aria-hidden /> No public key log yet: this name hasn&apos;t set up Haven.
           </p>
         ) : !k.matchesEns ? (
           <p className="inline-flex items-center gap-1.5 text-sm text-danger">

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Big_Shoulders, Hanken_Grotesk } from "next/font/google";
 import type { ReactNode } from "react";
+import "@rainbow-me/rainbowkit/styles.css";
 import "./globals.css";
 import { Providers } from "./providers";
 
@@ -9,14 +10,14 @@ const hanken = Hanken_Grotesk({ subsets: ["latin"], variable: "--font-hanken", d
 const shoulders = Big_Shoulders({ subsets: ["latin"], variable: "--font-shoulders", weight: ["700"], display: "swap", adjustFontFallback: false });
 
 export const metadata: Metadata = {
-  title: { default: "Cloakroom", template: "%s · Cloakroom" },
+  title: { default: "Haven", template: "%s · Haven" },
   description: "Share files privately with any ENS name. No one can see who you shared with, and new files lock when access ends.",
-  applicationName: "Cloakroom",
+  applicationName: "Haven",
   manifest: "/manifest.webmanifest",
   icons: { icon: "/icon.svg", apple: "/apple-touch-icon.png" },
-  appleWebApp: { capable: true, title: "Cloakroom", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: "Haven", statusBarStyle: "default" },
   openGraph: {
-    title: "Cloakroom",
+    title: "Haven",
     description: "Share files privately with any ENS name. No one can see who you shared with.",
     type: "website",
   },

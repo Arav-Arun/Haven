@@ -21,7 +21,7 @@ export default defineConfig({
   manifest: ({ mode }) => {
     const env = loadEnv(mode, process.cwd(), "WXT_");
     return {
-      name: "Cloakroom",
+      name: "Haven",
       description: "Share files privately with any ENS name. Save images and pages to your drive, and see new shares.",
       permissions: ["storage", "contextMenus", "alarms", "notifications", "offscreen"],
       // Our own services and the worker's code only. Saving from other sites asks for that site when used.
@@ -37,7 +37,7 @@ export default defineConfig({
         ]),
       ],
       optional_host_permissions: ["<all_urls>"],
-      action: { default_title: "Cloakroom" },
+      action: { default_title: "Haven" },
       // The anon-rpc worker runs in a sandboxed page at a null origin (harness README, "Manifest").
       sandbox: { pages: ["anon-rpc/*/sandbox.html"] },
       content_security_policy: {

@@ -11,7 +11,7 @@ import { useDrive } from "@/lib/drive";
 /** Says plainly why there's no client, instead of showing anything made up. */
 export function ClientUnavailable({ reason }: { reason: string }) {
   return (
-    <EmptyState icon={<Plug size={22} />} title="Not connected to Cloakroom yet">
+    <EmptyState icon={<Plug size={22} />} title="Not connected to Haven yet">
       <p>{reason}</p>
     </EmptyState>
   );
@@ -35,7 +35,7 @@ export function RequireIdentity({ children }: { children: (client: CloakroomClie
       <EmptyState icon={<ShieldAlert size={22} />} title="Your keys stayed in the extension">
         <p>{custodyProblem}</p>
         <p>
-          The extension gives your keys only to a page whose code matches a published Cloakroom release. Check the extension&apos;s
+          The extension gives your keys only to a page whose code matches a published Haven release. Check the extension&apos;s
           toolbar icon for details.
         </p>
       </EmptyState>

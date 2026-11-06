@@ -1,36 +1,29 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { connectorsForWallets, RainbowKitProvider } from "@rainbow-me/rainbowkit";
+import { injectedWallet, rainbowWallet, walletConnectWallet } from "@rainbow-me/rainbowkit/wallets";
 import { useEffect, useState, type ReactNode } from "react";
 import { custom } from "viem";
 import { sepolia } from "viem/chains";
-import { createConfig, WagmiProvider, type CreateConnectorFn } from "wagmi";
-import { injected, walletConnect } from "wagmi/connectors";
+import { createConfig, WagmiProvider } from "wagmi";
 import { anonJsonRpc } from "@/lib/anon";
 import { config } from "@/lib/config";
 import { DriveProvider } from "@/lib/drive";
 import { registerServiceWorker } from "@/lib/pwa";
 
-function connectors(): CreateConnectorFn[] {
-  const list: CreateConnectorFn[] = [injected()];
-  if (config.walletConnectProjectId) {
-    // Phone wallets. We draw the QR code ourselves (showQrModal: false), so Reown's hosted modal and its
-    // assets never load, and WalletConnect's telemetry is off. The relay itself is required by the
-    // protocol and is listed in the README's CROPS section.
-    const params = {
+function connectors() {
+  return connectorsForWallets(
+    [{ groupName: "Wallets", wallets: config.walletConnectProjectId
+      ? [rainbowWallet, injectedWallet, walletConnectWallet]
+      : [injectedWallet] }],
+    {
       projectId: config.walletConnectProjectId,
-      showQrModal: false,
-      telemetryEnabled: false,
-      metadata: {
-        name: "Cloakroom",
-        description: "Private file sharing with ENS names",
-        url: config.appOrigin,
-        icons: [],
-      },
-    };
-    list.push(walletConnect(params as Parameters<typeof walletConnect>[0]));
-  }
-  return list;
+      appName: "Haven",
+      appDescription: "Private file sharing with ENS names",
+      appUrl: config.appOrigin,
+    },
+  );
 }
 
 /**
@@ -59,7 +52,9 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <WagmiProvider config={wagmi}>
       <QueryClientProvider client={queries}>
-        <DriveProvider>{children}</DriveProvider>
+        <RainbowKitProvider>
+          <DriveProvider>{children}</DriveProvider>
+        </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>
   );

@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { readSharedFiles, removeSharedFile, type SharedFile } from "@/lib/pwa";
 
 /**
- * Files shared into Cloakroom from another app (Android's share sheet). The service worker parked them on this
+ * Files shared into Haven from another app (Android's share sheet). The service worker parked them on this
  * device; here the user picks a folder, and each is encrypted and uploaded like any other file.
  */
 export function SharedInbox({ client, onDone }: { client: DriveClient; onDone: () => void }) {

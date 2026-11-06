@@ -1,11 +1,11 @@
-# Cloakroom
+# Haven
 
 **Share files with ENS names privately: hidden members, and new files lock out when access ends.**
 
 Today, sharing sensitive files means a bad trade-off. Google Drive and DocSend see every file and every viewer. Putting
 access onchain is worse: anyone can see which investors got your data room.
 
-Cloakroom lets you share files with any ENS name so that only the recipient knows:
+Haven lets you share files with any ENS name so that only the recipient knows:
 - Each recipient gets access as a **fresh random address** that can't be traced to their name.
 - For a data room, an **unlinked room** has a random name that isn't connected to you at all.
 - Files are **encrypted and padded in your browser**, stored on **Swarm**, and listed on **Arkiv**.
@@ -21,7 +21,7 @@ Foundation (Best use of Anon-RPC; CROPS). Licence: [MIT](LICENSE).
 | Where | How |
 |---|---|
 | Website | The live link is added at deploy time. Sign in with a wallet, or **Try it** with no wallet: two fresh identities in one tab |
-| Phone | Open the website on your phone → Settings → **Install the app** (Android also gets "Share to Cloakroom") |
+| Phone | Open the website on your phone → Settings → **Install the app** (Android also gets "Share to Haven") |
 | Browser extension | Load `apps/extension/.output/chrome-mv3` unpacked, or the zip from the GitHub release; then website Settings → **Connect extension** |
 
 Everything runs on Sepolia (ENSv2), Arkiv's Rabdi testnet and Swarm. Nothing is pre-seeded or mocked: every value on
@@ -67,7 +67,7 @@ Details: [`docs/plan/CLOAKROOM_PLAN.md`](docs/plan/CLOAKROOM_PLAN.md) (design), 
 |---|---|---|
 | **Public key log** | Arkiv | Every ENS name has an append-only, signed key history on Arkiv (`cloak.keylog`). Sharing refuses a key that doesn't match its log or its `cloak.key` record, and warns when a recipient's key changed since you last shared. Profiles (`/u/?n=name`) show the 8-word fingerprint to compare in person, the history, devices, and any forged entries (ignored). |
 | **Share with an ENS team** | ENS | Share with "everyone at `acme.eth`". The rule lives only in the folder's encrypted roster; each subname holder becomes an ordinary stealth member, and names that expire, move or are excluded lose access at the next sync. The chain only sees random addresses. |
-| **Verified frontend** | EF, CROPS | Each release's file hashes are published on Arkiv and its build on Swarm (`cloakroom.eth`'s contenthash). The extension re-downloads and hashes the files a Cloakroom tab loaded and hands keys only to a page that matches; otherwise a red warning offers the verified copy. Builds are reproducible (build id = git commit). |
+| **Verified frontend** | EF, CROPS | Each release's file hashes are published on Arkiv and its build on Swarm (`cloakroom.eth`'s contenthash). The extension re-downloads and hashes the files a Haven tab loaded and hands keys only to a page that matches; otherwise a red warning offers the verified copy. Builds are reproducible (build id = git commit). |
 | **Live updates** | Swarm | Swarm GSOC "doorbells" on topics that change every epoch, so only current members can listen. A ring only says "check Arkiv now"; nothing is shown until the validator accepts it. Without them the app re-reads Arkiv every 30 seconds. |
 
 **Limits, said plainly.**
@@ -122,6 +122,8 @@ verify command. Check with any address: `cast call <registry> "wasAllowed(addres
 **3. Website.** Copy `.env.example` values into `apps/web/.env.local`; `NEXT_PUBLIC_API_URL` and
 `NEXT_PUBLIC_BEE_URL` are the API's URL, `NEXT_PUBLIC_ARKIV_RPC_URL` is `<API URL>/arkiv-rpc`. Then
 `pnpm --filter @cloakroom/web dev`, or deploy `apps/web` to Vercel (`apps/web/vercel.json`).
+Set `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` to enable RainbowKit's mobile wallet links and QR pairing;
+without it, only injected browser wallets are available. WalletConnect pairing uses its relay service.
 
 **4. Extension.** `apps/extension/.env` (see its `.env.example`), then `pnpm --filter @cloakroom/extension zip`.
 

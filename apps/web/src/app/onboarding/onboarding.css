@@ -1,0 +1,22 @@
+.haven-onboarding {
+  color: #0d1b33;
+  background: linear-gradient(180deg, #cfe1fc 0%, #eaf2fe 38%, #f3f7fd 100%);
+}
+
+.haven-onboarding-title {
+  font-family: var(--font-shoulders), "Arial Narrow", sans-serif;
+  font-weight: 700;
+  line-height: 0.95;
+  text-transform: uppercase;
+}
+
+.haven-onboarding button.bg-ink {
+  border-radius: 9999px;
+  background: linear-gradient(180deg, #4a8bff, #2563eb);
+  color: white;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.4), 0 8px 20px -10px rgb(37 99 235 / 0.55);
+}
+
+.haven-onboarding button.bg-ink:hover:not(:disabled) {
+  background: linear-gradient(180deg, #5b98ff, #2f6ef2);
+}

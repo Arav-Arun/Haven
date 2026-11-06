@@ -17,7 +17,7 @@ const base = (p: P): P => ({
   ...p,
 });
 
-/** Cloakroom's mark: a coat hanger. */
+/** Haven's mark: a coat hanger. */
 export const Hanger = (p: P) => (
   <svg {...base(p)}>
     <path d="M12 7.2a2.2 2.2 0 1 1 2.2-2.2c0 1.1-.8 1.6-1.5 2.1-.5.4-.7.8-.7 1.4v.6" />

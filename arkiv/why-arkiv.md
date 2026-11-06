@@ -4,7 +4,7 @@
 - **Expiry they can trust.** A guest's key copy and welcome note disappear at the end of their access because the
   database itself removes them, not because our server promised to.
 - **No one to ask.** With Postgres, our server would see every query: who opens which folder, when, how often. Here,
-  reads go through Anon-RPC to a public database, isolated per room and per stealth address. There's no Cloakroom
+  reads go through Anon-RPC to a public database, isolated per room and per stealth address. There's no Haven
   database to subpoena, breach or switch off.
 - **Writes owned by their writers.** Each file entry is created and paid for by the key that wrote it (an editor's
   stealth address, a room key). Our server can't add, change or hide a file; the client checks every entity against

@@ -1,4 +1,4 @@
-// Add-on F3, extension side: does the Cloakroom tab run a published release?
+// Add-on F3, extension side: does the Haven tab run a published release?
 //
 // The page's scripts, styles and HTML are re-downloaded here (MV3 can't read response bodies directly), hashed, and
 // compared with the manifest of a cloak.release entity signed by the release key R (WXT_RELEASE_SIGNER) and not
@@ -47,7 +47,7 @@ export async function verifyUrls(urls: string[]): Promise<VerificationResult> {
   const reader = arkivReader({ rpcUrl: config.arkivRpcUrl, accessKey: "", anon: getAnon() });
   const [releases, unreleases] = await Promise.all([listReleases(reader), listUnreleases(reader)]);
   const trusted = (await trustedReleases(releases.records, unreleases.records, signer as Address)).slice(0, MAX_RELEASES);
-  if (!trusted.length) return { status: "unknown", detail: "No published Cloakroom release was found on Arkiv." };
+  if (!trusted.length) return { status: "unknown", detail: "No published Haven release was found on Arkiv." };
   let best: { files: string[]; version: string } | null = null;
   for (const r of trusted) {
     const res = await getAnon().fetch(`${config.beeUrl.replace(/\/+$/, "")}/bytes/${r.manifestSwarmRef.slice(2)}`).catch(() => null);

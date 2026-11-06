@@ -1,4 +1,4 @@
-// Add-on F3, page side: ask the Cloakroom extension for this account's keys. The extension first re-downloads and hashes
+// Add-on F3, page side: ask the Haven extension for this account's keys. The extension first re-downloads and hashes
 // every file this page loaded and compares them with a published release; only a verified page gets the seed. The
 // reply comes back on a MessageChannel port, never on window.postMessage, so other listeners on the page don't see it.
 
@@ -29,7 +29,7 @@ export function extensionPresent(timeoutMs = 1500): Promise<boolean> {
 
 /** The account seed from the extension, after it verified this page; or why not. */
 export async function requestVerifiedKeys(timeoutMs = 60_000): Promise<VerifiedKeys> {
-  if (!(await extensionPresent())) return { ok: false, reason: "The Cloakroom extension isn't installed in this browser." };
+  if (!(await extensionPresent())) return { ok: false, reason: "The Haven extension isn't installed in this browser." };
   return new Promise((resolve) => {
     const channel = new MessageChannel();
     const timer = setTimeout(() => {

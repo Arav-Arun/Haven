@@ -1,4 +1,4 @@
-// Cloakroom's service worker: the app shell offline, and Android's "Share to Cloakroom".
+// Haven's service worker: the app shell offline, and Android's "Share to Haven".
 // It never touches cross-origin traffic (RPCs, Bee, our API), and it never sees keys or decrypted files except the
 // ones the user shares into the app, which it hands straight to the page through IndexedDB.
 const VERSION = "1";

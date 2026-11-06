@@ -397,7 +397,7 @@ export function createApi(env: ApiEnv) {
       const address = getAddress(r.address);
       const registry = getAddress(r.registry);
       // Only the owner key of a Cloakroom registry (K of a drive root, or K_room of a room). Never a stealth member.
-      if (!(await isOurRegistry(registry))) throw new DriveError("NOT_AUTHORIZED", "not a Cloakroom registry");
+      if (!(await isOurRegistry(registry))) throw new DriveError("NOT_AUTHORIZED", "not a Haven registry");
       const [owner, access] = await Promise.all([driveOwner(sepoliaClient, registry), accessOf(sepoliaClient, registry, address)]);
       if (!isAddressEqual(owner, address) || access.via !== "owner") throw new DriveError("NOT_AUTHORIZED", "only a registry's owner key gets gas");
       if (!pending.has(address) && !counters.hit(`drip:${address}`, 1, 1, DAY)) throw new DriveError("RATE_LIMITED", "one drip per key per day");

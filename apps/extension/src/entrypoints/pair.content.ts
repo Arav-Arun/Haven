@@ -43,8 +43,8 @@ function showOverlay(result: VerificationResult) {
     </style>
     <div class="wrap" role="alertdialog" aria-labelledby="t">
       <div class="card">
-        <h1 id="t">This page's code doesn't match any published Cloakroom release</h1>
-        <p>The Cloakroom extension won't give your keys to this page. Someone may have changed the website's files.</p>
+        <h1 id="t">This page's code doesn't match any published Haven release</h1>
+        <p>The Haven extension won't give your keys to this page. Someone may have changed the website's files.</p>
         ${files.length ? `<code></code>` : ""}
         <div class="row">
           ${copy ? `<a href="${copy}" rel="noreferrer">Open the verified copy</a>` : ""}
@@ -59,7 +59,7 @@ function showOverlay(result: VerificationResult) {
 }
 
 /**
- * Runs only on the Cloakroom website. It tells the page the extension is installed, passes a pairing request (the
+ * Runs only on the Haven website. It tells the page the extension is installed, passes a pairing request (the
  * account seed, sent after the user confirms on the website) to the background worker, checks the page's files against
  * the published release, and hands the page its keys only when that check passes.
  */

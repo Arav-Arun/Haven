@@ -86,7 +86,7 @@ export function MyKey() {
 export function LinkName() {
   const { client, identity } = useDrive();
   const { address } = useAccount();
-  const { mutateAsync } = useSignTypedData();
+  const { signTypedDataAsync } = useSignTypedData();
   const [name, setName] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<unknown>(null);
@@ -111,7 +111,7 @@ export function LinkName() {
             setDone(null);
             try {
               const n = name.trim().toLowerCase();
-              const info = await client.linkName(n, (td) => mutateAsync(td as never));
+              const info = await client.linkName(n, (td) => signTypedDataAsync(td as never));
               setDone(`${info.ensName} now points at your key (${info.fingerprint.join(" ")}).`);
             } catch (err) {
               setError(err);

@@ -11,16 +11,16 @@ const COPY: Record<DriveErrorCode, { title: string; detail: string }> = {
   WALLET_NOT_SUPPORTED: {
     title: "This wallet can't sign in",
     detail:
-      "Smart-contract wallets, and wallets that sign the same message differently each time, can't rebuild your keys. Connect a regular wallet instead, or try Cloakroom without one.",
+      "Smart-contract wallets, and wallets that sign the same message differently each time, can't rebuild your keys. Connect a regular wallet instead, or try Haven without one.",
   },
   KEY_MISMATCH: {
     title: "This sign-in gives different keys",
-    detail: "The keys from this signature don't match this name's Cloakroom key. Your files are safe; sign in with the wallet that set up this name.",
+    detail: "The keys from this signature don't match this name's Haven key. Your files are safe; sign in with the wallet that set up this name.",
   },
   NAME_TAKEN: { title: "That name is taken", detail: "Try another name." },
   NO_CLOAK_KEY: {
-    title: "This name hasn't set up Cloakroom yet",
-    detail: "Ask them to sign in to Cloakroom once. Then you can share with them.",
+    title: "This name hasn't set up Haven yet",
+    detail: "Ask them to sign in to Haven once. Then you can share with them.",
   },
   NOT_AUTHORIZED: { title: "You don't have access to do that", detail: "Ask a manager of this folder." },
   EXPIRED: { title: "Your access has ended", detail: "New files are locked for you. What you already opened, you keep." },

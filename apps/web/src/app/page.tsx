@@ -34,7 +34,7 @@ export default function Home() {
                 <span className="flex size-9 items-center justify-center rounded-full bg-white text-[#2563eb] shadow-[0_6px_16px_-6px_rgb(13_27_51_/_0.4)]">
                   <Hanger width={20} height={20} />
                 </span>
-                <span className="text-lg font-semibold tracking-tight">Cloakroom</span>
+                <span className="text-lg font-semibold tracking-tight">Haven</span>
               </Link>
               <nav className="flex items-center gap-1 sm:gap-2">
                 <ul className="mr-2 hidden items-center gap-1 lg:flex">
@@ -66,7 +66,7 @@ export default function Home() {
               <TicketStack />
             </div>
 
-            <div className="hero-copy relative z-30 mx-auto flex max-w-5xl flex-col items-center px-5 pb-16 text-center sm:pb-20">
+            <div className="hero-copy relative z-30 mx-auto flex max-w-5xl flex-col items-center px-5 pb-12 text-center sm:pb-16">
               <span className="glass-soft inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-[#0d1b33]/80">
                 <Lock width={16} height={16} className="text-[#2563eb]" />
                 Private file sharing on ENS
@@ -90,12 +90,8 @@ export default function Home() {
                 )}
               </div>
             </div>
-          </section>
-
-          <div className="rounded-b-[24px] bg-white/70">
-            <p className="pt-6 text-center text-xs font-medium text-[#0d1b33]/45">Built on open networks</p>
             <BuiltOn />
-          </div>
+          </section>
         </div>
       </div>
 

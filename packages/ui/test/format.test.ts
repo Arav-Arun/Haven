@@ -28,7 +28,7 @@ describe("format", () => {
 describe("describeError", () => {
   it("maps DriveError codes to fixed wording", () => {
     expect(describeError(new DriveError("REFRESH_PENDING")).title).toBe("Waiting for the owner to refresh access");
-    expect(describeError(new DriveError("NO_CLOAK_KEY")).title).toBe("This name hasn't set up Cloakroom yet");
+    expect(describeError(new DriveError("NO_CLOAK_KEY")).title).toBe("This name hasn't set up Haven yet");
     expect(describeError(new DriveError("KEY_MISMATCH")).detail).toMatch(/Your files are safe/);
   });
 

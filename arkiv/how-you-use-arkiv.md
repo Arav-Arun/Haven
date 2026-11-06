@@ -7,7 +7,7 @@ Arkiv could filter, and nothing secret is indexed: the indexed columns are addre
 **Edit rights.** We don't rely on Arkiv's ownership for who may write: anyone can create an entity that matches a query.
 Instead every entity is created read-only, and the client checks its `$creator` against the folder's onchain roles at
 `$createdAt` (`DriveRegistry.wasAllowed`). Users see this: planted entries never show, and the Public view counts them
-("3 records were written here by addresses without access. Cloakroom ignores them"). Entities that managers keep alive
+("3 records were written here by addresses without access. Haven ignores them"). Entities that managers keep alive
 are created with permissionless extension, so a manager can renew an editor's entry without being able to change it.
 
 **Expiry.** It changes what users see:
@@ -23,7 +23,7 @@ size and expiry; the receipts panel links each Arkiv transaction.
 
 **Public data (add-ons).** Arkiv also holds data meant for everyone:
 - **A key directory keyed by ENS name** (`cloak.keylog`): any app looks up a name's current key, and its whole history,
-  with one query, and can tell a swapped key from a real change. Sharing in Cloakroom refuses a key that doesn't match
+  with one query, and can tell a swapped key from a real change. Sharing in Haven refuses a key that doesn't match
   its log, and warns when a key changed since the last share. Forged entries (written about a name by anyone but its
   controller) show on the profile page as ignored.
 - **Devices** (`cloak.device`) expire after 90 days unless used, so a lost laptop drops off on its own.

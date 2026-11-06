@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "Cloakroom",
-  "short_name": "Cloakroom",
+  "name": "Haven",
+  "short_name": "Haven",
   "description": "Share files privately with any ENS name.",
   "start_url": "/drive/",
   "scope": "/",

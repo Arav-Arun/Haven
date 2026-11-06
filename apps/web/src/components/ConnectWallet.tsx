@@ -1,16 +1,17 @@
 "use client";
 
-import { Button, ErrorNote, shortAddress } from "@cloakroom/ui";
+import { Button, shortAddress } from "@cloakroom/ui";
+import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { Wallet } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useAccount, useConnect, useDisconnect, usePublicClient } from "wagmi";
-import { WalletConnectQr } from "./WalletConnectQr";
+import { useAccount, useDisconnect, usePublicClient } from "wagmi";
+import { config } from "@/lib/config";
 
 export type WalletKind = "checking" | "eoa" | "contract" | "error";
 
 /**
  * Whether the connected address is a plain key (EOA) or a contract, read from Sepolia through Anon-RPC.
- * Contract wallets can't give the same signature twice, so they can't rebuild Cloakroom keys.
+ * Contract wallets can't give the same signature twice, so they can't rebuild Haven keys.
  */
 export function useWalletKind(): WalletKind | null {
   const { address } = useAccount();
@@ -31,10 +32,10 @@ export function useWalletKind(): WalletKind | null {
   return kind;
 }
 
-/** Connects a wallet: browser wallets found on the page, or a phone wallet through a locally drawn QR code. */
+/** Connects injected and mobile wallets through RainbowKit. */
 export function ConnectWallet() {
   const { address, isConnected, connector } = useAccount();
-  const { connect, connectors, isPending, error } = useConnect();
+  const { openConnectModal } = useConnectModal();
   const { disconnect } = useDisconnect();
   const kind = useWalletKind();
   // Wallets are only found in the browser, so the list is drawn after hydration to match the prerendered page.
@@ -45,14 +46,10 @@ export function ConnectWallet() {
   if (!isConnected)
     return (
       <div className="flex flex-col gap-2">
-        {connectors.map((c) => (
-          <Button key={c.uid} variant="primary" onClick={() => connect({ connector: c })} disabled={isPending}>
-            <Wallet size={18} aria-hidden />
-            {c.name === "Injected" ? "Browser wallet" : c.name === "WalletConnect" ? "Phone wallet (WalletConnect)" : c.name}
-          </Button>
-        ))}
-        <ErrorNote error={error} />
-        <WalletConnectQr />
+        <Button variant="primary" onClick={openConnectModal} disabled={!openConnectModal}>
+          <Wallet size={18} aria-hidden /> Connect wallet
+        </Button>
+        {!config.walletConnectProjectId && <p className="text-muted">Mobile wallets need a WalletConnect project ID configured by the app.</p>}
       </div>
     );
 
@@ -65,7 +62,7 @@ export function ConnectWallet() {
       {kind === "contract" && (
         <p className="text-danger">
           This is a smart-contract wallet. It can&apos;t give the same signature twice, so your keys couldn&apos;t be rebuilt.
-          Connect a regular wallet instead, or try Cloakroom without a wallet.
+          Connect a regular wallet instead, or try Haven without a wallet.
         </p>
       )}
       {kind === "error" && <p className="text-danger">Couldn&apos;t reach Sepolia to check this wallet. See the network status at the top.</p>}

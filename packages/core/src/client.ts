@@ -394,7 +394,7 @@ class Client implements CloakroomClient {
   private async api<T>(path: string, body: unknown, step?: StepSink, method: "GET" | "POST" = "POST"): Promise<T> {
     const anon = this.cfg.anon;
     const routed = anon.supportsAnyHttps && isAnonymous(anon.status());
-    const label = `Cloakroom API ${path}`;
+    const label = `Haven API ${path}`;
     if (!routed) this.direct.add(label);
     step?.({ kind: "route", label, route: routed ? "anon" : "direct", network: anon.status().network });
     const doFetch = routed ? anon.fetch : globalThis.fetch.bind(globalThis);
@@ -439,13 +439,13 @@ class Client implements CloakroomClient {
       throw new DriveError("UNKNOWN", "Your access here has no gas yet. The folder's owner tops it up when their app opens.");
     }
     const drip = await this.api<DripResponse>("/drip", { address: h.address, registry: h.folder }, step);
-    step({ kind: "check", label: "Gas requested from the Cloakroom API", detail: `sent in a batch at ${new Date(drip.sendsAt * 1000).toLocaleTimeString()}`, ok: true });
+    step({ kind: "check", label: "Gas requested from the Haven API", detail: `sent in a batch at ${new Date(drip.sendsAt * 1000).toLocaleTimeString()}`, ok: true });
     const deadline = Math.max(drip.sendsAt, now()) + 180;
     while (now() < deadline) {
       await new Promise((r) => setTimeout(r, 5000));
       if (await enough()) return;
     }
-    throw new DriveError("RATE_LIMITED", "Gas from the Cloakroom API didn't arrive in time. Try again in a minute.");
+    throw new DriveError("RATE_LIMITED", "Gas from the Haven API didn't arrive in time. Try again in a minute.");
   }
 
   // ------------------------------------------------------------ session
@@ -1491,7 +1491,7 @@ class Client implements CloakroomClient {
   private async keyForName(name: string, isolationKey?: string): Promise<{ key: Hex | null; why?: string }> {
     const r = await this.readKeyLog(name, undefined, isolationKey);
     if (r.checked.problem) return { key: null, why: "its public key log is broken" };
-    if (!r.current) return { key: null, why: "no Cloakroom key yet" };
+    if (!r.current) return { key: null, why: "no Haven key yet" };
     if (ensAgreement(r.current, r.cloakKey) === "mismatch") return { key: null, why: "its key doesn't match its cloak.key record" };
     return { key: r.current };
   }
@@ -1506,7 +1506,7 @@ class Client implements CloakroomClient {
     return {
       parent,
       ready: holders.filter((x) => x.key).map((x) => x.name),
-      noKey: holders.filter((x) => !x.key).map((x) => ({ name: x.name, why: x.why ?? "no Cloakroom key yet" })),
+      noKey: holders.filter((x) => !x.key).map((x) => ({ name: x.name, why: x.why ?? "no Haven key yet" })),
     };
   }
 
@@ -1549,7 +1549,7 @@ class Client implements CloakroomClient {
       if (current.roster.subtrees?.some((r) => r.parent === parent)) throw new DriveError("UNKNOWN", `This folder is already shared with ${parent}.`);
       const holders = await this.holdersOf(parent, h.address, step);
       const ready = holders.filter((x) => x.key);
-      step({ kind: "check", label: `Names under ${parent}`, detail: `${ready.length} found with a Cloakroom key, ${holders.length - ready.length} without`, ok: true });
+      step({ kind: "check", label: `Names under ${parent}`, detail: `${ready.length} found with a Haven key, ${holders.length - ready.length} without`, ok: true });
       const rule: SubtreeRuleData = { parent, role: opts.role, until: opts.until, excluded: [], hideFromMembers: opts.hideFromMembers, syncedAt: now() };
       const everyone = [...current.roster.managers, ...current.roster.members];
       const plan = planSync(rule, everyone, holders);
@@ -1797,7 +1797,7 @@ class Client implements CloakroomClient {
           .filter((k): k is Uint8Array => k !== null)
           .map((k) => this.gsocFor(f, k, config));
         if (!topics.length) return startPolling("your access has ended");
-        this.direct.add("Swarm doorbell subscription (WebSocket to the Cloakroom API)");
+        this.direct.add("Swarm doorbell subscription (WebSocket to the Haven API)");
         let failed = false;
         for (const { topic, key } of topics) {
           const ws = new WebSocket(`${wsBase}/doorbell/subscribe/${key.address.slice(2)}`);
@@ -1887,7 +1887,7 @@ class Client implements CloakroomClient {
             const until = access.roles ? access.until : last ? (last.endedAt ? Number(last.endedAt) : Number(last.until)) : null;
             return {
               folder,
-              sharedBy: folder.kind === "room" ? "unlinked room" : (ownerNameOf(folder.ensName) ?? "a Cloakroom user"),
+              sharedBy: folder.kind === "room" ? "unlinked room" : (ownerNameOf(folder.ensName) ?? "a Haven user"),
               role,
               until,
               firstSeenAt: s.seen,

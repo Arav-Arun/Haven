@@ -15,7 +15,7 @@ export interface NavItem {
 export type LinkLike = ComponentType<{ href: string; className?: string; children: ReactNode; "aria-current"?: "page" }>;
 
 export function Wordmark({ className }: { className?: string }) {
-  return <span className={cx("font-display text-2xl font-bold uppercase leading-none tracking-wide", className)}>Cloakroom</span>;
+  return <span className={cx("font-display text-2xl font-bold uppercase leading-none tracking-wide", className)}>Haven</span>;
 }
 
 /** Sidebar on desktop, bottom tabs on phones. `status` is the network badge; `account` the signed-in name. */

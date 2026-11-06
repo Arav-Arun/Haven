@@ -71,7 +71,7 @@ type Lookup =
 
 /**
  * Share a folder with an ENS name or one of your groups. The recipient is looked up live: names without a
- * Cloakroom key are refused before anything is sent.
+ * Haven key are refused before anything is sent.
  */
 export function ShareDialog({
   open,
@@ -130,7 +130,7 @@ export function ShareDialog({
           setLookup(
             r.canReceive
               ? { state: "ok", ensName: r.ensName }
-              : { state: "no", ensName: r.ensName, reason: "This name hasn't set up Cloakroom yet. Ask them to sign in once." },
+              : { state: "no", ensName: r.ensName, reason: "This name hasn't set up Haven yet. Ask them to sign in once." },
           ),
         (e) => live && setLookup({ state: "no", ensName: n, reason: describeError(e).title }),
       );
@@ -327,7 +327,7 @@ export function ShareDialog({
                   <span className={cx("inline-flex items-center gap-1", preview.ready.length ? "text-private" : "text-danger")}>
                     <Users size={12} aria-hidden />
                     {preview.ready.length + preview.noKey.length} members found
-                    {preview.noKey.length ? ` (${preview.noKey.length} ${preview.noKey.length === 1 ? "has" : "have"} no Cloakroom key)` : ""}
+                    {preview.noKey.length ? ` (${preview.noKey.length} ${preview.noKey.length === 1 ? "has" : "have"} no Haven key)` : ""}
                   </span>
                 )}
                 {previewError ? <span className="text-danger">{describeError(previewError).title}</span> : null}
