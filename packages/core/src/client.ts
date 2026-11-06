@@ -803,6 +803,24 @@ class Client implements HavenClient {
     };
   }
 
+  /**
+   * A folder this client has just made: everything is known from what it wrote, so nothing is read back from Arkiv
+   * (that read-back, through a private network, was most of the wait after creating something).
+   */
+  private freshFolder(registry: Address, ensName: string, displayName: string, parent: Address | null, inherit: boolean): Folder {
+    return {
+      registry,
+      ensName,
+      displayName,
+      kind: kindOf(ensName),
+      parent,
+      inherit,
+      myAccess: { role: "owner", until: null, via: "owner" },
+      version: 1,
+      refreshPending: false,
+    };
+  }
+
   async getFolder(folder: Address): Promise<Folder> {
     const f = getAddress(folder);
     const h = await this.holding(f);
@@ -967,7 +985,7 @@ class Client implements HavenClient {
       );
       this.childCache.delete(lower(parentRegistry));
       if (inherit) await this.syncInherited(parentRegistry, registry, step);
-      return this.toFolder(registry, h, await this.readFolder(registry, h, step), step);
+      return this.freshFolder(registry, ensName, displayName, parent === "root" ? null : parentRegistry, inherit);
     });
   }
 
@@ -991,7 +1009,7 @@ class Client implements HavenClient {
         step,
       );
       this.childCache.delete(lower(requireDeployed("roomsRegistry")));
-      return this.toFolder(h.folder, h, await this.readFolder(h.folder, h, step), step);
+      return this.freshFolder(h.folder, room.ensName, displayName, null, false);
     });
   }
 

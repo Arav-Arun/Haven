@@ -263,13 +263,12 @@ export function ShareDialog({
   };
 
   const presets: [Preset, string][] = [
-    ...(demoMode ? ([["2m", "2 minutes"]] as [Preset, string][]) : []),
+    ...(demoMode ? ([["2m", "2 min"]] as [Preset, string][]) : []),
     ["1h", "1 hour"],
     ["1d", "1 day"],
     ["1w", "1 week"],
-    ["month", "End of month"],
-    ["custom", "Custom"],
-    ["never", "No end date"],
+    ["month", "Month end"],
+    ["never", "No end"],
   ];
 
   return (
@@ -436,54 +435,67 @@ export function ShareDialog({
           </fieldset>
 
           <fieldset className="flex flex-col gap-2 text-sm">
-            <legend className="mb-1">Access until</legend>
-            <div className="flex flex-wrap gap-1.5">
+            <legend className="mb-1.5 font-medium">Access until</legend>
+            {/* Quick picks as one even bar; typing a length below takes over from them. */}
+            <div role="group" aria-label="Quick lengths" className="grid grid-cols-3 gap-1 rounded-2xl bg-ink/[0.05] p-1 sm:grid-cols-6">
               {presets.map(([p, label]) => (
                 <button
                   key={p}
                   type="button"
                   aria-pressed={preset === p}
-                  onClick={() => setPreset(p)}
-                  className={cx("rounded-xl border px-2.5 py-1", preset === p ? "border-action bg-action text-white" : "border-line bg-card")}
+                  onClick={() => {
+                    setPreset(p);
+                    setCustom("");
+                    setPickDate(false);
+                  }}
+                  className={cx(
+                    "rounded-xl px-2 py-2 text-[13px] font-medium transition-colors",
+                    preset === p ? "bg-white text-ink shadow-[0_4px_12px_-6px_rgb(13_27_51/0.4)]" : "text-muted hover:text-ink",
+                  )}
                 >
                   {label}
                 </button>
               ))}
             </div>
-            {preset === "custom" && (
-              <div className="flex flex-col gap-1.5">
-                {pickDate ? (
-                  <input
-                    type="datetime-local"
-                    className={inputClass}
-                    value={customAt}
-                    onChange={(e) => setCustomAt(e.target.value)}
-                    aria-label="Access ends at"
-                    required
-                  />
-                ) : (
-                  <input
-                    className={inputClass}
-                    value={custom}
-                    onChange={(e) => setCustom(e.target.value)}
-                    placeholder="How long? e.g. 5m 30s, 2 hours, 3 days"
-                    aria-label="How long access lasts"
-                    autoFocus
-                    required
-                  />
-                )}
-                <p className={cx("text-xs", until !== null && until > nowSeconds() ? "text-private" : "text-muted")}>
-                  {until !== null && until > nowSeconds()
-                    ? `${pickDate ? "Ends" : `${spell(until - nowSeconds())}, ends`} ${new Date(until * 1000).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit", second: "2-digit" })}`
-                    : pickDate
-                      ? "Pick when access ends."
-                      : "Type a length like 5m 30s, 90 minutes, 2h or 1 week."}{" "}
-                  <button type="button" className="font-medium text-action underline-offset-2 hover:underline" onClick={() => setPickDate((v) => !v)}>
-                    {pickDate ? "Type a length instead" : "Pick a date and time"}
-                  </button>
-                </p>
-              </div>
-            )}
+            <div className="mt-2 flex items-center gap-2">
+              {pickDate ? (
+                <input
+                  type="datetime-local"
+                  className={cx(inputClass, "flex-1")}
+                  value={customAt}
+                  onFocus={() => setPreset("custom")}
+                  onChange={(e) => {
+                    setPreset("custom");
+                    setCustomAt(e.target.value);
+                  }}
+                  aria-label="Access ends at"
+                />
+              ) : (
+                <input
+                  className={cx(inputClass, "flex-1", preset === "custom" && "border-action")}
+                  value={custom}
+                  onFocus={() => setPreset("custom")}
+                  onChange={(e) => {
+                    setPreset("custom");
+                    setCustom(e.target.value);
+                  }}
+                  placeholder="Or type how long: 5m 30s, 2 hours, 3 days"
+                  aria-label="How long access lasts"
+                />
+              )}
+              <button type="button" className="shrink-0 text-xs font-medium text-action hover:underline" onClick={() => setPickDate((v) => !v)}>
+                {pickDate ? "Type a length" : "Pick a date"}
+              </button>
+            </div>
+            <p className={cx("mt-1.5 text-xs", customInvalid ? "text-danger" : "text-muted")}>
+              {preset === "never"
+                ? "No end date: access lasts until you remove them."
+                : until !== null && until > nowSeconds()
+                  ? `${preset === "custom" && !pickDate ? `${spell(until - nowSeconds())}: ` : ""}ends ${new Date(until * 1000).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit", second: "2-digit" })}.`
+                  : pickDate
+                    ? "Pick when access ends."
+                    : "Type a length like 5m 30s, 90 minutes, 2h or 1 week."}
+            </p>
             <p className="text-muted">New files will be locked for them after this date. What they already opened, they keep.</p>
           </fieldset>
 
