@@ -14,7 +14,6 @@ const raw = {
   NEXT_PUBLIC_MAINNET_RPC_URL: process.env.NEXT_PUBLIC_MAINNET_RPC_URL,
   NEXT_PUBLIC_TOR_GATEWAYS: process.env.NEXT_PUBLIC_TOR_GATEWAYS,
   NEXT_PUBLIC_ARKIV_RPC_URL: process.env.NEXT_PUBLIC_ARKIV_RPC_URL,
-  NEXT_PUBLIC_ARKIV_ACCESS_KEY: process.env.NEXT_PUBLIC_ARKIV_ACCESS_KEY,
   NEXT_PUBLIC_PRIVATE_NETWORK: process.env.NEXT_PUBLIC_PRIVATE_NETWORK,
   NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID,
 } as const;
@@ -43,7 +42,8 @@ export const config = {
   mainnetRpcUrl: raw.NEXT_PUBLIC_MAINNET_RPC_URL ?? "",
   torGateways: (raw.NEXT_PUBLIC_TOR_GATEWAYS ?? "").split(",").map((s) => s.trim()).filter(Boolean),
   arkivRpcUrl: raw.NEXT_PUBLIC_ARKIV_RPC_URL ?? "",
-  arkivAccessKey: raw.NEXT_PUBLIC_ARKIV_ACCESS_KEY ?? "",
+  // The Arkiv access key never reaches browsers: arkivRpcUrl is our API's /arkiv-rpc pass-through, which adds it.
+  arkivAccessKey: "",
   network: (raw.NEXT_PUBLIC_PRIVATE_NETWORK ?? "off") as PrivateNetwork,
   walletConnectProjectId: raw.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? "",
 };
