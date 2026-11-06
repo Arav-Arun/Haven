@@ -79,7 +79,7 @@ Built and wired to the real client; waiting on `createDriveClient` (see `docs/re
 Built; the "Done when" needs a real Android phone and iPhone (human).
 - `public/manifest.webmanifest`: standalone, start at `/drive/`, icons (SVG, 192, 512, maskable 512, Apple touch),
   and an Android `share_target` (POST, multipart, any file type).
-- Icons are drawn by `scripts/make-icons.mjs` (a ticket on spruce), no image tools needed.
+- Icons are drawn by `scripts/make-icons.py` (Pillow) from `public/haven-mark.webp`: the shield mark on the blue tile.
 - `public/sw.js`: caches the app's pages and hashed assets so it starts offline; never touches cross-origin traffic
   (RPCs, Bee, API). Shared files are parked in IndexedDB and the drive opens a "Save shared files" dialog to pick a
   folder; each is then encrypted and uploaded like any other file. Registered only in production builds.

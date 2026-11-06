@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   description: "Share files privately with any ENS name. No one can see who you shared with, and new files lock when access ends.",
   applicationName: "Haven",
   manifest: "/manifest.webmanifest",
-  icons: { icon: "/icon.svg", apple: "/apple-touch-icon.png" },
+  icons: { icon: [{ url: "/favicon.png", sizes: "64x64", type: "image/png" }, { url: "/icon-192.png", sizes: "192x192", type: "image/png" }], apple: "/apple-touch-icon.png" },
   appleWebApp: { capable: true, title: "Haven", statusBarStyle: "default" },
   openGraph: {
     title: "Haven",

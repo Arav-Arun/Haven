@@ -20,13 +20,13 @@ const SPEED = 1.2;
 const MAX_WAIT_MS = 10_000;
 const FADE_MS = 700;
 
-// Haven's mark (the same shapes as HavenMark in @haven/ui), drawn into the logo canvas next to the name.
-const MARK = `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 64 64"><defs><linearGradient id="t" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5b93ff"/><stop offset="1" stop-color="#1f4fd1"/></linearGradient><linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0.45"/><stop offset="0.5" stop-color="#fff" stop-opacity="0"/></linearGradient></defs><rect width="64" height="64" rx="18" fill="url(#t)"/><rect width="64" height="64" rx="18" fill="url(#s)"/><path d="M17 50V30a15 15 0 0 1 30 0v20" fill="none" stroke="#fff" stroke-width="6.5" stroke-linecap="round"/><circle cx="32" cy="32" r="5" fill="#fff"/><path d="M29.6 34.5h4.8l1.6 9.5h-8z" fill="#fff"/></svg>`;
+// Haven's mark (public/haven-mark.webp, white on transparent), tinted the same ink as the name.
+const INK = "#0d1b33";
 
 /** The mark and "Haven" side by side, in the page's own font, as on the landing page's nav. */
 async function drawHavenLogo(): Promise<HTMLCanvasElement> {
   const mark = new Image();
-  mark.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(MARK)}`;
+  mark.src = "/haven-mark.webp";
   await mark.decode();
 
   const size = 512;
@@ -47,8 +47,15 @@ async function drawHavenLogo(): Promise<HTMLCanvasElement> {
   canvas.width = size + gap + textWidth + 32;
   canvas.height = size;
   setText(); // resizing the canvas resets its state
-  ctx.drawImage(mark, 0, 0, size, size);
-  ctx.fillStyle = "#0d1b33";
+  const ink = document.createElement("canvas");
+  ink.width = ink.height = size;
+  const inkCtx = ink.getContext("2d")!;
+  inkCtx.drawImage(mark, 0, 0, size, size);
+  inkCtx.globalCompositeOperation = "source-in";
+  inkCtx.fillStyle = INK;
+  inkCtx.fillRect(0, 0, size, size);
+  ctx.drawImage(ink, size * 0.08, size * 0.08, size * 0.84, size * 0.84);
+  ctx.fillStyle = INK;
   ctx.textBaseline = "middle";
   ctx.fillText("Haven", size + gap, size / 2 + fontPx * 0.04);
   return canvas;

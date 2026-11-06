@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, type ComponentType, type ReactNode } from "react";
+import { type ComponentType, type ReactNode } from "react";
 import { CloudBank } from "./Clouds";
 import { KineticMenu } from "./KineticMenu";
 import { cx } from "./format";
@@ -18,26 +18,13 @@ export type LinkLike = ComponentType<{ href: string; className?: string; childre
 
 /** Haven's mark, the same as the landing page's: an arched doorway with a keyhole, on a blue tile. */
 export function HavenMark({ className }: { className?: string }) {
-  // useId can contain characters that break url(#...) references.
-  const id = `haven${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  // The shield, drawn from public/haven-mark.webp as a mask, so it takes the text colour (black on light, white on dark).
   return (
-    <svg viewBox="0 0 64 64" aria-hidden className={cx("drop-shadow-[0_6px_14px_rgb(31_79_209/0.35)]", className)}>
-      <defs>
-        <linearGradient id={`${id}-tile`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#5b93ff" />
-          <stop offset="1" stopColor="#1f4fd1" />
-        </linearGradient>
-        <linearGradient id={`${id}-shine`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#fff" stopOpacity="0.45" />
-          <stop offset="0.5" stopColor="#fff" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <rect width="64" height="64" rx="18" fill={`url(#${id}-tile)`} />
-      <rect width="64" height="64" rx="18" fill={`url(#${id}-shine)`} />
-      <path d="M17 50V30a15 15 0 0 1 30 0v20" fill="none" stroke="#fff" strokeWidth="6.5" strokeLinecap="round" />
-      <circle cx="32" cy="32" r="5" fill="#fff" />
-      <path d="M29.6 34.5h4.8l1.6 9.5h-8z" fill="#fff" />
-    </svg>
+    <span
+      aria-hidden
+      className={cx("inline-block bg-current", className)}
+      style={{ WebkitMask: "url(/haven-mark.webp) center / contain no-repeat", mask: "url(/haven-mark.webp) center / contain no-repeat" }}
+    />
   );
 }
 
@@ -45,7 +32,7 @@ export function HavenMark({ className }: { className?: string }) {
 export function Wordmark({ className }: { className?: string }) {
   return (
     <span className={cx("inline-flex items-center gap-2.5 text-[21px] font-bold leading-none tracking-[-0.03em] text-ink", className)}>
-      <HavenMark className="size-[1.55em] shrink-0" />
+      <HavenMark className="size-[1.3em] shrink-0" />
       Haven
     </span>
   );

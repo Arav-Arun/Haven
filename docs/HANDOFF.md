@@ -123,7 +123,7 @@ pnpm --filter @haven/web build        # static export to apps/web/out
 - **Wallets:** RainbowKit picker shows MetaMask, Phantom, Rainbow, Rabby, plus injected and WalletConnect.
 - **Etherscan links:** "View on Etherscan" on every folder and room; ticket serials link to the member's address.
 - **Landing page:** redesigned (layout inspired by the Noa site, Haven's own look, no night sky), new arch-and-keyhole
-  logo and icons (`apps/web/scripts/make-icons.mjs`), footer credit to Team **Deploy For Good**. Small "AI slop" text,
+  logo and icons (shield mark `apps/web/public/haven-mark.webp`, icons from `apps/web/scripts/make-icons.py`), footer credit to Team **Deploy For Good**. Small "AI slop" text,
   chips and icons removed.
 - **Workspace:** cleaned and moved to `/Users/arav/Desktop/Haven`. Nested submodule gitdir paths were fixed to the new
   location.
