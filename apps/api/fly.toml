@@ -3,9 +3,14 @@
 #     POSTAGE_BATCH_ID=… BEE_URL=http://haven-bee.internal:1633
 app = "havenethglobal-api"
 primary_region = "sin"
+# Swap on the machine's disk: a burst (a 16 MB padded upload held in memory) slows down instead of being killed
+# for running out of memory on the 256 MB machine.
+swap_size_mb = 1024
 
 [env]
   PORT = "8787"
+  # Keep the JavaScript heap small, so garbage is collected before the machine runs short.
+  NODE_OPTIONS = "--max-old-space-size=160"
   ARKIV_RPC_URL = "https://rpc.rabdi.db-chain.testnet.arkiv.network"
   ROOM_POW_DIFFICULTY = "20"
   DRIP_SEPOLIA_WEI = "1000000000000000"

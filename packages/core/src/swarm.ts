@@ -268,7 +268,8 @@ export async function storeOnBee(
       "content-type": "application/octet-stream",
       "swarm-postage-batch-id": postageBatchId.replace(/^0x/, ""),
     },
-    body: new Uint8Array(body),
+    // The bytes as they are: no copy, so a 16 MB upload doesn't need another 16 MB on a small server.
+    body: body as Uint8Array<ArrayBuffer>,
   });
   if (!response.ok) throw httpError(response.status, "Bee upload");
   const { reference } = (await response.json()) as { reference?: string };
