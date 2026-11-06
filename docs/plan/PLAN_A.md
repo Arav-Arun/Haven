@@ -53,7 +53,7 @@ Run checks 1, 2, 3, 4, 5, 8 and 9 from `CLOAKROOM_PLAN.md` section 17, using thr
   This sizes the drips.
 
 **Done when:** `docs/checks-a.md` has pass/fail, tx hashes and gas for each check. Any failure is posted to B with the
-fallback chosen. B has the Arkiv access key and the app names (handoff H4).
+fallback chosen. B has the app names (handoff H4). The Arkiv access key stays in `apps/api/.env`, never in a browser.
 
 ## A2 · `DriveRegistry`, part 1 (H3–H7)
 - **Setup:**
@@ -142,6 +142,9 @@ In `packages/core` (TypeScript, vitest, fast-check):
     `rooms.cloakroom.eth`;
   - queued and sent **in a batch every 10 minutes**;
   - once per key per day; global budget; balance floor.
+- **`POST /arkiv-rpc`:** a JSON-RPC pass-through to `ARKIV_RPC_URL` that adds `ARKIV_ACCESS_KEY` server-side (Arkiv's
+  guidance: never ship the key in a browser bundle). Forward only the read methods the client uses plus
+  `eth_sendRawTransaction`; rate-limit; log nothing.
 - **`POST /upload`:** the signature must be from a key with WRITE now (`wasAllowed` at the current time); 25 MB cap;
   quota per key; stamp budget guard; streams to Bee with `POSTAGE_BATCH_ID`.
 - **`GET /health`.**
