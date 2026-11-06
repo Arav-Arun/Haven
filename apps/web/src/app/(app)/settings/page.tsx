@@ -133,6 +133,8 @@ function Account() {
       if (what === "maintain") setRan(await client.maintain());
       else {
         await client.signOut();
+        // The quick-start lists of this tab belong to the account that just left.
+        for (const k of Object.keys(sessionStorage)) if (k.startsWith("haven:view:")) sessionStorage.removeItem(k);
         setIdentity(null);
         router.push("/");
       }

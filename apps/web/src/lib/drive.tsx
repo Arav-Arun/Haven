@@ -3,7 +3,7 @@
 import { createDriveClient, type HavenClient } from "@haven/core";
 import { createWebStorage, requestVerifiedKeys } from "@haven/platform";
 import type { Identity, KeyValueStore, Receipt } from "@haven/types";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { getAnon } from "./anon";
 import { CLIENT_NEEDS, config, missingConfig } from "./config";
 
@@ -176,18 +176,35 @@ export function useDrive(): DriveState {
  */
 export function useLoad<T>(load: ((c: HavenClient) => Promise<T>) | null, deps: unknown[], cache?: string) {
   const { client, identity, profile } = useDrive();
+  const identityRef = useRef<string | null>(null);
+  identityRef.current = identity?.driveKey ?? null;
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [loading, setLoading] = useState(false);
   const [tick, setTick] = useState(0);
-  const key = cache && identity ? `haven:view:${profile}:${identity.driveKey}:${cache}` : null;
+  // Keyed by tab profile, not by the account: the account is only known after start-up lookups, which is what this is
+  // here to skip. Each entry records whose it is, and is dropped if a different account turns out to be signed in.
+  const key = cache ? `haven:view:${profile}:${cache}` : null;
+  const me = identity?.driveKey ?? null;
+  useEffect(() => {
+    if (!key || !me) return;
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(key) ?? "null") as { who: string | null; data: T } | null;
+      if (saved?.who && saved.who !== me) {
+        sessionStorage.removeItem(key);
+        setData(null);
+      }
+    } catch {
+      // ignore
+    }
+  }, [key, me]);
   useEffect(() => {
     if (!client || !load) return;
     let live = true;
     if (key) {
       try {
-        const saved = sessionStorage.getItem(key);
-        if (saved) setData(JSON.parse(saved) as T);
+        const saved = JSON.parse(sessionStorage.getItem(key) ?? "null") as { who: string | null; data: T } | null;
+        if (saved && (!me || !saved.who || saved.who === me)) setData(saved.data);
       } catch {
         // a cache that can't be read is just skipped
       }
@@ -200,7 +217,7 @@ export function useLoad<T>(load: ((c: HavenClient) => Promise<T>) | null, deps: 
         setData(d);
         if (key) {
           try {
-            sessionStorage.setItem(key, JSON.stringify(d));
+            sessionStorage.setItem(key, JSON.stringify({ who: identityRef.current, data: d }));
           } catch {
             // full or not serialisable: no cache, nothing else changes
           }
