@@ -110,7 +110,7 @@ addresses go to `packages/core/src/generated.ts` via `pnpm --filter @haven/core 
 | Done when | Status |
 |---|---|
 | `forge test` passes, including invariants and the fork test | **Pass, 35 tests:** 26 unit/fuzz (1,024 fuzz runs each), the invariant suite (256 runs × 64 calls, 0 unexpected reverts), the 6 check-2 tests, and the 2 fork tests against live Sepolia (block pinned in `deployments/sepolia.json`). The fork run used a public RPC, which only keeps recent state, so it ran at the then-latest block |
-| Implementation verified on Etherscan | Pending funds and `ETHERSCAN_API_KEY`. `pnpm --filter @haven/core bootstrap` deploys it (about 31.3M gas, measured on a fork) and runs `forge verify-contract` |
+| Implementation verified on Etherscan | **Pass.** Deployed by `pnpm --filter @haven/core bootstrap` and verified: [`0x779Ee739785907454748aAfed760130Bdf0b7628`](https://sepolia.etherscan.io/address/0x779Ee739785907454748aAfed760130Bdf0b7628#code). `haven.eth` registry `0xd20bC8330a9E9fCc14B8111Ab0D2CA5626Fc0632`, `rooms.haven.eth` `0x951D7D861710dcb645013eD1Fb3A0589980174db` (all in `contracts/deployments/sepolia.json`) |
 | Demo proxy on Sepolia: grant → `wasAllowed` true → time passes → false, with the interval still readable | **Pass on the fork.** Live run ready: `pnpm --filter @haven/core a1` |
 | `upgradeToAndCall` reverts when called by K | Shown in tests (`test_upgradeReverts_forOwnerAndWallet_withAnyTarget`, a fuzz over any caller, and invariants) and on the fork for K and W. Live run ready: `a1` |
 

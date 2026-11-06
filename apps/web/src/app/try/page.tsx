@@ -80,8 +80,15 @@ function PersonaCard({ persona, client, onReady }: { persona: Persona; client: D
 export default function TryIt() {
   const router = useRouter();
   const { unavailable, setProfile } = useDrive();
-  const founder = useMemo(() => (typeof window === "undefined" ? null : makeClient("founder")), []);
-  const investor = useMemo(() => (typeof window === "undefined" ? null : makeClient("investor")), []);
+  // Made after mount, so the static HTML and the first client render match (no hydration mismatch).
+  const [clients, setClients] = useState<{ founder: ReturnType<typeof makeClient>; investor: ReturnType<typeof makeClient> } | null>(null);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setClients({ founder: makeClient("founder"), investor: makeClient("investor") });
+    setMounted(true);
+  }, []);
+  const founder = clients?.founder ?? null;
+  const investor = clients?.investor ?? null;
   const [ready, setReady] = useState<Record<Persona, Identity | null>>({ founder: null, investor: null });
   const onFounder = useMemo(() => (i: Identity) => setReady((r) => ({ ...r, founder: i })), []);
   const onInvestor = useMemo(() => (i: Identity) => setReady((r) => ({ ...r, investor: i })), []);
@@ -108,7 +115,7 @@ export default function TryIt() {
           {config.demoMode && <p className="mt-2 text-sm text-warn">Test network, 1-minute access windows.</p>}
         </div>
 
-        {!founder || !investor ? (
+        {!mounted ? null : !founder || !investor ? (
           <ClientUnavailable reason={unavailable ?? "No client."} />
         ) : (
           <>
