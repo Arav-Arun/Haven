@@ -9,7 +9,49 @@ import { Button, Dialog, ErrorNote, inputClass } from "./primitives";
 
 type Preset = "2m" | "1h" | "1d" | "1w" | "month" | "custom" | "never";
 
-function untilFor(preset: Preset, custom: string, now: Timestamp): Timestamp | null {
+const UNIT_SECONDS: Record<string, number> = {
+  s: 1, sec: 1, secs: 1, second: 1, seconds: 1,
+  m: 60, min: 60, mins: 60, minute: 60, minutes: 60,
+  h: 3600, hr: 3600, hrs: 3600, hour: 3600, hours: 3600,
+  d: 86_400, day: 86_400, days: 86_400,
+  w: 604_800, wk: 604_800, week: 604_800, weeks: 604_800,
+};
+
+/**
+ * "5m 30s", "5 min 30 sec", "1h30m", "2 hours", "3 days" → seconds. A bare number is minutes. null if it can't be read.
+ */
+export function parseDuration(text: string): number | null {
+  const t = text.trim().toLowerCase().replace(/,|\band\b/g, " ");
+  if (!t) return null;
+  if (/^\d+(\.\d+)?$/.test(t)) return Math.round(Number(t) * 60);
+  let total = 0;
+  let rest = t;
+  const part = /^\s*(\d+(?:\.\d+)?)\s*([a-z]+)\s*/;
+  while (rest.length) {
+    const m = rest.match(part);
+    if (!m) return null;
+    const unit = UNIT_SECONDS[m[2]!];
+    if (!unit) return null;
+    total += Number(m[1]) * unit;
+    rest = rest.slice(m[0].length);
+  }
+  return total > 0 ? Math.round(total) : null;
+}
+
+/** "5 minutes 30 seconds" for a number of seconds. */
+function spell(seconds: number): string {
+  const units: [number, string][] = [[86_400, "day"], [3600, "hour"], [60, "minute"], [1, "second"]];
+  const out: string[] = [];
+  let left = seconds;
+  for (const [n, name] of units) {
+    const q = Math.floor(left / n);
+    if (q) out.push(`${q} ${name}${q === 1 ? "" : "s"}`);
+    left -= q * n;
+  }
+  return out.slice(0, 3).join(" ");
+}
+
+function untilFor(preset: Preset, custom: string, now: Timestamp, customAt = ""): Timestamp | null {
   switch (preset) {
     case "2m":
       return now + 120;
@@ -23,8 +65,11 @@ function untilFor(preset: Preset, custom: string, now: Timestamp): Timestamp | n
       const d = new Date();
       return Math.floor(new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime() / 1000) - 1;
     }
-    case "custom":
-      return custom ? Math.floor(new Date(custom).getTime() / 1000) : null;
+    case "custom": {
+      if (customAt) return Math.floor(new Date(customAt).getTime() / 1000);
+      const secs = parseDuration(custom);
+      return secs === null ? null : now + secs;
+    }
     case "never":
       return null;
   }
@@ -113,6 +158,9 @@ export function ShareDialog({
   const [role, setRole] = useState<Role>("viewer");
   const [preset, setPreset] = useState<Preset>(demoMode ? "2m" : "1w");
   const [custom, setCustom] = useState("");
+  /** "Pick a date and time" instead of typing a duration. */
+  const [customAt, setCustomAt] = useState("");
+  const [pickDate, setPickDate] = useState(false);
   const [hide, setHide] = useState(true);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<unknown>(null);
@@ -184,7 +232,7 @@ export function ShareDialog({
     };
   }, [team, to]);
 
-  const until = untilFor(preset, custom, nowSeconds());
+  const until = untilFor(preset, custom, nowSeconds(), pickDate ? customAt : "");
   const keyBlocked = !!key && (key.changedSinceLastShare || !key.matchesEns || !!key.problem);
   const recipient =
     to === "name" ? (lookup.state === "ok" && !keyBlocked ? lookup.ensName : null) : to === "team" ? (preview && preview !== "checking" && preview.ready.length ? preview.parent : null) : group || null;
@@ -195,7 +243,7 @@ export function ShareDialog({
     setPending(true);
     setError(null);
     try {
-      const opts = { role, until: untilFor(preset, custom, nowSeconds()), hideFromMembers: hide };
+      const opts = { role, until: untilFor(preset, custom, nowSeconds(), pickDate ? customAt : ""), hideFromMembers: hide };
       if (to === "team" && onShareTeam) setTeamDone({ parent: recipient, ...(await onShareTeam(recipient, opts)) });
       else setDone(await onShare(recipient, opts));
     } catch (e) {
@@ -403,14 +451,38 @@ export function ShareDialog({
               ))}
             </div>
             {preset === "custom" && (
-              <input
-                type="datetime-local"
-                className={inputClass}
-                value={custom}
-                onChange={(e) => setCustom(e.target.value)}
-                aria-label="Custom end date"
-                required
-              />
+              <div className="flex flex-col gap-1.5">
+                {pickDate ? (
+                  <input
+                    type="datetime-local"
+                    className={inputClass}
+                    value={customAt}
+                    onChange={(e) => setCustomAt(e.target.value)}
+                    aria-label="Access ends at"
+                    required
+                  />
+                ) : (
+                  <input
+                    className={inputClass}
+                    value={custom}
+                    onChange={(e) => setCustom(e.target.value)}
+                    placeholder="How long? e.g. 5m 30s, 2 hours, 3 days"
+                    aria-label="How long access lasts"
+                    autoFocus
+                    required
+                  />
+                )}
+                <p className={cx("text-xs", until !== null && until > nowSeconds() ? "text-private" : "text-muted")}>
+                  {until !== null && until > nowSeconds()
+                    ? `${pickDate ? "Ends" : `${spell(until - nowSeconds())}, ends`} ${new Date(until * 1000).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit", second: "2-digit" })}`
+                    : pickDate
+                      ? "Pick when access ends."
+                      : "Type a length like 5m 30s, 90 minutes, 2h or 1 week."}{" "}
+                  <button type="button" className="font-medium text-action underline-offset-2 hover:underline" onClick={() => setPickDate((v) => !v)}>
+                    {pickDate ? "Type a length instead" : "Pick a date and time"}
+                  </button>
+                </p>
+              </div>
             )}
             <p className="text-muted">New files will be locked for them after this date. What they already opened, they keep.</p>
           </fieldset>

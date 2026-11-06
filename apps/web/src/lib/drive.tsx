@@ -170,25 +170,48 @@ export function useDrive(): DriveState {
 }
 
 /** Runs `load` with the client whenever its inputs change, with loading and error state. */
-export function useLoad<T>(load: ((c: HavenClient) => Promise<T>) | null, deps: unknown[]) {
-  const { client } = useDrive();
+/**
+ * Loads something from the client. With `cache`, the last result for this account is shown at once (sessionStorage:
+ * kept across a refresh, gone when the tab closes) while a fresh one loads behind it, so pages don't open empty.
+ */
+export function useLoad<T>(load: ((c: HavenClient) => Promise<T>) | null, deps: unknown[], cache?: string) {
+  const { client, identity, profile } = useDrive();
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [loading, setLoading] = useState(false);
   const [tick, setTick] = useState(0);
+  const key = cache && identity ? `haven:view:${profile}:${identity.driveKey}:${cache}` : null;
   useEffect(() => {
     if (!client || !load) return;
     let live = true;
+    if (key) {
+      try {
+        const saved = sessionStorage.getItem(key);
+        if (saved) setData(JSON.parse(saved) as T);
+      } catch {
+        // a cache that can't be read is just skipped
+      }
+    }
     setLoading(true);
     setError(null);
     load(client)
-      .then((d) => live && setData(d))
+      .then((d) => {
+        if (!live) return;
+        setData(d);
+        if (key) {
+          try {
+            sessionStorage.setItem(key, JSON.stringify(d));
+          } catch {
+            // full or not serialisable: no cache, nothing else changes
+          }
+        }
+      })
       .catch((e) => live && setError(e))
       .finally(() => live && setLoading(false));
     return () => {
       live = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [client, tick, ...deps]);
+  }, [client, tick, key, ...deps]);
   return { data, error, loading, reload: () => setTick((t) => t + 1) };
 }

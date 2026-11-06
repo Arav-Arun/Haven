@@ -83,7 +83,7 @@ export function FolderListPage({
 }) {
   const router = useRouter();
   const now = useNow(5000);
-  const list = useLoad((c) => c.listFolders(which), [which]);
+  const list = useLoad((c) => c.listFolders(which), [which], `folders:${which}`);
   const [open, setOpen] = useState(false);
   const go = (f: Folder) => router.push(`/drive?f=${f.registry}`);
 

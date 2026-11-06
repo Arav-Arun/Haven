@@ -15,7 +15,7 @@ function Shared() {
   const router = useRouter();
   const now = useNow(1000);
   const { client } = useDrive();
-  const shares = useLoad((c) => c.sharedWithMe(), []);
+  const shares = useLoad((c) => c.sharedWithMe(), [], "shared");
   const reload = useRef(shares.reload);
   reload.current = shares.reload;
   // Add-on F4: rooms already shared with you update within seconds through their doorbells.

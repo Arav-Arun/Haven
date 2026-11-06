@@ -169,11 +169,11 @@ export function FolderView({ client, folder }: { client: HavenClient; folder: Ad
   const router = useRouter();
   const { receipts } = useDrive();
   const now = useNow(1000);
-  const info = useLoad((c) => c.getFolder(folder), [folder]);
-  const subfolders = useLoad((c) => c.listFolders(folder), [folder]);
-  const files = useLoad((c) => c.listFiles(folder), [folder]);
-  const members = useLoad((c) => c.listMembers(folder), [folder]);
-  const rules = useLoad((c) => c.listSubtreeRules(folder), [folder]);
+  const info = useLoad((c) => c.getFolder(folder), [folder], `folder:${folder}`);
+  const subfolders = useLoad((c) => c.listFolders(folder), [folder], `subfolders:${folder}`);
+  const files = useLoad((c) => c.listFiles(folder), [folder], `files:${folder}`);
+  const members = useLoad((c) => c.listMembers(folder), [folder], `members:${folder}`);
+  const rules = useLoad((c) => c.listSubtreeRules(folder), [folder], `rules:${folder}`);
   const [live, setLive] = useState<LiveStatus | null>(null);
   const reloaders = useRef({ files, members, info, rules });
   reloaders.current = { files, members, info, rules };
