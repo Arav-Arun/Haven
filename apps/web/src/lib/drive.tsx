@@ -11,6 +11,12 @@ import { CLIENT_NEEDS, config, missingConfig } from "./config";
 
 /** Whose keys this tab is using: your own, or one of the two "Try it" personas, each with its own storage. */
 export type Profile = "me" | "founder" | "investor";
+
+/** How the two "Try it" personas are named on screen (the ids stay as they are, so saved sessions keep working). */
+export const PERSONA = {
+  founder: { name: "owner", title: "The owner", label: "owner" },
+  investor: { name: "recipient", title: "The recipient", label: "guest" },
+} as const;
 const PROFILE_KEY = "haven:profile";
 
 function storageName(p: Profile) {

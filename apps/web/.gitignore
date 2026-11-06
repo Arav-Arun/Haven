@@ -3,3 +3,5 @@ public/anon-rpc-iframe.html
 next-env.d.ts
 *.tsbuildinfo
 AGENTS.md
+.vercel
+.env*

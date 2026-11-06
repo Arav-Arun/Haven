@@ -7,13 +7,13 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { ClientUnavailable } from "@/components/Gate";
 import { config } from "@/lib/config";
-import { makeClient, useDrive, type Profile } from "@/lib/drive";
+import { makeClient, PERSONA, useDrive, type Profile } from "@/lib/drive";
 
 type Persona = Exclude<Profile, "me">;
 
 function randomLabel(p: Persona): string {
   const bytes = crypto.getRandomValues(new Uint8Array(3));
-  return `${p}-${Array.from(bytes, (b) => b.toString(36).padStart(2, "0")).join("").slice(0, 5)}`;
+  return `${PERSONA[p].label}-${Array.from(bytes, (b) => b.toString(36).padStart(2, "0")).join("").slice(0, 5)}`;
 }
 
 /** One persona: a fresh random key on this device, and a real name claimed for it on Sepolia. */
@@ -57,17 +57,17 @@ function PersonaCard({ persona, client, onReady }: { persona: Persona; client: D
   return (
     <div className="flex flex-col gap-3">
       {identity?.ensName ? (
-        <Ticket address={identity.driveKey} href={`${config.explorerUrl}/address/${identity.driveKey}`} title={identity.ensName} subtitle={`The ${persona}`} role="owner" until={null} now={now} />
+        <Ticket address={identity.driveKey} href={`${config.explorerUrl}/address/${identity.driveKey}`} title={identity.ensName} subtitle={PERSONA[persona].title} role="owner" until={null} now={now} />
       ) : (
         <div className="flex flex-col gap-3 surface rounded-2xl p-4">
-          <h2 className="font-semibold">The {persona}</h2>
+          <h2 className="font-semibold">{PERSONA[persona].title}</h2>
           <p className="text-sm text-muted">
             {persona === "founder"
-              ? "Makes a data room, adds files, and shares it with the investor's name."
+              ? "Makes a private folder, adds files, and shares it with the recipient's name."
               : "Gets the share, opens the files, and sees new ones lock when access ends."}
           </p>
           <Button variant="primary" className="self-start" pending={pending} onClick={setUp}>
-            Make the {persona}
+            Make the {PERSONA[persona].name}
           </Button>
           {receipt && !receipt.done && <ReceiptSteps receipt={receipt} />}
           <ErrorNote error={error} />
@@ -126,14 +126,14 @@ export default function TryIt() {
             {ready.founder && ready.investor && (
               <div className="flex flex-col gap-3 surface rounded-2xl p-4">
                 <p>
-                  Start as the founder: make a room, drop in a file, and share it with <strong>{ready.investor.ensName}</strong>{" "}
-                  for a few minutes. Then switch to the investor from the bar at the top.
+                  Start as the owner: make a room, drop in a file, and share it with <strong>{ready.investor.ensName}</strong>{" "}
+                  for a few minutes. Then switch to the recipient from the bar at the top.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <Button variant="primary" onClick={() => start("founder")}>
-                    Start as the founder
+                    Start as the owner
                   </Button>
-                  <Button onClick={() => start("investor")}>Start as the investor</Button>
+                  <Button onClick={() => start("investor")}>Start as the recipient</Button>
                 </div>
               </div>
             )}

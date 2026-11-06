@@ -40,30 +40,31 @@ export function Ticket({
           target="_blank"
           rel="noreferrer noopener"
           title={`${address}: view on Etherscan`}
-          className="group flex w-[72px] shrink-0 flex-col items-center justify-center px-1 text-stamp"
+          className="group flex w-[88px] shrink-0 flex-col items-center justify-center gap-1 px-1.5 text-stamp"
         >
-          <span className="text-[10px] leading-none">No.</span>
-          <span className="font-display text-[22px] font-bold leading-none tracking-[-0.02em] [font-variant-numeric:tabular-nums] group-hover:underline">
+          <span className="text-[10px] font-medium uppercase leading-none tracking-[0.08em] opacity-70">No.</span>
+          <span className="font-display text-[18px] font-bold leading-none tracking-[0.01em] [font-variant-numeric:tabular-nums] group-hover:underline">
             {ticketSerial(address)}
           </span>
-          <span className="mt-1 text-[10px] leading-none underline decoration-stamp/40 underline-offset-2">Etherscan</span>
+          <span className="text-[10px] leading-none underline decoration-stamp/40 underline-offset-2">Etherscan</span>
         </a>
       ) : (
-        <div className="flex w-[72px] shrink-0 flex-col items-center justify-center px-1 text-stamp" title={address}>
-          <span className="text-[10px] leading-none">No.</span>
-          <span className="font-display text-[22px] font-bold leading-none tracking-[-0.02em] [font-variant-numeric:tabular-nums]">
+        <div className="flex w-[88px] shrink-0 flex-col items-center justify-center gap-1 px-1.5 text-stamp" title={address}>
+          <span className="text-[10px] font-medium uppercase leading-none tracking-[0.08em] opacity-70">No.</span>
+          <span className="font-display text-[18px] font-bold leading-none tracking-[0.01em] [font-variant-numeric:tabular-nums]">
             {ticketSerial(address)}
           </span>
         </div>
       )}
-      <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3 pl-4 pr-3">
+      <div className="@container flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-4 gap-y-1.5 py-3 pl-4 pr-3">
         <div className="min-w-0">
           <p className="truncate font-medium">{title}</p>
           {subtitle && <p className="truncate text-sm text-ink/70">{subtitle}</p>}
           {tags && <div className="mt-1.5 flex flex-wrap gap-1.5">{tags}</div>}
         </div>
         <div className="flex items-center gap-3">
-          <div className="text-right">
+          {/* Right-aligned beside the name; left-aligned under it when the ticket is too narrow for one line. */}
+          <div className="text-left @[24rem]:text-right">
             <p className="text-sm font-medium">{ROLE_LABEL[role]}</p>
             <p
               className={cx("text-sm", ended ? "text-stamp" : "text-ink/70")}

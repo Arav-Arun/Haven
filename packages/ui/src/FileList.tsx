@@ -137,30 +137,45 @@ export function FileRows({ files, now, proved, ...actions }: { files: FileEntry[
 }
 
 /** A small header for a folder: name, my role, and the folder-level actions. */
-export function FolderHeader({ folder, now, children }: { folder: Folder; now: Timestamp; children?: ReactNode }) {
+export function FolderHeader({
+  folder,
+  now,
+  badge,
+  children,
+}: {
+  folder: Folder;
+  now: Timestamp;
+  /** Sits beside the title (the live-updates pill). */
+  badge?: ReactNode;
+  children?: ReactNode;
+}) {
+  const chip = "inline-flex items-center gap-1.5 rounded-full bg-white/70 px-2.5 py-1 ring-1 ring-ink/[0.06]";
   return (
-    <div className="flex flex-wrap items-end justify-between gap-3">
+    <div className="flex flex-col gap-4">
       <div className="min-w-0">
-        <h1 className="truncate text-3xl font-bold tracking-[-0.035em]">{folder.displayName}</h1>
-        <p className="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-muted">
-          {folder.kind === "room" && <span>Unlinked room.</span>}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <h1 className="min-w-0 truncate text-3xl font-bold tracking-[-0.035em]">{folder.displayName}</h1>
+          {badge}
+        </div>
+        <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[13px] text-muted">
+          {folder.kind === "room" && <span className={chip}>Unlinked room</span>}
           {folder.kind === "group" && (
-            <span className="inline-flex items-center gap-1">
-              <Users size={14} aria-hidden /> Group.
+            <span className={chip}>
+              <Users size={13} aria-hidden /> Group
             </span>
           )}
           {folder.myAccess && (
-            <span>
-              You&apos;re {folder.myAccess.role === "owner" ? "the owner" : `a ${ROLE_LABEL[folder.myAccess.role].toLowerCase()}`}
-              {folder.myAccess.until !== null && `. ${formatUntil(folder.myAccess.until, now)}`}.
+            <span className={chip}>
+              {folder.myAccess.role === "owner" ? "You're the owner" : `You're a ${ROLE_LABEL[folder.myAccess.role].toLowerCase()}`}
             </span>
           )}
-          <span className="truncate" title={folder.ensName}>
+          {folder.myAccess && folder.myAccess.until !== null && <span className={chip}>{formatUntil(folder.myAccess.until, now)}</span>}
+          <span className={cx(chip, "min-w-0 max-w-full truncate font-mono text-[12px]")} title={folder.ensName}>
             {folder.ensName}
           </span>
-        </p>
+        </div>
       </div>
-      {children && <div className="flex flex-wrap gap-2">{children}</div>}
+      {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
     </div>
   );
 }

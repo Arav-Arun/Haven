@@ -10,7 +10,7 @@ import {
   FilePreview,
   FolderHeader,
   FolderRows,
-  FxLabel,
+  buttonClass,
   MembersPanel,
   NewFolderDialog,
   RefreshPendingBanner,
@@ -24,7 +24,7 @@ import {
   useNow,
   type UploadItem,
 } from "@haven/ui";
-import { ArrowLeft, Copy, ExternalLink, Eye, FolderDown, FolderPlus, Radio, Share2, Timer } from "lucide-react";
+import { ArrowLeft, Copy, ExternalLink, Eye, FolderDown, FolderPlus, Share2, Timer } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -148,11 +148,18 @@ function VersionsDialog({ client, file, onClose }: { client: HavenClient; file: 
 function LiveBadge({ status }: { status: LiveStatus | null }) {
   if (!status || status.mode === "off") return null;
   return status.mode === "live" ? (
-    <span className="inline-flex items-center gap-1.5 text-xs text-private" title="New files and member changes appear within seconds (Swarm pub/sub). Each one is checked against Arkiv first.">
-      <Radio size={12} aria-hidden /> Live
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full bg-private/10 px-2.5 py-1 text-xs font-semibold text-private"
+      title="New files and member changes appear within seconds (Swarm pub/sub). Each one is checked against Arkiv first."
+    >
+      <span className="relative flex size-2">
+        <span className="absolute inline-flex size-full animate-ping rounded-full bg-private/60" />
+        <span className="relative inline-flex size-2 rounded-full bg-private" />
+      </span>
+      Live
     </span>
   ) : (
-    <span className="inline-flex items-center gap-1.5 text-xs text-muted" title={status.detail}>
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-ink/5 px-2.5 py-1 text-xs font-medium text-muted" title={status.detail}>
       <Timer size={12} aria-hidden /> Checking every 30 s
     </span>
   );
@@ -242,11 +249,14 @@ export function FolderView({ client, folder }: { client: HavenClient; folder: Ad
 
   return (
     <div className="flex flex-col gap-6">
-      <Link href={backHref(f)} className="inline-flex items-center gap-1 self-start text-sm text-muted hover:text-ink">
+      <Link
+        href={backHref(f)}
+        className="-mb-2 inline-flex min-h-9 items-center gap-1.5 self-start rounded-full bg-white/70 py-1.5 pl-2.5 pr-3.5 text-sm font-medium text-muted ring-1 ring-ink/[0.06] transition-colors hover:bg-white hover:text-ink"
+      >
         <ArrowLeft size={16} aria-hidden /> Back
       </Link>
 
-      <FolderHeader folder={f} now={now}>
+      <FolderHeader folder={f} now={now} badge={<LiveBadge status={live} />}>
         {canManage && (
           <Button variant="primary" onClick={() => setShareOpen(true)}>
             <Share2 size={16} aria-hidden /> {f.kind === "group" ? "Add to group" : "Share"}
@@ -277,24 +287,19 @@ export function FolderView({ client, folder }: { client: HavenClient; folder: Ad
             {zipProgress === null ? "Download folder" : `Downloading ${Math.round(zipProgress * 100)}%`}
           </Button>
         )}
-        <Link href={`/public?f=${folder}`} className="fx inline-flex min-h-10 items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold">
-          <FxLabel>
-            <Eye size={16} aria-hidden /> Public view
-          </FxLabel>
+        <Link href={`/public?f=${folder}`} className={buttonClass("quiet")}>
+          <Eye size={16} aria-hidden /> Public view
         </Link>
         <a
           href={`${config.explorerUrl}/address/${folder}`}
           target="_blank"
           rel="noreferrer noopener"
           title="This folder is its own ENS registry contract on Sepolia"
-          className="fx inline-flex min-h-10 items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold"
+          className={buttonClass("quiet")}
         >
-          <FxLabel>
-            <ExternalLink size={16} aria-hidden /> View on Etherscan
-          </FxLabel>
+          <ExternalLink size={16} aria-hidden /> View on Etherscan
         </a>
       </FolderHeader>
-      <LiveBadge status={live} />
       <ErrorNote error={zipError} />
 
       {f.refreshPending && <RefreshPendingBanner />}

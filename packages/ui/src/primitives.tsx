@@ -34,6 +34,14 @@ export function FxLabel({ children }: { children: ReactNode }) {
   );
 }
 
+const BUTTON_BASE =
+  "inline-flex min-h-10 items-center justify-center gap-2 rounded-full px-4.5 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-55";
+
+/** A Button's look, for links that should match the buttons beside them. */
+export function buttonClass(variant: Variant = "secondary", className?: string): string {
+  return cx(BUTTON_BASE, VARIANT[variant], className);
+}
+
 export function Button({
   variant = "secondary",
   pending = false,
@@ -47,11 +55,7 @@ export function Button({
       {...rest}
       disabled={disabled || pending}
       aria-busy={pending || undefined}
-      className={cx(
-        "inline-flex min-h-10 items-center justify-center gap-2 rounded-full px-4.5 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-55",
-        VARIANT[variant],
-        className,
-      )}
+      className={buttonClass(variant, className)}
     >
       {pending && <LoaderCircle size={16} className="animate-spin" aria-hidden />}
       {variant === "quiet" ? children : <FxLabel>{children}</FxLabel>}

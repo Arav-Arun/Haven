@@ -1,73 +1,21 @@
 "use client";
 
-// The loading cover: on every page load and every move to another page, a drop of clear glass lands over the screen,
-// spreads into a tile, holds Haven's logo while its rim bends it into colour, then lets go. If the next page is still
-// loading by then, the logo stays until it arrives (up to MAX_WAIT_MS); then the cover fades into the page.
-// Clicking a link starts it at once, so it covers the load instead of following it. Opening a folder inside the same
-// page and #section links don't trigger it. A click or Escape skips it; reduced motion gets the still logo instead.
+// The loading cover: on every page load and every move to another page, soft blue ink splashes out from the middle of
+// the screen with no edges, Haven's shield and name settle in its centre, and the cover fades into the page. If the
+// next page is still loading by then, the logo stays until it arrives (up to MAX_WAIT_MS). Clicking a link starts it
+// at once, so it covers the load instead of following it. Opening a folder inside the same page and #section links
+// don't trigger it. A click or Escape skips it; reduced motion gets the still logo instead.
 
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { LIGHT_GLASS, playGlassReveal, prepareLogo, type GlassSettings, type LogoData } from "./glass";
 import "./intro.css";
 
-/** The page colour (styles.css --color-paper): the canvas paints it, so the fade at the end is seamless. */
-const PAGE = "#eef3fa";
-
-const SETTINGS: GlassSettings = { ...LIGHT_GLASS, background: PAGE, tileSize: 360, logoScale: 0.66, finalScale: 0.8 };
-const SPEED = 1.2;
+/** How long the splash plays before the cover may leave. */
+const REVEAL_MS = 1100;
 /** The longest the finished logo waits for a slow page before fading anyway. */
 const MAX_WAIT_MS = 10_000;
 const FADE_MS = 700;
-
-// Haven's mark (public/haven-mark.webp, white on transparent), tinted the same ink as the name.
-const INK = "#0d1b33";
-
-/** The mark and "Haven" side by side, in the page's own font, as on the landing page's nav. */
-async function drawHavenLogo(): Promise<HTMLCanvasElement> {
-  const mark = new Image();
-  mark.src = "/haven-mark.webp";
-  await mark.decode();
-
-  const size = 512;
-  const fontPx = Math.round(size * 0.62);
-  const gap = Math.round(size * 0.3);
-  const family = getComputedStyle(document.documentElement).getPropertyValue("--font-hanken").trim() || "sans-serif";
-  const font = `700 ${fontPx}px ${family}`;
-  await document.fonts.load(font).catch(() => undefined);
-
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d")!;
-  const setText = () => {
-    ctx.font = font;
-    ctx.letterSpacing = `${-0.03 * fontPx}px`;
-  };
-  setText();
-  const textWidth = Math.ceil(ctx.measureText("Haven").width);
-  canvas.width = size + gap + textWidth + 32;
-  canvas.height = size;
-  setText(); // resizing the canvas resets its state
-  const ink = document.createElement("canvas");
-  ink.width = ink.height = size;
-  const inkCtx = ink.getContext("2d")!;
-  inkCtx.drawImage(mark, 0, 0, size, size);
-  inkCtx.globalCompositeOperation = "source-in";
-  inkCtx.fillStyle = INK;
-  inkCtx.fillRect(0, 0, size, size);
-  ctx.drawImage(ink, size * 0.08, size * 0.08, size * 0.84, size * 0.84);
-  ctx.fillStyle = INK;
-  ctx.textBaseline = "middle";
-  ctx.fillText("Haven", size + gap, size / 2 + fontPx * 0.04);
-  return canvas;
-}
-
-// Drawn and turned into textures once per page load (~100 ms); every later cover reuses it.
-let logoJob: Promise<LogoData> | null = null;
-function havenLogo() {
-  logoJob ??= drawHavenLogo().then(prepareLogo);
-  logoJob.catch(() => (logoJob = null));
-  return logoJob;
-}
+const MARK = "url(/haven-mark.webp) center / contain no-repeat";
 
 const pathOf = (p: string) => p.replace(/\/+$/, "") || "/";
 
@@ -85,7 +33,6 @@ function linkTarget(e: MouseEvent): string | null {
 
 export function Intro() {
   const pathname = usePathname();
-  const wrap = useRef<HTMLDivElement>(null);
   const [run, setRun] = useState(0);
   const [phase, setPhase] = useState<"show" | "leave" | "gone">("show");
   const phaseRef = useRef(phase);
@@ -105,31 +52,21 @@ export function Intro() {
     setRun((r) => r + 1);
   }, []);
 
-  // Each cover: play the reveal, then leave once the page underneath is there.
+  // Each cover: play the splash, then leave once the page underneath is there.
   useEffect(() => {
     const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    let cancelled = false;
-    let engine: ReturnType<typeof playGlassReveal> = null;
     let beat: ReturnType<typeof setTimeout> | undefined;
-    const finish = () => {
-      revealed.current = true;
-      // A short beat on the finished logo, then the fade. Still waiting: the page change below ends it.
-      if (!waiting.current) beat = setTimeout(leave, still ? 900 : 250);
-    };
+    const done = setTimeout(
+      () => {
+        revealed.current = true;
+        // A short beat on the finished logo, then the fade. Still waiting: the page change below ends it.
+        if (!waiting.current) beat = setTimeout(leave, still ? 600 : 200);
+      },
+      still ? 0 : REVEAL_MS,
+    );
     const cap = setTimeout(leave, MAX_WAIT_MS);
-    havenLogo()
-      .then((logo) => {
-        if (cancelled || !wrap.current) return;
-        engine = playGlassReveal(wrap.current, logo, SETTINGS, SPEED, finish, still);
-        if (!engine) finish();
-      })
-      .catch((err) => {
-        console.error(err);
-        if (!cancelled) finish();
-      });
     return () => {
-      cancelled = true;
-      engine?.dispose();
+      clearTimeout(done);
       clearTimeout(beat);
       clearTimeout(cap);
     };
@@ -176,7 +113,16 @@ export function Intro() {
   return (
     // Decoration only: screen readers go straight to the page. A fresh element per cover restarts the CSS safety net.
     <div key={run} aria-hidden className={`haven-intro${phase === "leave" ? " haven-intro-leave" : ""}`} onClick={leave}>
-      <div ref={wrap} className="absolute inset-0" />
+      <div className="haven-splash">
+        <span className="splash-ink splash-ink-1" />
+        <span className="splash-ink splash-ink-2" />
+        <span className="splash-ink splash-ink-3" />
+        <span className="splash-ink splash-ink-4" />
+      </div>
+      <div className="haven-intro-logo">
+        <span className="haven-intro-mark" style={{ WebkitMask: MARK, mask: MARK }} />
+        <span className="haven-intro-word">Haven</span>
+      </div>
     </div>
   );
 }

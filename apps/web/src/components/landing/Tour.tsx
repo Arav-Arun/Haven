@@ -40,9 +40,9 @@ const WORDS = ["maple", "harbor", "violin", "pebble", "summit", "otter", "velvet
 
 function ShareMock({ s }: { s: number }) {
   return (
-    <Window title="Share “Series A”">
+    <Window title="Share “Family documents”">
       <div className="flex items-center rounded-xl border border-[#0d1b33]/10 px-3 py-2.5 text-[14px]">
-        <span className="font-medium">investor.eth</span>
+        <span className="font-medium">sam.eth</span>
         <BadgeCheck size={16} className="ml-auto text-[#1d6b4b]" />
       </div>
       <p className="mt-3 text-[12px] font-medium text-[#0d1b33]/50">Their key, as eight words to compare in person</p>
@@ -58,7 +58,7 @@ function ShareMock({ s }: { s: number }) {
       </div>
       <div className="mt-3 flex flex-col gap-2">
         <Row tone="good" show={s >= 1}>
-          <BadgeCheck size={15} /> Shared. investor.eth holds a ticket until Friday.
+          <BadgeCheck size={15} /> Shared. sam.eth holds a ticket until Friday.
         </Row>
         <Row tone="blue" show={s >= 2}>
           <Eye size={15} /> On the chain: one new random address. Nothing says it&apos;s them.
@@ -70,7 +70,7 @@ function ShareMock({ s }: { s: number }) {
 
 function ExpiryMock({ s }: { s: number }) {
   return (
-    <Window title="Series A · as investor.eth sees it">
+    <Window title="Family documents · as sam.eth sees it">
       <div className="relative h-10">
         <div className="absolute inset-x-0 top-4 h-1.5 rounded-full bg-[#0d1b33]/10" />
         <div className="absolute left-0 top-4 h-1.5 rounded-full bg-[#1f4fd1] transition-[width] duration-700" style={{ width: s >= 1 ? "100%" : "62%" }} />
@@ -80,13 +80,13 @@ function ExpiryMock({ s }: { s: number }) {
       </div>
       <div className="mt-2 flex flex-col gap-2">
         <Row>
-          <BadgeCheck size={15} className="text-[#1d6b4b]" /> Deck.pdf <span className="ml-auto text-[#0d1b33]/50">Opens</span>
+          <BadgeCheck size={15} className="text-[#1d6b4b]" /> Lease.pdf <span className="ml-auto text-[#0d1b33]/50">Opens</span>
         </Row>
         <Row>
-          <BadgeCheck size={15} className="text-[#1d6b4b]" /> Financials.xlsx <span className="ml-auto text-[#0d1b33]/50">Opens</span>
+          <BadgeCheck size={15} className="text-[#1d6b4b]" /> Tax return.pdf <span className="ml-auto text-[#0d1b33]/50">Opens</span>
         </Row>
         <Row tone="bad" show={s >= 1}>
-          <ShieldAlert size={15} /> Final terms.pdf <span className="ml-auto">Locked: added after access ended</span>
+          <ShieldAlert size={15} /> Will, final.pdf <span className="ml-auto">Locked: added after access ended</span>
         </Row>
         <Row tone="blue" show={s >= 2}>
           <Clock3 size={15} /> No transaction needed. Their keys simply stop at the end date.
@@ -98,7 +98,7 @@ function ExpiryMock({ s }: { s: number }) {
 
 function TeamMock({ s }: { s: number }) {
   return (
-    <Window title="Members · Q3 board pack">
+    <Window title="Members · Research notes">
       <Row tone="blue">
         <AtSign size={15} /> Everyone at <b>acme.eth</b> <span className="ml-auto text-[12px]">synced just now</span>
       </Row>
@@ -119,10 +119,10 @@ function TeamMock({ s }: { s: number }) {
 }
 
 function PublicMock({ s }: { s: number }) {
-  const seen = ["This room exists, made 3 Nov", "3 addresses hold access, 1 ends Friday", "4 files, about 6 MB padded"];
-  const hidden = ["Who the 3 members are", "File names and real sizes", "Who owns the room"];
+  const seen = ["This folder exists, made 3 Nov", "3 addresses hold access, 1 ends Friday", "4 files, about 6 MB padded"];
+  const hidden = ["Who the 3 members are", "File names and real sizes", "Who owns the folder"];
   return (
-    <Window title="Public view · a data room">
+    <Window title="Public view · a private folder">
       <div className="grid gap-3 sm:grid-cols-2">
         <div className={`rounded-xl p-3 transition-colors duration-500 ${s === 0 ? "bg-[#f3f6fb]" : "bg-white ring-1 ring-[#0d1b33]/[0.06]"}`}>
           <p className="flex items-center gap-1.5 text-[12px] font-semibold text-[#0d1b33]/60"><Eye size={14} /> Anyone can see</p>
@@ -142,7 +142,7 @@ function PublicMock({ s }: { s: number }) {
 
 function KeyLogMock({ s }: { s: number }) {
   return (
-    <Window title="investor.eth · public key log">
+    <Window title="sam.eth · public key log">
       <div className="flex flex-wrap gap-1.5">
         {WORDS.map((w) => (
           <span key={w} className="rounded-md bg-[#e8efff] px-2 py-1 text-[12px] font-semibold text-[#173f9e]">{w}</span>

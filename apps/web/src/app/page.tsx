@@ -5,6 +5,7 @@ import { ArrowRight, Puzzle } from "lucide-react";
 import Link from "next/link";
 import "./landing.css";
 import { Apps, BuiltOn, Closing, Faq, Privacy, Tracks } from "@/components/landing/More";
+import { RealScreens, UseCases } from "@/components/landing/Screens";
 import { Nav } from "@/components/landing/Nav";
 import { Clouds } from "@/components/landing/Sky";
 import { Steps } from "@/components/landing/Steps";
@@ -29,15 +30,15 @@ export default function Home() {
             <div className="relative z-10 px-4 pt-24">
               <MissingConfig />
             </div>
-            <div className="hero-copy relative z-30 mx-auto flex max-w-5xl flex-1 flex-col items-center justify-center px-5 pb-40 pt-6 text-center sm:pb-48">
+            <div className="hero-copy relative z-30 mx-auto flex max-w-5xl flex-1 flex-col items-center justify-center px-5 pb-10 pt-6 text-center">
               <h1 className="display text-[12vw] text-white drop-shadow-[0_4px_30px_rgb(20_60_150_/_0.35)] sm:text-7xl lg:text-[88px]">
-                Share any file by name.
+                Keep anything private.
                 <br />
-                <span className="text-[#0d1b33]">Nobody learns who.</span>
+                <span className="text-[#0d1b33]">Share it without a trace.</span>
               </h1>
               <p className="mt-7 max-w-[40rem] text-lg leading-relaxed text-[#0d1b33]/80 sm:text-xl">
-                Haven encrypts files on your device and shares them with any ENS name. Each person gets a private ticket, and
-                their access ends on the date you pick.
+                Haven is stealth storage on open networks. Files are encrypted on your device and kept on Swarm. Share them
+                with any ENS name through a fresh address nobody can trace, until the date you pick.
               </p>
               <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
                 <Link href={primary.href} className="btn-clay fx inline-flex items-center gap-3 rounded-full py-2 pl-7 pr-2 text-[17px] font-semibold">
@@ -56,12 +57,26 @@ export default function Home() {
                 </Link>
               </div>
             </div>
+            {/* The real product, rising out of the clouds: the Public view from a Try it run on Sepolia. */}
+            <div className="relative z-20 mx-auto -mb-16 w-full max-w-[640px] px-5 sm:-mb-24">
+              <div className="rounded-[24px] bg-white/60 p-2 shadow-[0_40px_80px_-30px_rgb(13_27_51_/_0.55)] ring-1 ring-white/80 backdrop-blur">
+                <img
+                  src="/screens/public-view.webp"
+                  width={606}
+                  height={320}
+                  alt="Haven's Public view of a live data room: two random addresses and padded files is all anyone can see"
+                  className="h-auto w-full rounded-[18px]"
+                />
+              </div>
+            </div>
           </section>
         </div>
 
         <BuiltOn />
         <main>
+          <UseCases />
           <Steps />
+          <RealScreens />
           <Tour />
           <Tracks />
           <Privacy />

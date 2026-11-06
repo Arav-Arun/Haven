@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { config } from "@/lib/config";
-import { useDrive } from "@/lib/drive";
+import { PERSONA, useDrive } from "@/lib/drive";
 import { NetworkBadge } from "./NetworkBadge";
 
 const NAV: Omit<NavItem, "active">[] = [
@@ -25,12 +25,12 @@ function PersonaBar() {
   return (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-ink px-4 py-2.5 text-sm text-white shadow-[0_14px_30px_-18px_rgb(13_27_51/0.6)]">
       <span>
-        Try it: you&apos;re the {profile}
+        Try it: you&apos;re the {PERSONA[profile].name}
         {identity?.ensName ? ` (${identity.ensName})` : ""}.
       </span>
       <span className="flex gap-3">
         <button className="underline" onClick={() => setProfile(other)}>
-          Switch to the {other}
+          Switch to the {PERSONA[other].name}
         </button>
         <button className="underline" onClick={() => setProfile("me")}>
           Leave
