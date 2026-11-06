@@ -9,8 +9,6 @@ address, file and record you show is live and can be checked on Etherscan or the
   `https://eth-global-mumbai-six.vercel.app/try/`.
 - Use Chrome or Brave, not the built-in browser of an IDE: the private network (Anon-RPC Nox) runs in a sandboxed
   iframe that some embedded browsers block.
-- Install the extension from `/extension` (Download for Chrome → chrome://extensions → Developer mode → Load
-  unpacked), then **Settings → Connect extension**.
 - Have Etherscan (Sepolia) open in a second tab.
 
 ## 1. Opening (15 s)
@@ -50,10 +48,7 @@ transaction."
 1. **Receipts** (top right): each lookup is labelled **Private** (through Anon-RPC Nox) with its own isolation key
    per address and room, so the network can't link your shares.
 2. **Settings → Private network**: Nox is on.
-3. The extension's popup on the site: **Verified release 1.0.3 (or the latest)**. "The extension re-downloads every file of this page
-   and checks it against a release signed onchain (Arkiv) before it gives the page your keys. A tampered site gets a
-   red warning and no keys."
-4. The same build is on Swarm, and `haven.eth`'s contenthash points to it (show the Sepolia transaction).
+3. The same build is on Swarm, and `haven.eth`'s contenthash points to it (show the Sepolia transaction).
 
 ## 7. Close (15 s)
 "Open source, MIT. Runs on ENS, Arkiv, Swarm and Ethereum, not on our servers. Keep anything private, share it
@@ -78,4 +73,4 @@ without a trace."
 | ENS (Best use of ENSv2) | Name claim, folder = registry, roles that end on their own, share by name, team rules (A team tab) | Steps 2–3, Etherscan |
 | Arkiv (Build on Arkiv) | Sealed entries with expiry, public key log, Public view, explorer links | Step 4 |
 | Arkiv + Swarm bonus | Padded ciphertext uploads, live doorbells (the green **Live** pill), the site on Swarm | Steps 3, 6 |
-| EF (Anon-RPC, CROPS) | Private receipts, Nox, extension-verified release, no trackers, open source | Step 6 |
+| EF (Anon-RPC, CROPS) | Private receipts, Nox, signed releases on Swarm, no trackers, open source | Step 6 |

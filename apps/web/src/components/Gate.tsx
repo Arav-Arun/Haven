@@ -27,19 +27,9 @@ export function RequireClient({ children }: { children: (client: HavenClient) =>
 
 /** Renders children for a signed-in user, or points to sign-in. */
 export function RequireIdentity({ children }: { children: (client: HavenClient, identity: Identity) => ReactNode }) {
-  const { client, unavailable, restoring, identity, custodyProblem } = useDrive();
+  const { client, unavailable, restoring, identity } = useDrive();
   if (restoring) return <Skeleton />;
   if (!client) return <ClientUnavailable reason={unavailable ?? "No client."} />;
-  if (!identity && custodyProblem)
-    return (
-      <EmptyState icon={<ShieldAlert size={22} />} title="Your keys stayed in the extension">
-        <p>{custodyProblem}</p>
-        <p>
-          The extension gives your keys only to a page whose code matches a published Haven release. Check the extension&apos;s
-          toolbar icon for details.
-        </p>
-      </EmptyState>
-    );
   if (!identity)
     return (
       <EmptyState icon={<KeyRound size={22} />} title="Sign in to see your files">

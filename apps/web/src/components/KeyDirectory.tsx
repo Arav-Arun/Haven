@@ -1,15 +1,14 @@
 "use client";
 
 import type { DeviceInfo } from "@haven/core";
-import { extensionPresent } from "@haven/platform";
 import { Button, ErrorNote, FingerprintWords, Skeleton, formatAgo, formatDate, inputClass } from "@haven/ui";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAccount, useSignTypedData } from "wagmi";
-import { keysInExtension, setKeysInExtension, useDrive, useLoad } from "@/lib/drive";
+import { useDrive, useLoad } from "@/lib/drive";
 
-// Add-on F1 (public key log) and F3 (keys in the extension) controls, used by Settings and the profile page.
+// Add-on F1 (public key log) controls, used by Settings and the profile page.
 
 export function Devices({ now }: { now: number }) {
   const devices = useLoad((c) => c.listDevices(), []);
@@ -137,55 +136,6 @@ export function LinkName() {
       )}
       {done && <p className="mt-2 text-private">{done}</p>}
       <ErrorNote error={error} className="mt-2" />
-    </section>
-  );
-}
-
-/** "Keep keys in the extension": this site stops storing the seed and asks the extension, which checks the page first. */
-export function KeysInExtension() {
-  const { profile } = useDrive();
-  const [present, setPresent] = useState<boolean | null>(null);
-  const [on, setOn] = useState(false);
-  const [pending, setPending] = useState(false);
-  useEffect(() => {
-    setOn(keysInExtension());
-    void extensionPresent().then(setPresent);
-  }, []);
-  if (profile !== "me") return null;
-  return (
-    <section className="surface rounded-2xl p-5 text-sm">
-      <h2 className="font-medium">Verified page before keys</h2>
-      {present === false ? (
-        <p className="mt-1 text-muted">
-          Install the extension to verify this page before using your keys. It checks every file this site loads against the
-          published, open-source release, and won&apos;t hand your keys to a page that was changed.
-        </p>
-      ) : (
-        <>
-          <p className="mt-1 text-muted">
-            With this on, this website never stores your keys. Each time it opens, the extension compares the page&apos;s code with
-            the published release and only then hands the keys over. Connect the extension (below) first.
-          </p>
-          <label className="mt-3 flex items-center gap-2">
-            <input
-              type="checkbox"
-              className="accent-action"
-              checked={on}
-              disabled={pending || present === null}
-              onChange={async (e) => {
-                setPending(true);
-                try {
-                  await setKeysInExtension(e.target.checked);
-                  setOn(e.target.checked);
-                } finally {
-                  setPending(false);
-                }
-              }}
-            />
-            Keep my keys in the extension
-          </label>
-        </>
-      )}
     </section>
   );
 }

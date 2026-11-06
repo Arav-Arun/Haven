@@ -1,8 +1,8 @@
 "use client";
 
 import { createDriveClient, type HavenClient } from "@haven/core";
-import { createWebStorage, requestVerifiedKeys } from "@haven/platform";
-import type { Identity, KeyValueStore, Receipt } from "@haven/types";
+import { createWebStorage } from "@haven/platform";
+import type { Identity, Receipt } from "@haven/types";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { getAnon } from "./anon";
 import { CLIENT_NEEDS, config, missingConfig } from "./config";
@@ -23,42 +23,6 @@ function storageName(p: Profile) {
   return p === "me" ? "haven" : `haven-try-${p}`;
 }
 
-// ---------------------------------------------------------------- add-on F3: keys kept in the extension
-
-const CUSTODY_KEY = "haven:custody";
-const SEED_KEY = "seed";
-
-/** True when the user chose "Keep keys in the extension": the seed is then never written to this site's storage. */
-export function keysInExtension(): boolean {
-  return typeof window !== "undefined" && localStorage.getItem(CUSTODY_KEY) === "extension";
-}
-
-/** Turns extension custody on or off. Turning it on deletes the seed this site stored. */
-export async function setKeysInExtension(on: boolean): Promise<void> {
-  if (on) {
-    localStorage.setItem(CUSTODY_KEY, "extension");
-    await createWebStorage({ dbName: storageName("me") }).delete(SEED_KEY);
-  } else localStorage.removeItem(CUSTODY_KEY);
-}
-
-/** Keeps the seed in memory only while extension custody is on, so a swapped copy of this site finds nothing stored. */
-function custodyStorage(base: KeyValueStore): KeyValueStore {
-  const memory = new Map<string, Uint8Array>();
-  return {
-    get: (k) => (k === SEED_KEY && keysInExtension() ? Promise.resolve(memory.get(k) ?? null) : base.get(k)),
-    set: (k, v) => {
-      if (k === SEED_KEY && keysInExtension()) {
-        memory.set(k, v);
-        return Promise.resolve();
-      }
-      return base.set(k, v);
-    },
-    delete: (k) => {
-      memory.delete(k);
-      return base.delete(k);
-    },
-  };
-}
 
 function unavailableReason(): string | null {
   const missing = missingConfig(CLIENT_NEEDS);
@@ -72,7 +36,7 @@ export function makeClient(profile: Profile): HavenClient | null {
   const storage = createWebStorage({ dbName: storageName(profile) });
   return createDriveClient({
     anon: getAnon(),
-    storage: profile === "me" ? custodyStorage(storage) : storage,
+    storage,
     appOrigin: config.appOrigin,
     apiUrl: config.apiUrl,
     beeUrl: config.beeUrl,
@@ -94,8 +58,6 @@ interface DriveState {
   restoring: boolean;
   setIdentity: (i: Identity | null) => void;
   receipts: Receipt[];
-  /** Add-on F3: why the extension didn't hand this page its keys, when custody is on. */
-  custodyProblem: string | null;
 }
 
 const Ctx = createContext<DriveState | null>(null);
@@ -105,7 +67,6 @@ export function DriveProvider({ children }: { children: ReactNode }) {
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [restoring, setRestoring] = useState(true);
   const [receipts, setReceipts] = useState<Receipt[]>([]);
-  const [custodyProblem, setCustodyProblem] = useState<string | null>(null);
 
   useEffect(() => {
     const saved = sessionStorage.getItem(PROFILE_KEY);
@@ -123,21 +84,6 @@ export function DriveProvider({ children }: { children: ReactNode }) {
     let live = true;
     client
       .restore()
-      .then(async (i) => {
-        // Keys in the extension: nothing is stored here, so ask it. It checks this page's files first.
-        if (!i && profile === "me" && keysInExtension()) {
-          const keys = await requestVerifiedKeys();
-          if (!keys.ok) {
-            if (live) setCustodyProblem(keys.reason);
-            return null;
-          }
-          setCustodyProblem(null);
-          const me = await client.signIn({ kind: "seed", seed: keys.seed });
-          keys.seed.fill(0);
-          return me;
-        }
-        return i;
-      })
       .then((i) => live && setIdentity(i))
       .catch(() => live && setIdentity(null))
       .finally(() => live && setRestoring(false));
@@ -157,8 +103,8 @@ export function DriveProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ client, unavailable, profile, setProfile, identity, restoring, setIdentity, receipts, custodyProblem }),
-    [client, unavailable, profile, setProfile, identity, restoring, receipts, custodyProblem],
+    () => ({ client, unavailable, profile, setProfile, identity, restoring, setIdentity, receipts }),
+    [client, unavailable, profile, setProfile, identity, restoring, receipts],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
@@ -171,8 +117,8 @@ export function useDrive(): DriveState {
 
 /** Runs `load` with the client whenever its inputs change, with loading and error state. */
 /**
- * Loads something from the client. With `cache`, the last result for this account is shown at once (sessionStorage:
- * kept across a refresh, gone when the tab closes) while a fresh one loads behind it, so pages don't open empty.
+ * Loads something from the client. With `cache`, the last result for this account is shown at once (kept on this
+ * device until sign-out) while a fresh one loads behind it, so pages open with your folders straight away.
  */
 export function useLoad<T>(load: ((c: HavenClient) => Promise<T>) | null, deps: unknown[], cache?: string) {
   const { client, identity, profile } = useDrive();
@@ -189,9 +135,9 @@ export function useLoad<T>(load: ((c: HavenClient) => Promise<T>) | null, deps: 
   useEffect(() => {
     if (!key || !me) return;
     try {
-      const saved = JSON.parse(sessionStorage.getItem(key) ?? "null") as { who: string | null; data: T } | null;
+      const saved = JSON.parse(localStorage.getItem(key) ?? "null") as { who: string | null; data: T } | null;
       if (saved?.who && saved.who !== me) {
-        sessionStorage.removeItem(key);
+        localStorage.removeItem(key);
         setData(null);
       }
     } catch {
@@ -203,7 +149,7 @@ export function useLoad<T>(load: ((c: HavenClient) => Promise<T>) | null, deps: 
     let live = true;
     if (key) {
       try {
-        const saved = JSON.parse(sessionStorage.getItem(key) ?? "null") as { who: string | null; data: T } | null;
+        const saved = JSON.parse(localStorage.getItem(key) ?? "null") as { who: string | null; data: T } | null;
         if (saved && (!me || !saved.who || saved.who === me)) setData(saved.data);
       } catch {
         // a cache that can't be read is just skipped
@@ -217,7 +163,7 @@ export function useLoad<T>(load: ((c: HavenClient) => Promise<T>) | null, deps: 
         setData(d);
         if (key) {
           try {
-            sessionStorage.setItem(key, JSON.stringify({ who: identityRef.current, data: d }));
+            localStorage.setItem(key, JSON.stringify({ who: identityRef.current, data: d }));
           } catch {
             // full or not serialisable: no cache, nothing else changes
           }
