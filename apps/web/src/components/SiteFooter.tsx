@@ -10,6 +10,7 @@
 
 import { FxLabel } from "@haven/ui";
 import { ArrowUp } from "lucide-react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { HavenLogo } from "./landing/Logo";
@@ -111,7 +112,9 @@ function SiteFooter({ progress }: { progress: number }) {
 
       <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-x-10 gap-y-5 px-6 pt-8">
         <div className="flex flex-col gap-2">
-          <HavenLogo tone="light" size={30} />
+          <Link href="/" aria-label="Haven home" className="self-start">
+            <HavenLogo tone="light" size={30} />
+          </Link>
           <p className="text-sm text-white/60">
             Built at ETHGlobal Mumbai 2026 by Team <strong className="font-semibold text-white">Deploy For Good</strong>
           </p>

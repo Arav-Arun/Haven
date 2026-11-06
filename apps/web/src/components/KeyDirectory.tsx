@@ -3,6 +3,7 @@
 import type { DeviceInfo } from "@haven/core";
 import { extensionPresent } from "@haven/platform";
 import { Button, ErrorNote, FingerprintWords, Skeleton, formatAgo, formatDate, inputClass } from "@haven/ui";
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAccount, useSignTypedData } from "wagmi";
@@ -74,9 +75,17 @@ export function MyKey() {
       </p>
       {info.loading && !info.data && <Skeleton rows={1} />}
       <ErrorNote error={info.error} />
-      {info.data && <FingerprintWords words={info.data.fingerprint} className="mt-3" />}
-      <Link className="mt-3 inline-block underline" href={`/u/?n=${encodeURIComponent(identity.ensName)}`}>
-        Open your public profile
+      {info.data && (
+        <div className="mt-4 rounded-xl bg-paper px-3.5 py-3">
+          <p className="text-xs font-medium text-muted">Fingerprint, to compare in person</p>
+          <FingerprintWords words={info.data.fingerprint} className="mt-2 gap-1.5 [&>span]:px-2 [&>span]:py-0.5 [&>span]:text-xs" />
+        </div>
+      )}
+      <Link
+        className="mt-4 inline-flex items-center gap-1.5 font-semibold text-action hover:underline"
+        href={`/u/?n=${encodeURIComponent(identity.ensName)}`}
+      >
+        Open your public profile <ArrowRight size={14} aria-hidden />
       </Link>
     </section>
   );

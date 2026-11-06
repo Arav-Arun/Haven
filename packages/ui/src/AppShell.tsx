@@ -2,7 +2,7 @@
 
 import { useId, type ComponentType, type ReactNode } from "react";
 import { CloudBank } from "./Clouds";
-import { FxLabel } from "./primitives";
+import { KineticMenu } from "./KineticMenu";
 import { cx } from "./format";
 
 export interface NavItem {
@@ -51,7 +51,11 @@ export function Wordmark({ className }: { className?: string }) {
   );
 }
 
-/** Sidebar on desktop, bottom tabs on phones. `status` is the network badge; `account` the signed-in name. */
+/**
+ * No bar and no sidebar: the logo in the top-left corner, the actions and the kinetic menu's "Menu" in the top-right,
+ * the network badge (`status`) pinned to the bottom-left corner, and bottom tabs on phones (where the badge moves
+ * into the menu). `account` is the signed-in name, shown in the menu.
+ */
 export function AppShell({
   nav,
   Link,
@@ -68,63 +72,33 @@ export function AppShell({
   children: ReactNode;
 }) {
   return (
-    <div className="relative isolate min-h-dvh md:grid md:grid-cols-[232px_1fr]">
+    <div className="relative isolate min-h-dvh">
       <CloudBank className="-z-10" />
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50 focus:rounded-full focus:bg-card focus:px-3 focus:py-2">
         Skip to content
       </a>
-      <aside className="sticky top-0 hidden h-dvh flex-col gap-7 border-r border-white/70 bg-white/45 px-4 py-6 backdrop-blur-xl md:flex">
-        <Link href="/drive" className="px-2">
-          <Wordmark />
+      <header className="relative z-30 flex items-center justify-between gap-3 px-4 pt-4 sm:px-8 sm:pt-6">
+        <Link href="/">
+          <Wordmark className="text-xl" />
         </Link>
-        <nav aria-label="Main" className="flex flex-col gap-1">
-          {nav.map((n) => (
-            <Link
-              key={n.href}
-              href={n.href}
-              aria-current={n.active ? "page" : undefined}
-              className={cx(
-                "flex items-center gap-3 rounded-full px-3 py-2.5 text-sm font-medium transition-colors",
-                n.active
-                  ? "bg-white text-action shadow-[0_1px_2px_rgb(13_27_51/0.05),0_10px_24px_-14px_rgb(28_64_140/0.45)]"
-                  : "fx justify-start text-ink/70",
-              )}
-            >
-              {n.active ? (
-                <>
-                  {n.icon}
-                  {n.label}
-                </>
-              ) : (
-                <FxLabel>
-                  {n.icon}
-                  {n.label}
-                </FxLabel>
-              )}
-            </Link>
-          ))}
-        </nav>
-        <div className="mt-auto flex flex-col items-start gap-3 px-2 text-sm">
-          {account}
-          {status}
+        <div className="flex min-w-0 items-center gap-3 sm:gap-5">
+          {actions}
+          <KineticMenu
+              items={nav}
+              Link={Link}
+            footer={
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white bg-white/70 px-4 py-3 text-sm">
+                {account}
+                {status}
+              </div>
+            }
+          />
         </div>
-      </aside>
-
-      <div className="flex min-w-0 flex-col">
-        <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-white/80 bg-white/75 px-4 py-3 backdrop-blur-xl md:hidden">
-          <Link href="/drive">
-            <Wordmark className="text-xl" />
-          </Link>
-          <div className="flex min-w-0 items-center gap-2">
-            {status}
-            {actions}
-          </div>
-        </header>
-        <div className="hidden items-center justify-end gap-2 px-8 pt-5 md:flex">{actions}</div>
-        <main id="main" className="mx-auto w-full max-w-5xl flex-1 px-4 pb-28 pt-4 md:px-8 md:pb-12">
-          {children}
-        </main>
-      </div>
+      </header>
+      <div className="fixed bottom-5 left-5 z-20 hidden md:block">{status}</div>
+      <main id="main" className="mx-auto w-full max-w-5xl px-4 pb-28 pt-6 md:px-8 md:pb-12">
+        {children}
+      </main>
 
       <nav
         aria-label="Main"

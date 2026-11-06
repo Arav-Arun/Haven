@@ -5,6 +5,7 @@ export * from "./Clouds";
 export * from "./errors";
 export * from "./FileList";
 export * from "./FilePreview";
+export * from "./KineticMenu";
 export * from "./format";
 export * from "./MembersPanel";
 export * from "./NetworkBadge";
