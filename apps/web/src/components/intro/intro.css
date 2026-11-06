@@ -5,15 +5,13 @@
   z-index: 1000;
   background: #eef3fa;
   cursor: pointer;
-  transition:
-    opacity 700ms ease,
-    filter 700ms ease;
+  transition: opacity 450ms ease;
   /* Safety net: if the script never runs, the cover still goes away (after the longest wait Intro.tsx allows). */
   animation: haven-intro-failsafe 600ms ease 12s forwards;
 }
+/* By now the logo has already blurred away in the glass, so only the plain backdrop fades off the page. */
 .haven-intro-leave {
   opacity: 0;
-  filter: blur(6px);
   pointer-events: none;
 }
 @keyframes haven-intro-failsafe {
@@ -21,100 +19,5 @@
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
-  }
-}
-
-/* The splash: four soft, blurred blobs of the sky palette bloom out from the centre at slightly different times and
-   sizes, then thin out, so there is never an edge or a tile. */
-.haven-splash {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-.splash-ink {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 62vmax;
-  height: 62vmax;
-  border-radius: 50%;
-  filter: blur(60px);
-  opacity: 0;
-  transform: translate(-50%, -50%) scale(0.08);
-  animation: haven-splash 1500ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-.splash-ink-1 {
-  background: radial-gradient(circle, rgb(91 147 255 / 0.85), rgb(91 147 255 / 0) 68%);
-}
-.splash-ink-2 {
-  background: radial-gradient(circle, rgb(143 181 242 / 0.9), rgb(143 181 242 / 0) 66%);
-  margin: -6vmax 0 0 -9vmax;
-  animation-delay: 90ms;
-}
-.splash-ink-3 {
-  background: radial-gradient(circle, rgb(31 79 209 / 0.55), rgb(31 79 209 / 0) 64%);
-  margin: 7vmax 0 0 8vmax;
-  animation-delay: 160ms;
-}
-.splash-ink-4 {
-  background: radial-gradient(circle, rgb(255 255 255 / 0.95), rgb(255 255 255 / 0) 60%);
-  width: 34vmax;
-  height: 34vmax;
-  animation-delay: 220ms;
-}
-@keyframes haven-splash {
-  0% {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0.08);
-  }
-  35% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0.45;
-    transform: translate(-50%, -50%) scale(1.25);
-  }
-}
-.haven-intro-logo {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  display: flex;
-  align-items: center;
-  gap: 0.35em;
-  color: #0d1b33;
-  font-size: clamp(40px, 7vw, 72px);
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  transform: translate(-50%, -50%) scale(0.86);
-  opacity: 0;
-  filter: blur(10px);
-  animation: haven-intro-logo 900ms cubic-bezier(0.16, 1, 0.3, 1) 200ms forwards;
-}
-.haven-intro-mark {
-  display: inline-block;
-  width: 0.95em;
-  height: 0.95em;
-  background: currentColor;
-}
-@keyframes haven-intro-logo {
-  to {
-    opacity: 1;
-    filter: blur(0);
-    transform: translate(-50%, -50%) scale(1);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .splash-ink {
-    animation: none;
-    opacity: 0.45;
-    transform: translate(-50%, -50%) scale(1.25);
-  }
-  .haven-intro-logo {
-    animation: none;
-    opacity: 1;
-    filter: none;
-    transform: translate(-50%, -50%);
   }
 }
