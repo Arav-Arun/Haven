@@ -11,18 +11,24 @@ import {
   createLinkName,
   deployDrive,
   driveOwner,
+  expectProxy,
+  getSubregistry,
   grantRoleUntil,
   historyOf,
   isLabelAvailable,
   listChildren,
   mountFolder,
+  NO_END,
+  planDrive,
   randomLabel,
+  registerTx,
   revokeAccess,
   ROLE_DRIVE_READ,
   ROLE_DRIVE_SHARE,
   ROLE_DRIVE_WRITE,
   roleBits,
   roleOf,
+  sendTxs,
   sweep,
   wasAllowed,
   wasAllowedMany,
@@ -90,6 +96,54 @@ describe("folders and names", () => {
     await expect(
       createFolder(outsider.writer, { ...params, label: randomLabel("f"), driveKey: outsider.address }),
     ).rejects.toMatchObject({ code: "NOT_AUTHORIZED" });
+  });
+});
+
+describe("sending a registry and its name together (claims and rooms)", () => {
+  // Mine on a 1 s timer, as a real chain does, instead of one block per transaction.
+  async function timedBlocks<T>(run: () => Promise<T>): Promise<T> {
+    await chain.public.request({ method: "evm_setAutomine" as never, params: [false] as never });
+    await chain.public.request({ method: "evm_setIntervalMining" as never, params: [1] as never });
+    try {
+      return await run();
+    } finally {
+      await chain.public.request({ method: "evm_setIntervalMining" as never, params: [0] as never });
+      await chain.public.request({ method: "evm_setAutomine" as never, params: [true] as never });
+    }
+  }
+
+  it("lands both in one block, at the address planned before sending", async () => {
+    const { K, registry: root } = await newDrive(false);
+    const label = randomLabel("f");
+    const steps: ReceiptStep[] = [];
+    const drive = await planDrive(K.writer, { implementation: chain.implementation, driveKey: K.address, mainWallet: null, factory: chain.factory });
+    expect(await chain.public.getCode({ address: drive.address })).toBeUndefined();
+    const register = registerTx({ parent: root, label, owner: K.address, subregistry: drive.address, expiry: NO_END });
+
+    const receipts = await timedBlocks(() => sendTxs(K.writer, [drive, register], (s) => steps.push(s)));
+
+    expect(receipts).toHaveLength(2);
+    expect(receipts[0]!.blockNumber).toBe(receipts[1]!.blockNumber);
+    expect(() => expectProxy(receipts[0]!, drive)).not.toThrow();
+    expect(await getSubregistry(chain.public, root, label)).toBe(drive.address);
+    expect(await driveOwner(chain.public, drive.address)).toBe(K.address);
+    expect(steps).toEqual([
+      expect.objectContaining({ kind: "sepolia-tx", label: "Create folder registry", ok: true }),
+      expect.objectContaining({ kind: "sepolia-tx", label: `Register ${label}`, ok: true }),
+    ]);
+  });
+
+  it("sends nothing when any transaction in the batch would fail", async () => {
+    const { K, registry: root } = await newDrive(false);
+    const label = randomLabel("f");
+    await createFolder(K.writer, { parent: root, implementation: chain.implementation, driveKey: K.address, mainWallet: null, factory: chain.factory, label });
+    const nonceBefore = await chain.public.getTransactionCount({ address: K.address });
+    const drive = await planDrive(K.writer, { implementation: chain.implementation, driveKey: K.address, mainWallet: null, factory: chain.factory });
+    const taken = registerTx({ parent: root, label, owner: K.address, subregistry: drive.address, expiry: NO_END });
+
+    await expect(sendTxs(K.writer, [drive, taken])).rejects.toMatchObject({ code: "NAME_TAKEN" });
+    expect(await chain.public.getTransactionCount({ address: K.address })).toBe(nonceBefore);
+    expect(await chain.public.getCode({ address: drive.address })).toBeUndefined();
   });
 });
 
