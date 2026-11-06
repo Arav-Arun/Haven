@@ -284,3 +284,20 @@ Still open (not code):
 - **Swarm batch** lasts until about 2026-11-14; top up before then (7 xBZZ left, spend needs the user's OK).
 - **Domain:** nameservers at the .xyz registry are Vercel's (checked 2026-11-07); public resolvers were still caching
   the parking answer. Vercel issues HTTPS once they refresh. Then add the domain to WalletConnect's allowlist.
+
+## 10. Signed website releases, 2026-11-07
+
+- Releases 1.0.0 to 1.0.3 were published with `pnpm --filter @haven/core release publish <version>` after checking
+  that a local production build matched every file Vercel serves (307 of 307, byte for byte). Each one uploads the
+  site and manifest to Swarm, writes `haven.release` on Arkiv signed by R `0xBFc132fda5A9119dCE4C9b5bb5470255A586B50e`
+  (the extension's `WXT_RELEASE_SIGNER`), and sets `haven.eth`'s contenthash on Sepolia.
+- **Any change under `apps/web` or `packages` changes the deployed files**, so the extension marks the live site as a
+  mismatch until a new release is published. After every website deploy: build with the production `NEXT_PUBLIC_*`
+  values (read them from the live JS if Vercel marks them Sensitive), compare with the live site, then publish.
+- The public Swarm gateway (bzz.link) answers "forbidden" for our content (not allow-listed). Any Bee node, ours
+  included, serves the Swarm copy.
+- Domain: the `.xyz` zone still delegated to `parking1/2.gen.xyz` on 2026-11-07 although the registrar shows Vercel's
+  nameservers. Fastest fix: gen.xyz → Use default nameservers → Manage DNS → `A @ 216.198.79.1` and
+  `CNAME www cname.vercel-dns.com`.
+- Fixed today: direct Swarm calls used an unbound `fetch` (Illegal invocation); the share dialog's lookup restarted on
+  every render; the intro replayed on every page change; Settings hid nothing it couldn't run (now only Nox and Off).

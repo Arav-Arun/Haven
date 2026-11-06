@@ -215,7 +215,7 @@ export default function SettingsPage() {
   const options: PrivateNetwork[] = ["nox", "nym", "tor", "off"];
 
   return (
-    <div className="flex max-w-2xl flex-col gap-6">
+    <div className="flex flex-col gap-6">
       <h1 className="text-3xl font-bold tracking-[-0.035em]">Settings</h1>
       <Account />
       <MyKey />
