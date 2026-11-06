@@ -32,6 +32,9 @@
   width: 1920px;
   height: 1080px;
   transform-origin: 0 0;
+  /* Moved and scaled every frame: keep it on the GPU, and keep its painting to itself. */
+  will-change: transform;
+  contain: layout paint;
 }
 .story-abs,
 .story-layer {
@@ -243,6 +246,11 @@
   position: absolute;
   inset: 0;
   opacity: 0.9;
+  will-change: transform;
+}
+.story-room-out-blur {
+  position: absolute;
+  inset: 0;
   filter: blur(26px) saturate(1.2);
 }
 .story-room-frost {
