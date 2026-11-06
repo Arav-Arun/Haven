@@ -6,6 +6,8 @@
 //   6. After Investor's end, Founder uploads; Investor sees it locked (readable: false), with no transaction.
 //   7. Founder removes Editor early; Editor's next upload is refused.
 //   8. The Public view: what anyone can read about the room.
+//   9. Groups and inherited subfolders: Founder shares a drive folder with a group, a subfolder follows it, and taking
+//      someone out of the group locks them out of both. Live updates (Swarm doorbell) are reported, not required.
 // Writes every transaction link to docs/evidence.md.
 //
 // Run: pnpm --filter @cloakroom/api start   (in another terminal)   then   pnpm --filter @cloakroom/core e2e
@@ -141,4 +143,42 @@ const view = await founder.publicView(room.registry);
 out(`- ${view.summary}`);
 out(`- ${view.members.length} member addresses, ${view.arkiv.length} Arkiv entities, ${view.swarm.length} Swarm blobs, ${view.ignoredWrites} ignored writes`);
 out(`- direct calls: ${view.directCalls.join(", ") || "none"}`);
+out("### 9. Groups and inherited subfolders");
+const partner = person("Partner");
+await partner.signIn({ kind: "random" });
+const partnerName = (await partner.claimName(label("partner"))).ensName!;
+out(`- partner: ${partnerName}`);
+const deals = await founder.createFolder("root", "Deals");
+const q3 = await founder.createFolder(deals.registry, "Q3", { inherit: true });
+check("the subfolder is marked as following its parent", q3.inherit);
+const group = await founder.createGroup("Partners");
+await founder.share(group.registry, partnerName, { role: "viewer", until: null, hideFromMembers: false });
+await founder.share(deals.registry, group.registry, { role: "viewer", until: null, hideFromMembers: true });
+const dealMembers = await founder.listMembers(deals.registry);
+check("the group rule shared the folder with the partner, as a group member", dealMembers.some((m) => m.label === partnerName && m.via === "group"));
+const q3Members = await founder.listMembers(q3.registry);
+check("the inheriting subfolder carries the same member", q3Members.some((m) => m.label === partnerName && m.inherited === true));
+
+let rang = false;
+let mode = "off";
+const stop = partner.subscribe([q3.registry], () => (rang = true), (st) => (mode = st.mode));
+await founder.upload(q3.registry, text("Q3 numbers."), "q3.txt");
+await partner.sharedWithMe();
+const partnerDeals = await partner.listFolders(deals.registry);
+check("the partner finds the subfolder through the shared folder", partnerDeals.some((f) => f.registry === q3.registry));
+const q3Files = await partner.listFiles(q3.registry);
+check("the partner can read the subfolder's file", q3Files.some((f) => f.name === "q3.txt" && f.readable));
+for (let i = 0; i < 20 && !rang; i++) await sleep(1);
+out(`- live updates: ${rang ? "the upload rang the partner's doorbell" : `no ring within 20 s (subscription mode: ${mode})`}`);
+stop();
+
+const inGroup = (await founder.listMembers(group.registry)).find((m) => m.label === partnerName)!;
+await founder.removeMember(group.registry, inGroup.address);
+await founder.maintain();
+check("taking the partner out of the group removed them from the folder", !(await founder.listMembers(deals.registry)).some((m) => m.label === partnerName));
+check("and from the subfolder that follows it", !(await founder.listMembers(q3.registry)).some((m) => m.label === partnerName));
+await founder.upload(q3.registry, text("Q4 plan."), "q4.txt");
+const lockedOut = await partner.listFiles(q3.registry).catch(() => [] as Awaited<ReturnType<typeof partner.listFiles>>);
+check("a file added after that is locked for the partner", !lockedOut.some((f) => f.name === "q4.txt" && f.readable));
+
 out(process.exitCode ? "\nRESULT: FAIL" : "\nRESULT: PASS");

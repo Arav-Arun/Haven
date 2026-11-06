@@ -244,7 +244,13 @@ interface FolderInfo {
   d: string; // display name
   e: string; // ENS name
   p: Address | null; // parent folder registry (null at the top)
+  i?: 1; // inherits its parent's members (fixed at creation)
 }
+
+/** Rule id of a share with one of the user's groups: "group:<group registry>". */
+const GROUP_RULE = "group:";
+/** Rule marking members a subfolder carries over from its parent folder. */
+const INHERITED = "inherited";
 
 /** A key the user holds for one folder. */
 interface Holding {
@@ -659,7 +665,23 @@ class Client implements CloakroomClient {
     for (let n = 0; n <= rooms + 2; n++) {
       if (isAddressEqual(owner, privateKeyToAccount(roomKey(keys, n)).address)) return this.roomHolding(folder, n);
     }
+    // A subfolder that inherits a folder shared with us: the same member address holds a role there too.
+    for (const s of await this.storedShares()) {
+      const address = privateKeyToAccount(s.sk).address;
+      const a = await accessOf(this.sepolia(undefined, address), folder, address).catch(() => null);
+      if (a && a.roles !== 0n) return this.adoptInherited(folder, s);
+    }
     throw new DriveError("NOT_AUTHORIZED", "You don't hold a key for this folder.");
+  }
+
+  /** Keeps the parent share's member key for an inheriting subfolder, so it's found again without a lookup. */
+  private async adoptInherited(folder: Address, from: StoredShare): Promise<Holding> {
+    const stored = await this.storedShares();
+    if (!stored.some((x) => isAddressEqual(x.folder, folder))) {
+      stored.push({ folder: getAddress(folder), sk: from.sk, mk: from.mk, seen: now() });
+      await this.cfg.storage.set(STORE.shares, json(stored));
+    }
+    return this.shareHolding({ folder: getAddress(folder), sk: from.sk, mk: from.mk, seen: now() });
   }
 
   // ------------------------------------------------------------ folder state
@@ -725,7 +747,7 @@ class Client implements CloakroomClient {
       displayName: fk.displayName || "Untitled",
       kind: ensName ? kindOf(ensName) : "drive",
       parent: fk.info?.p ?? null,
-      inherit: false,
+      inherit: fk.info?.i === 1,
       myAccess:
         a.via === "owner"
           ? { role: "owner", until: null, via: "owner" }
@@ -829,8 +851,11 @@ class Client implements CloakroomClient {
         const name = parentName ? `${c.label}.${parentName}` : undefined;
         if (isAddressEqual(c.owner, keys.driveAddress)) found.push({ registry: c.registry, holding: this.ownHolding(c.registry, name) });
         else {
-          const h = this.holdings.get(lower(c.registry));
-          if (h) found.push({ registry: c.registry, holding: h });
+          const h = this.holdings.get(lower(c.registry)) ?? (await this.holding(c.registry).catch(() => null));
+          if (h) {
+            if (name && !h.ensName) h.ensName = name;
+            found.push({ registry: c.registry, holding: h });
+          }
         }
       }
     }
@@ -857,7 +882,8 @@ class Client implements CloakroomClient {
   private async makeFolder(parent: Address | "root", displayName: string, prefix: "f" | "g", opts?: { inherit?: boolean }) {
     const keys = this.requireKeys();
     if (!this.driveRoot || !this.ensName) throw new DriveError("NOT_SIGNED_IN", "Claim a name first.");
-    if (opts?.inherit) throw new DriveError("UNKNOWN", "Folders that share their parent's access aren't available yet.");
+    // Only a subfolder can inherit: the drive root has no members of its own.
+    const inherit = parent !== "root" && prefix === "f" && opts?.inherit === true;
     const parentRegistry = parent === "root" ? this.driveRoot : getAddress(parent);
     const parentName = parent === "root" ? this.ensName : (await this.holding(parentRegistry)).ensName;
     if (!parentName) throw new DriveError("NOT_FOUND", "Unknown parent folder.");
@@ -874,10 +900,16 @@ class Client implements CloakroomClient {
       const h = this.ownHolding(registry, ensName);
       await this.writeVersion(
         h,
-        { version: 1, info: { d: displayName, e: ensName, p: parent === "root" ? null : parentRegistry }, roster: { managers: [], members: [] }, label: "Folder keys, version 1" },
+        {
+          version: 1,
+          info: { d: displayName, e: ensName, p: parent === "root" ? null : parentRegistry, ...(inherit ? { i: 1 as const } : {}) },
+          roster: { managers: [], members: [] },
+          label: "Folder keys, version 1",
+        },
         step,
       );
       this.childCache.delete(lower(parentRegistry));
+      if (inherit) await this.syncInherited(parentRegistry, registry, step);
       return this.toFolder(registry, h, await this.readFolder(registry, h, step), step);
     });
   }
@@ -1276,8 +1308,8 @@ class Client implements CloakroomClient {
 
   async share(folder: Address, recipient: string, opts: ShareOptions): Promise<Member> {
     const f = getAddress(folder);
-    if (isAddress(recipient)) throw new DriveError("UNKNOWN", "Sharing with a group isn't available in this version yet.");
     if (opts.until !== null && opts.until <= now()) throw new DriveError("EXPIRED", "That end date has passed.");
+    if (isAddress(recipient)) return this.shareWithGroup(f, getAddress(recipient), opts);
     const name = normName(recipient);
     return this.receipts.run(`Share with ${name}`, async (step) => {
       const h = await this.holding(f);
@@ -1288,6 +1320,7 @@ class Client implements CloakroomClient {
       const { added, rosterKey } = await this.addMembers(f, h, fk, current, [{ name, key: P }], opts, step);
       await this.keyMemory.remember(name, P, now());
       if (rosterKey) await this.ring(h, fk, { type: "member", arkivKey: rosterKey }, step);
+      await this.propagate(f, step);
       const m = added[0]!;
       return { address: m.address, label: name, role: opts.role, until: opts.until, via: "direct", hiddenFromMembers: opts.hideFromMembers, needsGas: false };
     });
@@ -1338,7 +1371,7 @@ class Client implements CloakroomClient {
         until: opts.until,
         hiddenFromMembers: opts.hideFromMembers,
         label: p.name,
-        via: "direct",
+        via: p.rule?.startsWith(GROUP_RULE) ? "group" : "direct",
         ...(p.rule ? { rule: p.rule } : {}),
         ...(p.holder ? { holder: p.holder } : {}),
         ...(p.rule ? { sharedKey: p.key } : {}),
@@ -1394,7 +1427,7 @@ class Client implements CloakroomClient {
     );
   }
 
-  async listMembers(folder: Address): Promise<(Member & { rule?: string })[]> {
+  async listMembers(folder: Address): Promise<(Member & { rule?: string; inherited?: boolean })[]> {
     const f = getAddress(folder);
     const h = await this.holding(f);
     const fk = await this.readFolder(f, h);
@@ -1411,7 +1444,9 @@ class Client implements CloakroomClient {
           via: m.via,
           hiddenFromMembers: m.hiddenFromMembers,
           needsGas: m.role !== "viewer" && (m.until === null || m.until > now()) && (await reader.getBalance({ address: m.address })) < LOW_TGLM,
-          ...(m.rule ? { rule: m.rule } : {}),
+          // Team members show "Via acme.eth"; group and inherited members are managed in the group or the parent folder.
+          ...(m.rule && m.rule !== INHERITED && !m.rule.startsWith(GROUP_RULE) ? { rule: m.rule } : {}),
+          ...(m.rule === INHERITED ? { inherited: true } : {}),
         })),
       );
     }
@@ -1482,8 +1517,90 @@ class Client implements CloakroomClient {
       const fk = await this.readFolder(f, h, step);
       const current = await this.latestRoster(f, fk, h);
       if (!current) throw new DriveError("NOT_AUTHORIZED", "Only managers can remove people.");
+      const m = [...current.roster.managers, ...current.roster.members].find((x) => isAddressEqual(x.address, member));
+      if (m?.rule === INHERITED) throw new DriveError("NOT_AUTHORIZED", "This person's access comes from the parent folder. Change it there.");
+      if (m?.rule?.startsWith(GROUP_RULE)) throw new DriveError("NOT_AUTHORIZED", "This person's access comes from a group. Remove them from the group.");
       await this.removeMembers(f, h, fk, current, [getAddress(member)], step);
+      await this.propagate(f, step);
     });
+  }
+
+  // ------------------------------------------------------------ inherited access (subfolders that follow their parent)
+  //
+  // The contract has no parent link (DriveRegistry: "Parent ... come[s] in later implementations"), so inheritance is
+  // done by the owner's app: an inheriting subfolder grants the SAME member addresses as its parent, with the same
+  // roles and end dates, and writes them key copies sealed with the member keys they already hold. Members find it
+  // because their address holds a role there. Removing someone from the parent removes them here too, with a key
+  // refresh, in the same action.
+
+  /** Grants people who already have a member address and key (from the parent folder) access to `f`. */
+  private async grantExisting(f: Address, h: Holding, fk: FolderKeys, current: { roster: Roster; version: number }, people: RosterMember[], step: StepSink) {
+    const v = current.version;
+    const rotation = fk.reading.versions.get(v)!;
+    const fsCopy = fk.copies.get(v)!;
+    const head = chainHead(fsCopy.key);
+    await this.ensureGas(h, { sepolia: true, arkiv: true }, step);
+    const ops: CreateOp[] = [];
+    for (const m of people) {
+      await grantRoleUntil(this.sepoliaWriter(h.key, step, h.address), f, m.address, m.role, m.until, step);
+      const copy: KeyCopy | null =
+        m.role === "manager"
+          ? { kind: "secret", version: v, key: fsCopy.key }
+          : (() => {
+              const e = epochKeyFor(head, scheduleOf(rotation), m.until);
+              return e ? { kind: "epoch" as const, version: v, ...e } : null;
+            })();
+      if (copy) ops.push(keyCopyOp({ folder: f, recipient: m.address, version: v, sealed: await sealKeyCopy(m.memberKey, f, copy), until: m.until }));
+    }
+    const inherited = people.map((m) => ({ ...m, rule: INHERITED }));
+    const roster: Roster = {
+      ...current.roster,
+      managers: [...current.roster.managers, ...inherited.filter((m) => m.role === "manager")],
+      members: [...current.roster.members, ...inherited.filter((m) => m.role !== "manager")],
+    };
+    ops.push(rosterOp({ folder: f, version: v, ...(await sealRoster(rosterKey(fsCopy.key), f, v, roster)) }));
+    for (let i = 0; i < ops.length; i += OPS_PER_TX) {
+      await writeEntities(this.arkivWriter(h.key, step, h.address), ops.slice(i, i + OPS_PER_TX), "Key copies and roster (from the parent folder)", step);
+    }
+  }
+
+  /** Makes an inheriting subfolder's members match its parent's. Returns whether anything changed. */
+  private async syncInherited(parent: Address, child: Address, step: StepSink): Promise<boolean> {
+    const p = await this.managed(parent, step);
+    let c = await this.managed(child, step);
+    const same = (a: RosterMember, b: RosterMember) => isAddressEqual(a.address, b.address) && a.role === b.role && a.until === b.until;
+    const want = [...p.current.roster.managers, ...p.current.roster.members].filter((m) => m.until === null || m.until > now());
+    const have = [...c.current.roster.managers, ...c.current.roster.members].filter((m) => m.rule === INHERITED);
+    const remove = have.filter((m) => !want.some((w) => same(w, m)));
+    const add = want.filter((w) => !have.some((m) => same(w, m)));
+    if (!remove.length && !add.length) return false;
+    step({ kind: "check", label: "Subfolder follows its parent", detail: `${add.length} to add, ${remove.length} to remove`, ok: true });
+    if (remove.length) {
+      await this.removeMembers(child, c.h, c.fk, c.current, remove.map((m) => m.address), step);
+      c = await this.managed(child, step);
+    }
+    if (add.length) await this.grantExisting(child, c.h, c.fk, c.current, add.map(({ rule: _r, holder: _h, ...m }) => m), step);
+    return true;
+  }
+
+  /** After the members of `f` change: every inheriting subfolder the user owns follows, all the way down. */
+  private async propagate(f: Address, step: StepSink, depth = 0): Promise<void> {
+    if (depth > 8) return;
+    const keys = this.requireKeys();
+    let children: ChildName[];
+    try {
+      children = await this.children(f, true);
+    } catch {
+      return;
+    }
+    for (const c of children) {
+      if (!c.registry || !c.label.startsWith("f-") || !isAddressEqual(c.owner, keys.driveAddress)) continue;
+      const h = this.ownHolding(c.registry);
+      const fk = await this.readFolder(c.registry, h).catch(() => null);
+      if (fk?.info?.i !== 1) continue;
+      await this.syncInherited(f, c.registry, step);
+      await this.propagate(c.registry, step, depth + 1);
+    }
   }
 
   // ------------------------------------------------------------ F2: private ENS subtree sharing (subtree.ts)
@@ -1498,7 +1615,36 @@ class Client implements CloakroomClient {
   }
 
   private holdersOf(parent: string, isolationKey?: string, step?: StepSink): Promise<SubtreeHolder[]> {
+    if (parent.startsWith(GROUP_RULE)) return this.groupHolders(getAddress(parent.slice(GROUP_RULE.length)), isolationKey);
     return listSubtreeHolders(this.sepolia(step, isolationKey), parent, (n) => this.keyForName(n, isolationKey));
+  }
+
+  /**
+   * The people in one of the user's groups, as rule holders: every current member of the group's sealed roster, with
+   * the key from their public log. Only the group's managers can read that roster, so only they can sync it.
+   */
+  private async groupHolders(group: Address, isolationKey?: string): Promise<SubtreeHolder[]> {
+    const { current } = await this.managed(group);
+    const names = new Set<string>();
+    for (const m of [...current.roster.managers, ...current.roster.members]) {
+      if (m.label && (m.until === null || m.until > now())) names.add(m.label);
+    }
+    const out: SubtreeHolder[] = [];
+    for (const name of names) {
+      const controller = await nameController(this.sepolia(undefined, isolationKey), name).catch(() => null);
+      if (!controller) continue;
+      const { key, why } = await this.keyForName(name, isolationKey);
+      out.push({ name, controller, key, ...(why ? { why } : {}) });
+    }
+    return out.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  /** Shares a folder with one of the user's groups: a rule in the folder's sealed roster plus one stealth share each. */
+  private async shareWithGroup(f: Address, group: Address, opts: ShareOptions): Promise<Member> {
+    const g = await this.getFolder(group);
+    if (g.kind !== "group") throw new DriveError("NOT_FOUND", "That isn't one of your groups.");
+    await this.shareWithRule(f, `${GROUP_RULE}${group}`, opts, `Share with the group "${g.displayName}"`);
+    return { address: group, label: g.displayName, role: opts.role, until: opts.until, via: "group", hiddenFromMembers: opts.hideFromMembers, needsGas: false };
   }
 
   async previewSubtree(parentEnsName: string): Promise<SubtreePreview> {
@@ -1523,9 +1669,10 @@ class Client implements CloakroomClient {
     await this.cfg.storage.set(STORE.synced, json(all));
   }
 
-  private toRule(rule: SubtreeRuleData, roster: Roster, synced: Record<string, number>): SubtreeRule {
+  private toRule(rule: SubtreeRuleData, roster: Roster, synced: Record<string, number>, label?: string): SubtreeRule {
     return {
       parent: rule.parent,
+      ...(label ? { label } : {}),
       role: rule.role,
       until: rule.until,
       excluded: rule.excluded,
@@ -1543,14 +1690,19 @@ class Client implements CloakroomClient {
   }
 
   async shareWithSubtree(folder: Address, parentEnsName: string, opts: ShareOptions): Promise<SubtreeRule> {
-    const f = getAddress(folder);
     const parent = normName(parentEnsName);
-    return this.receipts.run(`Share with everyone at ${parent}`, async (step) => {
+    return this.shareWithRule(getAddress(folder), parent, opts, `Share with everyone at ${parent}`);
+  }
+
+  /** A rule (an ENS subtree, or "group:<registry>") plus a stealth share for each person it reaches now. */
+  private async shareWithRule(f: Address, parent: string, opts: ShareOptions, action: string): Promise<SubtreeRule> {
+    return this.receipts.run(action, async (step) => {
       const { h, fk, current } = await this.managed(f, step);
       if (current.roster.subtrees?.some((r) => r.parent === parent)) throw new DriveError("UNKNOWN", `This folder is already shared with ${parent}.`);
       const holders = await this.holdersOf(parent, h.address, step);
       const ready = holders.filter((x) => x.key);
-      step({ kind: "check", label: `Names under ${parent}`, detail: `${ready.length} found with a Haven key, ${holders.length - ready.length} without`, ok: true });
+      const where = parent.startsWith(GROUP_RULE) ? "People in the group" : `Names under ${parent}`;
+      step({ kind: "check", label: where, detail: `${ready.length} found with a Haven key, ${holders.length - ready.length} without`, ok: true });
       const rule: SubtreeRuleData = { parent, role: opts.role, until: opts.until, excluded: [], hideFromMembers: opts.hideFromMembers, syncedAt: now() };
       const everyone = [...current.roster.managers, ...current.roster.members];
       const plan = planSync(rule, everyone, holders);
@@ -1569,7 +1721,9 @@ class Client implements CloakroomClient {
       );
       for (const x of plan.add) await this.keyMemory.remember(x.name, x.key!, now());
       await this.markSynced(f, [parent]);
-      step({ kind: "check", label: "What the chain sees", detail: `${added.length} random addresses; nothing links them to ${parent}`, ok: true });
+      const what = parent.startsWith(GROUP_RULE) ? "the group" : parent;
+      step({ kind: "check", label: "What the chain sees", detail: `${added.length} random addresses; nothing links them to ${what}`, ok: true });
+      await this.propagate(f, step);
       return { parent, role: rule.role, until: rule.until, excluded: [], memberCount: added.length, lastSyncedAt: now() };
     });
   }
@@ -1581,7 +1735,14 @@ class Client implements CloakroomClient {
     const current = await this.latestRoster(f, fk, h);
     if (!current) return [];
     const synced = await this.syncedAt(f);
-    return (current.roster.subtrees ?? []).map((r) => this.toRule(r, current.roster, synced));
+    return Promise.all(
+      (current.roster.subtrees ?? []).map(async (r) => {
+        const label = r.parent.startsWith(GROUP_RULE)
+          ? await this.getFolder(getAddress(r.parent.slice(GROUP_RULE.length))).then((g) => `the group "${g.displayName}"`).catch(() => "a group")
+          : undefined;
+        return this.toRule(r, current.roster, synced, label);
+      }),
+    );
   }
 
   /**
@@ -1637,6 +1798,7 @@ class Client implements CloakroomClient {
           state = await this.managed(f, sink);
         }
       }
+      await this.propagate(f, sink);
       run?.finish();
       return true;
     } catch (e) {
@@ -1667,6 +1829,7 @@ class Client implements CloakroomClient {
       const gone = [...current.roster.managers, ...current.roster.members].filter((m) => m.rule === parent && m.label === member);
       if (gone.length) await this.removeMembers(f, h, fk, current, gone.map((m) => m.address), step, edit);
       else await this.writeRoster(h, fk, current, edit(current.roster), step);
+      if (gone.length) await this.propagate(f, step);
     });
   }
 
@@ -1679,6 +1842,7 @@ class Client implements CloakroomClient {
       const gone = [...current.roster.managers, ...current.roster.members].filter((m) => m.rule === parent);
       if (gone.length) await this.removeMembers(f, h, fk, current, gone.map((m) => m.address), step, edit);
       else await this.writeRoster(h, fk, current, edit(current.roster), step);
+      if (gone.length) await this.propagate(f, step);
     });
   }
 
@@ -1904,7 +2068,19 @@ class Client implements CloakroomClient {
   async maintain(): Promise<Receipt[]> {
     const done: Receipt[] = [];
     const managed = [...(await this.listFolders("root").catch(() => [])), ...(await this.listFolders("rooms").catch(() => []))];
+    // Subfolders too (their own team and group rules), breadth first, at most 200 folders per run.
+    for (let i = 0; i < managed.length && managed.length < 200; i++) {
+      const kids = await this.listFolders(managed[i]!.registry).catch(() => [] as Folder[]);
+      for (const k of kids) if (k.myAccess?.role === "owner" && !managed.some((m) => isAddressEqual(m.registry, k.registry))) managed.push(k);
+    }
     for (const folder of managed) {
+      if (folder.inherit && folder.parent) {
+        try {
+          await this.receipts.run(`Follow parent: ${folder.displayName}`, (step) => this.syncInherited(folder.parent!, folder.registry, step));
+        } catch {
+          // reported in the receipt
+        }
+      }
       const h = await this.holding(folder.registry);
       const fk = await this.readFolder(folder.registry, h);
       const current = await this.latestRoster(folder.registry, fk, h);

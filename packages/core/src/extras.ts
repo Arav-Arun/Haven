@@ -4,7 +4,7 @@
 // DriveClient. They are exactly the optional members the add-ons spec lists, plus a few fields the UI needed
 // (marked). docs/requests-b.md asks for them to be copied into @cloakroom/types on main once both people agree.
 
-import type { Address, DriveClient, Hex, Role, ShareOptions, Timestamp } from "@cloakroom/types";
+import type { Address, DriveClient, Member, Hex, Role, ShareOptions, Timestamp } from "@cloakroom/types";
 
 // ---------------------------------------------------------------- F1
 
@@ -55,7 +55,10 @@ export type SignTypedData = (typedData: {
 // ---------------------------------------------------------------- F2
 
 export interface SubtreeRule {
+  /** The ENS parent ("acme.eth"), or "group:<registry>" for one of the user's groups. */
   parent: string;
+  /** Added: how to show the rule, e.g. `the group "Design"` (absent for ENS parents). */
+  label?: string;
   role: Role;
   until: Timestamp | null;
   excluded: string[];
@@ -88,6 +91,9 @@ export interface LiveStatus {
 }
 
 export interface CloakroomClient extends DriveClient {
+  /** Adds who came in through a team rule ("Via acme.eth") and who follows a parent folder. */
+  listMembers(folder: Address): Promise<(Member & { rule?: string; inherited?: boolean })[]>;
+
   // F1
   lookupKey(ensName: string): Promise<KeyInfo>;
   confirmKeyChange(ensName: string): Promise<void>;

@@ -72,3 +72,13 @@ reference for the code as built.
 - Writers ring on upload, share and key refresh (a refresh rings the old topic). Members subscribe to the current and
   next epoch's topics and resubscribe at each epoch end; every ring is checked by re-reading Arkiv. No config or a
   dropped socket: re-read Arkiv every 30 s.
+
+## Groups and inherited subfolders (`client.ts`)
+- A group is a `g-<random>` DriveRegistry whose sealed roster lists people by ENS name. Sharing a folder with it stores
+  the rule `group:<registry>` in the folder's sealed roster and makes one stealth share per person; each sync compares
+  the rule's people with the group's roster (removals first: revoke, then one key refresh).
+- A subfolder created with `inherit` carries `i: 1` in its sealed folder info. The owner's app grants the parent's
+  member addresses on it with the same roles and ends, and writes key copies sealed with each member's existing member
+  key (rule `inherited`). Members find it because their address holds a role there. Changes to the parent propagate
+  down at once, and `maintain()` re-checks every inheriting subfolder.
+

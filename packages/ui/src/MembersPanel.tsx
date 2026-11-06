@@ -14,12 +14,14 @@ import { Tag, Ticket } from "./Ticket";
 /** Add-on F2: a "share with everyone under acme.eth" rule (core's SubtreeRule, structurally). */
 export interface TeamRuleView {
   parent: string;
+  /** How to show the rule when it isn't an ENS name (a group). */
+  label?: string;
   memberCount: number;
   lastSyncedAt: Timestamp;
   excluded: string[];
 }
 
-type PanelMember = Member & { rule?: string };
+type PanelMember = Member & { rule?: string; inherited?: boolean };
 
 /** Team rules on a folder: who they reach, when they last synced, and "Sync now". */
 function TeamRules({
@@ -51,7 +53,7 @@ function TeamRules({
       {rules.map((r) => (
         <div key={r.parent} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-line bg-card px-3 py-2 text-sm">
           <div>
-            <p className="font-medium">Everyone at {r.parent}</p>
+            <p className="font-medium">{r.label ? `Everyone in ${r.label}` : `Everyone at ${r.parent}`}</p>
             <p className="text-xs text-muted">
               {r.memberCount} {r.memberCount === 1 ? "person" : "people"}
               {r.excluded.length ? `, ${r.excluded.length} excluded` : ""}, last synced {r.lastSyncedAt ? formatAgo(r.lastSyncedAt, now) : "never"}
@@ -117,8 +119,13 @@ export function MembersPanel({
             until={m.until}
             now={now}
             tags={
-              (m.via === "group" || m.hiddenFromMembers || m.needsGas || m.rule) && (
+              (m.via === "group" || m.hiddenFromMembers || m.needsGas || m.rule || m.inherited) && (
                 <>
+                  {m.inherited && (
+                    <Tag title="This subfolder follows its parent folder's members">
+                      <Users size={12} aria-hidden /> From the parent folder
+                    </Tag>
+                  )}
                   {m.rule && (
                     <Tag title="Added because their name is under this ENS name">
                       <AtSign size={12} aria-hidden /> Via {m.rule}
@@ -144,7 +151,8 @@ export function MembersPanel({
             }
             actions={
               canManage &&
-              m.via === "direct" && (
+              m.via === "direct" &&
+              !m.inherited && (
                 <Button variant="quiet" className="px-2" onClick={() => setConfirm(m)} aria-label={`${m.rule ? "Exclude" : "Remove"} ${m.label}`}>
                   {m.rule ? "Exclude" : "Remove"}
                 </Button>
