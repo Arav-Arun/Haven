@@ -1,20 +1,2 @@
 @import "tailwindcss";
-
-@theme {
-  --color-ink: #16181d;
-  --color-muted: #5b6270;
-  --color-paper: #f7f6f2;
-  --color-card: #ffffff;
-  --color-line: #e4e2db;
-  --color-accent: #2f5d50;
-  --color-accent-soft: #e3eee9;
-  --color-danger: #b42318;
-  --color-danger-soft: #fdecea;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-}
-
-html,
-body {
-  background: var(--color-paper);
-  color: var(--color-ink);
-}
+@import "@cloakroom/ui/styles.css";

@@ -13,6 +13,7 @@
     "@anon-rpc/browser-harness": "0.4.0",
     "@cloakroom/platform": "workspace:*",
     "@cloakroom/types": "workspace:*",
+    "@cloakroom/ui": "workspace:*",
     "@tanstack/react-query": "^5.90.0",
     "@walletconnect/ethereum-provider": "^2.26.0",
     "lucide-react": "^1.60.0",

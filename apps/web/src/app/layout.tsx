@@ -1,35 +1,34 @@
 import type { Metadata, Viewport } from "next";
-import Link from "next/link";
+import { Big_Shoulders, Hanken_Grotesk } from "next/font/google";
 import type { ReactNode } from "react";
-import { NetworkBadge } from "@/components/NetworkBadge";
 import "./globals.css";
 import { Providers } from "./providers";
 
+// Fonts are downloaded at build time and served from our own origin: no font requests leave the app.
+const hanken = Hanken_Grotesk({ subsets: ["latin"], variable: "--font-hanken", display: "swap" });
+const shoulders = Big_Shoulders({ subsets: ["latin"], variable: "--font-shoulders", weight: ["700"], display: "swap", adjustFontFallback: false });
+
 export const metadata: Metadata = {
-  title: "Cloakroom",
-  description: "Share files with ENS names privately: hidden members, and new files lock out when access ends.",
+  title: { default: "Cloakroom", template: "%s · Cloakroom" },
+  description: "Share files privately with any ENS name. No one can see who you shared with, and new files lock when access ends.",
+  applicationName: "Cloakroom",
+  manifest: "/manifest.webmanifest",
+  icons: { icon: "/icon.svg", apple: "/apple-touch-icon.png" },
+  appleWebApp: { capable: true, title: "Cloakroom", statusBarStyle: "default" },
+  openGraph: {
+    title: "Cloakroom",
+    description: "Share files privately with any ENS name. No one can see who you shared with.",
+    type: "website",
+  },
 };
 
-export const viewport: Viewport = { themeColor: "#f7f6f2", width: "device-width", initialScale: 1 };
+export const viewport: Viewport = { themeColor: "#f1f2ee", width: "device-width", initialScale: 1, viewportFit: "cover" };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${hanken.variable} ${shoulders.variable}`}>
       <body className="min-h-dvh font-sans antialiased">
-        <Providers>
-          <header className="mx-auto flex max-w-5xl items-center justify-between px-5 py-4">
-            <Link href="/" className="text-lg font-semibold tracking-tight">
-              Cloakroom
-            </Link>
-            <nav className="flex items-center gap-4 text-sm">
-              <Link href="/settings" className="text-muted hover:text-ink">
-                Settings
-              </Link>
-              <NetworkBadge />
-            </nav>
-          </header>
-          <main className="mx-auto max-w-5xl px-5 pb-16">{children}</main>
-        </Providers>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

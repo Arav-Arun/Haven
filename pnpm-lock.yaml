@@ -23,6 +23,9 @@ importers:
       '@cloakroom/types':
         specifier: workspace:*
         version: link:../../packages/types
+      '@cloakroom/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       '@tanstack/react-query':
         specifier: ^5.90.0
         version: 5.106.0(@types/react@19.3.0)(react@19.3.1)
@@ -96,7 +99,27 @@ importers:
 
   packages/types: {}
 
-  packages/ui: {}
+  packages/ui:
+    dependencies:
+      '@cloakroom/types':
+        specifier: workspace:*
+        version: link:../types
+    devDependencies:
+      '@types/react':
+        specifier: ^19.3.0
+        version: 19.3.0
+      lucide-react:
+        specifier: ^1.60.0
+        version: 1.68.0(@types/react@19.3.0)(react@19.3.1)
+      react:
+        specifier: ^19.3.1
+        version: 19.3.1
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)
 
 packages:
 

@@ -1,9 +1,77 @@
 "use client";
 
 import { NETWORKS } from "@cloakroom/platform";
-import type { AnonStatus, PrivateNetwork } from "@cloakroom/types";
+import type { AnonStatus, PrivateNetwork, Receipt } from "@cloakroom/types";
+import { Button, ErrorNote, shortAddress } from "@cloakroom/ui";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { chooseNetwork, getAnon, selectedNetwork, unavailableReason } from "@/lib/anon";
+import { config } from "@/lib/config";
+import { useDrive } from "@/lib/drive";
+
+/** Who is signed in, the housekeeping run, and sign-out. */
+function Account() {
+  const router = useRouter();
+  const { client, identity, setIdentity, profile } = useDrive();
+  const [ran, setRan] = useState<Receipt[] | null>(null);
+  const [pending, setPending] = useState<"maintain" | "signout" | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  if (!client || !identity) return null;
+
+  const run = async (what: "maintain" | "signout") => {
+    setPending(what);
+    setError(null);
+    try {
+      if (what === "maintain") setRan(await client.maintain());
+      else {
+        await client.signOut();
+        setIdentity(null);
+        router.push("/");
+      }
+    } catch (e) {
+      setError(e);
+    } finally {
+      setPending(null);
+    }
+  };
+
+  return (
+    <section className="rounded-lg border border-line bg-card p-5 text-sm">
+      <h2 className="font-medium">Account{profile !== "me" && ` (Try it: the ${profile})`}</h2>
+      <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
+        <dt className="text-muted">Name</dt>
+        <dd>{identity.ensName ?? "None yet"}</dd>
+        <dt className="text-muted">Wallet</dt>
+        <dd>{identity.wallet ? <a className="underline" href={`${config.explorerUrl}/address/${identity.wallet}`} target="_blank" rel="noreferrer noopener">{shortAddress(identity.wallet)}</a> : "None (key made on this device)"}</dd>
+        <dt className="text-muted">App key</dt>
+        <dd>
+          <a className="underline" href={`${config.explorerUrl}/address/${identity.driveKey}`} target="_blank" rel="noreferrer noopener">
+            {shortAddress(identity.driveKey)}
+          </a>{" "}
+          <span className="text-muted">signs everyday actions, so your wallet doesn&apos;t pop up each time.</span>
+        </dd>
+      </dl>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button pending={pending === "maintain"} onClick={() => run("maintain")}>
+          Run housekeeping now
+        </Button>
+        <Button variant="quiet" pending={pending === "signout"} onClick={() => run("signout")}>
+          Sign out of this device
+        </Button>
+      </div>
+      <p className="mt-2 text-muted">
+        Housekeeping tops up gas for editors, refreshes keys after someone is removed, and renews storage. The app runs it
+        when it opens; it&apos;s here so you can run it now.
+      </p>
+      {ran && (
+        <p className="mt-2">
+          {ran.length === 0 ? "Nothing needed doing." : `Done: ${ran.map((r) => r.action).join(", ")}. See Receipts for each step.`}
+        </p>
+      )}
+      <ErrorNote error={error} className="mt-2" />
+    </section>
+  );
+}
 
 const ABOUT: Record<PrivateNetwork, string> = {
   nox: "A Sphinx mixnet. Its worker is registered on Sepolia, so it needs no mainnet connection.",
@@ -32,10 +100,11 @@ export default function SettingsPage() {
   const options: PrivateNetwork[] = ["nox", "nym", "tor", "off"];
 
   return (
-    <div className="flex max-w-2xl flex-col gap-6 pt-8">
-      <h1 className="text-2xl font-semibold">Settings</h1>
+    <div className="flex max-w-2xl flex-col gap-6">
+      <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+      <Account />
 
-      <section className="rounded-2xl border border-line bg-card p-5">
+      <section className="rounded-lg border border-line bg-card p-5">
         <h2 className="font-medium">Private network</h2>
         <p className="mt-1 text-sm text-muted">
           Every lookup this app makes goes through the network you pick, so RPC providers can&apos;t see who is asking.
@@ -45,11 +114,11 @@ export default function SettingsPage() {
           {options.map((n) => {
             const reason = unavailableReason(n);
             return (
-              <label key={n} className={`flex gap-3 rounded-lg border p-3 ${n === current ? "border-accent" : "border-line"} ${reason ? "opacity-60" : "cursor-pointer"}`}>
+              <label key={n} className={`flex gap-3 rounded-md border p-3 ${n === current ? "border-ink" : "border-line"} ${reason ? "opacity-60" : "cursor-pointer"}`}>
                 <input
                   type="radio"
                   name="network"
-                  className="mt-1"
+                  className="mt-1 accent-ink"
                   checked={n === current}
                   disabled={!!reason}
                   onChange={() => chooseNetwork(n)}
@@ -66,7 +135,7 @@ export default function SettingsPage() {
         </fieldset>
       </section>
 
-      <section className="rounded-2xl border border-line bg-card p-5 text-sm">
+      <section className="rounded-lg border border-line bg-card p-5 text-sm">
         <h2 className="font-medium">What is routed right now</h2>
         <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
           <dt className="text-muted">Status</dt>

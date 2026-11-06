@@ -8,6 +8,7 @@ import { createConfig, WagmiProvider, type CreateConnectorFn } from "wagmi";
 import { injected, walletConnect } from "wagmi/connectors";
 import { anonJsonRpc } from "@/lib/anon";
 import { config } from "@/lib/config";
+import { DriveProvider } from "@/lib/drive";
 
 function connectors(): CreateConnectorFn[] {
   const list: CreateConnectorFn[] = [injected()];
@@ -31,20 +32,33 @@ function connectors(): CreateConnectorFn[] {
   return list;
 }
 
+/**
+ * One wagmi config per page load, made in the browser only: wallets and WalletConnect's relay connection don't
+ * exist while the static pages are prerendered, and React's strict mode would otherwise start WalletConnect twice.
+ */
+let wagmiConfig: ReturnType<typeof createConfig> | null = null;
+function getWagmiConfig() {
+  const browser = typeof window !== "undefined";
+  if (browser && wagmiConfig) return wagmiConfig;
+  const made = createConfig({
+    chains: [sepolia],
+    connectors: browser ? connectors() : [],
+    // Every Sepolia read goes through Anon-RPC (or plain fetch when the private network is off).
+    transports: { [sepolia.id]: custom({ request: anonJsonRpc(config.sepoliaRpcUrl) }) },
+    ssr: true,
+  });
+  if (browser) wagmiConfig = made;
+  return made;
+}
+
 export function Providers({ children }: { children: ReactNode }) {
-  const [wagmi] = useState(() =>
-    createConfig({
-      chains: [sepolia],
-      connectors: connectors(),
-      // Every Sepolia read goes through Anon-RPC (or plain fetch when the private network is off).
-      transports: { [sepolia.id]: custom({ request: anonJsonRpc(config.sepoliaRpcUrl) }) },
-      ssr: true,
-    }),
-  );
+  const [wagmi] = useState(getWagmiConfig);
   const [queries] = useState(() => new QueryClient());
   return (
     <WagmiProvider config={wagmi}>
-      <QueryClientProvider client={queries}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queries}>
+        <DriveProvider>{children}</DriveProvider>
+      </QueryClientProvider>
     </WagmiProvider>
   );
 }

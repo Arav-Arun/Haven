@@ -1,45 +1,57 @@
 "use client";
 
+import { Button, ErrorNote, shortAddress } from "@cloakroom/ui";
 import { Wallet } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAccount, useConnect, useDisconnect, usePublicClient } from "wagmi";
 import { WalletConnectQr } from "./WalletConnectQr";
 
+export type WalletKind = "checking" | "eoa" | "contract" | "error";
+
 /**
- * Connects a wallet and checks, on Sepolia through Anon-RPC, whether the address has contract code.
- * Contract wallets can't produce the same signature twice, so they're pointed to passkey sign-in.
+ * Whether the connected address is a plain key (EOA) or a contract, read from Sepolia through Anon-RPC.
+ * Contract wallets can't give the same signature twice, so they can't rebuild Cloakroom keys.
  */
+export function useWalletKind(): WalletKind | null {
+  const { address } = useAccount();
+  const client = usePublicClient();
+  const [kind, setKind] = useState<WalletKind | null>(null);
+  useEffect(() => {
+    if (!address || !client) return setKind(null);
+    let live = true;
+    setKind("checking");
+    client
+      .getCode({ address })
+      .then((code) => live && setKind(code && code !== "0x" ? "contract" : "eoa"))
+      .catch(() => live && setKind("error"));
+    return () => {
+      live = false;
+    };
+  }, [address, client]);
+  return kind;
+}
+
+/** Connects a wallet: browser wallets found on the page, or a phone wallet through a locally drawn QR code. */
 export function ConnectWallet() {
   const { address, isConnected, connector } = useAccount();
   const { connect, connectors, isPending, error } = useConnect();
   const { disconnect } = useDisconnect();
-  const client = usePublicClient();
-  const [kind, setKind] = useState<"checking" | "eoa" | "contract" | "error">("checking");
-
-  useEffect(() => {
-    if (!address || !client) return;
-    setKind("checking");
-    client
-      .getCode({ address })
-      .then((code) => setKind(code && code !== "0x" ? "contract" : "eoa"))
-      .catch(() => setKind("error"));
-  }, [address, client]);
+  const kind = useWalletKind();
+  // Wallets are only found in the browser, so the list is drawn after hydration to match the prerendered page.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
 
   if (!isConnected)
     return (
       <div className="flex flex-col gap-2">
-        {connectors.length === 0 && <p className="text-sm text-muted">No browser wallet found. Install one, or use passkey sign-in.</p>}
         {connectors.map((c) => (
-          <button
-            key={c.uid}
-            onClick={() => connect({ connector: c })}
-            disabled={isPending}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-ink px-4 py-2.5 text-paper disabled:opacity-60"
-          >
-            <Wallet size={18} aria-hidden /> Connect {c.name}
-          </button>
+          <Button key={c.uid} variant="primary" onClick={() => connect({ connector: c })} disabled={isPending}>
+            <Wallet size={18} aria-hidden />
+            {c.name === "Injected" ? "Browser wallet" : c.name === "WalletConnect" ? "Phone wallet (WalletConnect)" : c.name}
+          </Button>
         ))}
-        {error && <p className="text-sm text-danger">{error.message}</p>}
+        <ErrorNote error={error} />
         <WalletConnectQr />
       </div>
     );
@@ -47,19 +59,18 @@ export function ConnectWallet() {
   return (
     <div className="flex flex-col gap-2 text-sm">
       <p>
-        Connected with {connector?.name}: <span className="font-mono">{address}</span>
+        Connected with {connector?.name}: <span title={address}>{address && shortAddress(address)}</span>
       </p>
       {kind === "checking" && <p className="text-muted">Checking your wallet type on Sepolia…</p>}
-      {kind === "eoa" && <p className="text-accent">This wallet can sign in: it signs the same message the same way every time.</p>}
       {kind === "contract" && (
         <p className="text-danger">
-          This is a smart-contract wallet. It can't give the same signature twice, so your keys wouldn't be recoverable. Use passkey
-          sign-in instead.
+          This is a smart-contract wallet. It can&apos;t give the same signature twice, so your keys couldn&apos;t be rebuilt.
+          Connect a regular wallet instead, or try Cloakroom without a wallet.
         </p>
       )}
-      {kind === "error" && <p className="text-danger">Couldn't reach Sepolia to check this wallet. See the network status above.</p>}
+      {kind === "error" && <p className="text-danger">Couldn&apos;t reach Sepolia to check this wallet. See the network status at the top.</p>}
       <button onClick={() => disconnect()} className="self-start text-muted underline">
-        Disconnect
+        Use a different wallet
       </button>
     </div>
   );

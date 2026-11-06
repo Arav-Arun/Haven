@@ -1,4 +1,5 @@
 import type { PrivateNetwork } from "@cloakroom/types";
+import { sepolia } from "viem/chains";
 
 /**
  * Every setting comes from env (see .env.example at the repo root). Nothing has a built-in fallback:
@@ -21,8 +22,11 @@ const raw = {
 type Key = keyof typeof raw;
 const NETWORKS: PrivateNetwork[] = ["nym", "nox", "tor", "off"];
 
-/** Settings the shell needs today. The data screens add API, Bee and Arkiv when core lands. */
+/** Settings the shell needs: wallet sign-in and the private network. */
 const REQUIRED_NOW: Key[] = ["NEXT_PUBLIC_APP_ORIGIN", "NEXT_PUBLIC_SEPOLIA_RPC_URL", "NEXT_PUBLIC_PRIVATE_NETWORK"];
+
+/** Settings the drive client needs on top of those: our API, the Bee node, and the API's Arkiv pass-through. */
+export const CLIENT_NEEDS: Key[] = [...REQUIRED_NOW, "NEXT_PUBLIC_API_URL", "NEXT_PUBLIC_BEE_URL", "NEXT_PUBLIC_ARKIV_RPC_URL"];
 
 export function missingConfig(keys: Key[] = REQUIRED_NOW): Key[] {
   const missing = keys.filter((k) => !raw[k]);
@@ -46,4 +50,8 @@ export const config = {
   arkivAccessKey: "",
   network: (raw.NEXT_PUBLIC_PRIVATE_NETWORK ?? "off") as PrivateNetwork,
   walletConnectProjectId: raw.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? "",
+  /** Sepolia's block explorer, from viem's chain definition. */
+  explorerUrl: sepolia.blockExplorers.default.url,
+  /** The parent of every claimed name (CLOAKROOM_PLAN.md section 5): alice.cloakroom.eth. */
+  ensParent: "cloakroom.eth",
 };

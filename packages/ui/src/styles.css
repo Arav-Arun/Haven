@@ -1,0 +1,78 @@
+/*
+ * Cloakroom's look. Import after "tailwindcss" in each app's stylesheet.
+ * The one bold element is the access ticket (.ticket): a coat-check stub whose serial number is the real random
+ * address the chain shows. Everything else stays quiet.
+ */
+@source "./";
+
+@theme {
+  --color-paper: #f1f2ee;
+  --color-card: #fafbf8;
+  --color-ink: #16302a;
+  --color-muted: #56655f;
+  --color-line: #d6dbd3;
+  --color-ticket: #f3ddb0;
+  --color-ticket-edge: #d8b97f;
+  --color-stamp: #9c2b21;
+  --color-private: #1d6b4b;
+  --color-private-soft: #dcede4;
+  --color-danger: #b3261e;
+  --color-danger-soft: #f8e1dd;
+  --color-warn: #8a5a00;
+  --color-warn-soft: #f7ecd2;
+
+  --font-sans: var(--font-hanken, ui-sans-serif), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-shoulders, ui-sans-serif), "Arial Narrow", ui-sans-serif, sans-serif;
+}
+
+@layer base {
+  html,
+  body {
+    background: var(--color-paper);
+    color: var(--color-ink);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+  }
+  dialog::backdrop {
+    background: rgb(22 48 42 / 0.35);
+  }
+}
+
+@layer components {
+  /* A coat-check stub: buff stock, a perforated tear line on the left, notches top and bottom. */
+  .ticket {
+    position: relative;
+    background-color: var(--color-ticket);
+    border: 1px solid var(--color-ticket-edge);
+    border-radius: 6px;
+    -webkit-mask:
+      radial-gradient(circle 7px at 72px 0, #0000 98%, #000) top / 100% 51% no-repeat,
+      radial-gradient(circle 7px at 72px 100%, #0000 98%, #000) bottom / 100% 51% no-repeat;
+    mask:
+      radial-gradient(circle 7px at 72px 0, #0000 98%, #000) top / 100% 51% no-repeat,
+      radial-gradient(circle 7px at 72px 100%, #0000 98%, #000) bottom / 100% 51% no-repeat;
+  }
+  .ticket::before {
+    content: "";
+    position: absolute;
+    top: 10px;
+    bottom: 10px;
+    left: 71px;
+    border-left: 2px dotted var(--color-ticket-edge);
+  }
+  .ticket-ended {
+    filter: grayscale(0.85);
+    opacity: 0.75;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

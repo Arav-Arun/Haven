@@ -39,4 +39,37 @@ In progress. Done so far:
   browser: switching to Off shows the red "Not private" badge, and switching back to Nox restores it.
 - Fixed: the bootstrap copy script now creates `public/`, which fresh clones (and Vercel) don't have.
 
-Still to do: signature collection, which needs `signInMessage` / `signIn` from Person A's core.
+- Signature collection is built (`/onboarding`): connect, contract-wallet check, one or two signatures as
+  `needsSecondSignature` says, a mismatch check, the domain warning, then `signIn`. It runs as soon as
+  `createDriveClient` is on `main`.
+- WalletConnect checked with the real project ID: the QR code is drawn on the page and no Reown modal loads.
+
+## B4 · `@cloakroom/ui`
+
+Done (typechecks against the frozen interface; 7 tests pass: formatting, error wording, the zip writer checked with
+the system `unzip`).
+- Look: cool paper, spruce ink, and one bold element, the **access ticket**: a coat-check stub whose serial number is
+  the real random address the chain shows for that member. Hanken Grotesk for text, Big Shoulders for the wordmark and
+  ticket numbers, both self-hosted at build time.
+- Components: AppShell (sidebar on desktop, bottom tabs on phones), NetworkBadge, Ticket, FolderRows / FileRows (locked
+  files say "Added after your access ended"), UploadDropzone (per-file progress, camera on phones, the padded size read
+  from the upload's Swarm receipt step), FilePreview (image, video, audio, PDF, text; the preview re-types the bytes so
+  a file labelled PDF can never render as a page), NewFolderDialog, ShareDialog (live ENS lookup, roles, "access until"
+  presets, "hide from other members", the locked-files line), MembersPanel (tickets, countdowns, via group, needs gas,
+  remove with the key-refresh line), RefreshPendingBanner, PublicViewPanel, ReceiptsDrawer (each route marked
+  "Private (Nox)" or "Direct"), and a ZIP writer for "Download folder".
+- Dialogs use the browser's own `<dialog>` instead of Radix (focus trap, Escape and backdrop built in, one less
+  dependency). PDFs use the browser's own viewer instead of pdf.js.
+
+## B5 · `apps/web`
+
+Built and wired to the real client; waiting on `createDriveClient` (see `docs/requests-b.md`).
+- Routes: `/`, `/onboarding`, `/drive`, `/rooms`, `/shared`, `/groups`, `/public`, `/settings`, `/l`, `/try`.
+  Folders are `?f=<registry>` instead of `/drive/[...path]`, because Swarm can't rewrite paths for a static export.
+  `/links` is left out: the frozen interface has `createLink` but no way to list links, so links are made from a
+  file's row and shown once.
+- With no client, every data screen says why (missing settings, or the client not in this build), never sample data.
+- `pnpm --filter @cloakroom/web build`: all 11 routes prerender as static pages. Checked in the browser at phone and
+  desktop widths.
+- Still to do: the strict CSP in `vercel.json`, after the Nox test in Chrome shows which origins the Anon-RPC worker
+  needs; the Vercel deploy.

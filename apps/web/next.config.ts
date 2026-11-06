@@ -4,7 +4,7 @@ import type { NextConfig } from "next";
 const config: NextConfig = {
   output: "export",
   images: { unoptimized: true },
-  transpilePackages: ["@cloakroom/platform", "@cloakroom/types"],
+  transpilePackages: ["@cloakroom/platform", "@cloakroom/types", "@cloakroom/ui"],
   reactStrictMode: true,
 };
 export default config;
