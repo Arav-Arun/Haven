@@ -2,5 +2,27 @@
   "name": "@cloakroom/core",
   "version": "0.0.0",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "check8": "tsx scripts/check8-fluidkey.ts",
+    "gen": "tsx scripts/gen.ts",
+    "a4": "tsx scripts/a4-live.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@arkiv-network/sdk": "1.0.1",
+    "@cloakroom/types": "workspace:*",
+    "@fluidkey/stealth-account-kit": "1.1.1",
+    "@noble/curves": "1.9.1",
+    "@noble/hashes": "1.8.0",
+    "viem": "2.57.16"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "fast-check": "4.10.2",
+    "tsx": "4.23.15",
+    "vitest": "5.1.0"
+  }
 }
