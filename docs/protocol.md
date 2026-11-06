@@ -37,3 +37,38 @@ reference for the code as built.
 ## Traffic (`transport.ts`, `@cloakroom/platform`)
 - All JSON-RPC (Sepolia and Arkiv) through Anon-RPC, isolated by the folder's key address; API and Swarm calls too
   when the worker carries generic HTTPS (measured), otherwise direct and marked so in receipts.
+
+## Add-on F1: public key log (`keydir.ts`)
+- `cloak.keylog` on Arkiv, keyed by ENS name: entries seq 0, 1, 2…, each EIP-712 signed by the name's controller
+  (K of the drive root for `<label>.cloakroom.eth`; the token owner for any other ENSv2 name) and pointing at the
+  previous entry's Arkiv key. Validity goes by the signature, so the API can relay entries (`POST /keylog`).
+- Share refuses a broken chain or a key that disagrees with `cloak.key` (`KEY_MISMATCH`), and a key that changed since
+  the last share until the user confirms (trust on first use, stored locally). Fingerprint: one word per byte of
+  `keccak256(compressed key)`, 8 words from the frozen list in `words.ts`.
+- `claimName` writes seq 0; every sign-in writes a `cloak.device` entry (90 days, renewed while used). A
+  `revoke-device` entry makes that device's app sign itself out when it next opens.
+- Another ENS name (e.g. `priya.acme.eth`) is linked by its owner wallet signing a `publish` entry for it.
+
+## Add-on F2: subtree sharing (`subtree.ts`)
+- A rule `{parent, role, until, excluded}` is stored only inside the sealed roster (managers part). Nothing is written
+  to ENS.
+- Sync (in `maintain()`, and "Sync now"): list `parent`'s subnames from its registry's `LabelRegistered` events (the
+  event carries the label), keep live ones (`getStatus`, `getExpiry`, `ownerOf`), resolve each holder's key from the
+  F1 log. New holders become ordinary stealth shares (the roster remembers name and controller); a name that is gone,
+  excluded or transferred is revoked, then one key refresh. Over 14 people is refused.
+
+## Add-on F3: verified frontend (`release.ts`, `scripts/release.ts`, the extension)
+- `manifest = {version, gitCommit, publicEnv, files: {path: sha256}}` over the export's `.html/.js/.css`;
+  `rootHash = sha256(canonical JSON)`. Build id = git commit.
+- `release publish`: the site (tar) and the manifest to Swarm, `cloak.release` signed by R, `cloakroom.eth`
+  contenthash → the site.
+- The extension re-downloads every file a Cloakroom tab loaded, hashes it, and matches a non-revoked release signed
+  by R. Only then does it answer the page's `keys-request` (on a MessageChannel port). With "Keep keys in the extension"
+  the site keeps the seed in memory only.
+
+## Add-on F4: doorbells (`doorbell.ts`)
+- Topic `HKDF(E_v[epoch], "doorbell/<folder>")`; GSOC key mined towards our Bee overlay; payload `{type, arkivKey}`
+  sealed and padded to 256 bytes; SOC signed with EIP-191 over `keccak256(id ‖ BMT address)`.
+- Writers ring on upload, share and key refresh (a refresh rings the old topic). Members subscribe to the current and
+  next epoch's topics and resubscribe at each epoch end; every ring is checked by re-reading Arkiv. No config or a
+  dropped socket: re-read Arkiv every 30 s.

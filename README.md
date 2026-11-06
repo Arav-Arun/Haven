@@ -61,6 +61,26 @@ screen is read live.
 
 Details: [`docs/plan/CLOAKROOM_PLAN.md`](docs/plan/CLOAKROOM_PLAN.md) (design), [`docs/protocol.md`](docs/protocol.md).
 
+## Add-ons
+
+| Add-on | For | What it does |
+|---|---|---|
+| **Public key log** | Arkiv | Every ENS name has an append-only, signed key history on Arkiv (`cloak.keylog`). Sharing refuses a key that doesn't match its log or its `cloak.key` record, and warns when a recipient's key changed since you last shared. Profiles (`/u/?n=name`) show the 8-word fingerprint to compare in person, the history, devices, and any forged entries (ignored). |
+| **Share with an ENS team** | ENS | Share with "everyone at `acme.eth`". The rule lives only in the folder's encrypted roster; each subname holder becomes an ordinary stealth member, and names that expire, move or are excluded lose access at the next sync. The chain only sees random addresses. |
+| **Verified frontend** | EF, CROPS | Each release's file hashes are published on Arkiv and its build on Swarm (`cloakroom.eth`'s contenthash). The extension re-downloads and hashes the files a Cloakroom tab loaded and hands keys only to a page that matches; otherwise a red warning offers the verified copy. Builds are reproducible (build id = git commit). |
+| **Live updates** | Swarm | Swarm GSOC "doorbells" on topics that change every epoch, so only current members can listen. A ring only says "check Arkiv now"; nothing is shown until the validator accepts it. Without them the app re-reads Arkiv every 30 seconds. |
+
+**Limits, said plainly.**
+- The extension catches files swapped for everyone (the Bybit case). A host that serves bad code only to one targeted
+  visitor could still pass a re-download check; the Swarm copy, fixed by its hash, is the defence there.
+- Revoking a device signs out the app on it; a copy of the seed taken from that device is not stopped.
+- Team sharing works with names whose holders have a key log (Settings → "Link another ENS name"). Sync runs when an
+  owner's or manager's app opens and every 15 minutes in the extension, so a removal takes effect at the next sync.
+- Doorbell privacy: our Bee node (through the API) sees which chunk addresses a connection subscribes to, when, and the
+  connection's IP: subscriptions are WebSockets, which the private network doesn't carry, so receipts mark them
+  "Direct". Topics rotate every epoch and can't be tied to a folder without its keys.
+- Future work: a zero-knowledge proof of membership in an ENS subtree, so team access needs no sync at all.
+
 ## Repository
 
 | Path | What |
@@ -105,7 +125,14 @@ verify command. Check with any address: `cast call <registry> "wasAllowed(addres
 
 **4. Extension.** `apps/extension/.env` (see its `.env.example`), then `pnpm --filter @cloakroom/extension zip`.
 
-**5. End-to-end check.** With the API running and `API_URL` set: `pnpm --filter @cloakroom/core e2e`. Three random
+**5. Website release (add-on F3).** Commit, then `pnpm --filter @cloakroom/web build` and
+`pnpm --filter @cloakroom/core release publish <version>` with `RELEASE_PRIVATE_KEY` (R, funded with tGLM),
+`DEPLOYER_PRIVATE_KEY`, `BEE_URL` and `POSTAGE_BATCH_ID` set. It uploads the site and its manifest to Swarm, writes
+`cloak.release` and points `cloakroom.eth` at the Swarm copy; put the printed R address in the extension's
+`WXT_RELEASE_SIGNER`. Anyone can rebuild the commit and run `release rebuild <rootHash>`; `release revoke <rootHash>`
+withdraws a build.
+
+**6. End-to-end check.** With the API running and `API_URL` set: `pnpm --filter @cloakroom/core e2e`. Three random
 identities run the whole story (room, upload, share, expiry, a locked file, removal, public view) and every
 transaction link is appended to `docs/evidence.md`.
 
@@ -126,6 +153,18 @@ const files = await arkiv.select().from(FileSchema).where(eq("folder", addr("0x<
 // each row: folder, fileId, version, epoch, swarmRef, and meta (sealed: name, type, size and file key)
 ```
 
+The public key log of a name, as any app can read it (forged entries are filtered by checking each `sig` against the
+name's controller, as `checkKeyLog` in `@cloakroom/core` does):
+
+```ts
+import { asc, eq } from "@arkiv-network/sdk/query";
+import { str } from "@arkiv-network/sdk/schema";
+import { KeyLogSchema } from "@cloakroom/core";
+
+const log = await arkiv.select().from(KeyLogSchema).where(eq("ensName", str("investor.cloakroom.eth"))).orderBy(asc("seq")).fetch();
+// each row: ensName, seq, kind, spendingPublicKey, devicePublicKey, prevEntryKey, sig (EIP-712)
+```
+
 ### Writer wallets
 
 | Who | Writes | Address |
@@ -135,6 +174,9 @@ const files = await arkiv.select().from(FileSchema).where(eq("folder", addr("0x<
 | Each user's K | Their own folders' entities | derived on the device |
 | Each room's K_room | That room's entities | derived on the device; unlinked to K |
 | Each member's stealth S | Their file entries | derived per share |
+| Relayer (API), add-ons | Arkiv: `cloak.keylog` and `cloak.device` entries users signed (validity is the signature) | same relayer |
+| Release key R | Arkiv: `cloak.release`, `cloak.unrelease` | from `RELEASE_PRIVATE_KEY`; the extension's `WXT_RELEASE_SIGNER` |
+| Any rebuilder | Arkiv: `cloak.rebuild` | their own key |
 
 ## State transitions
 
@@ -147,6 +189,10 @@ const files = await arkiv.select().from(FileSchema).where(eq("folder", addr("0x<
 | Early removal + key refresh | A manager | Removes someone | Access lasts until the end date |
 | Answer a refresh request | A folder manager's app | Keeps editors unblocked | Editors stay blocked; nothing leaks |
 | `sweep` | Anyone | Frees a member slot | The grant stays stored but inactive |
+| Key log entry (claim, new device, revoke, link a name) | The user signs; the API relays | Users can be shared with; we sponsor | No log: nobody can share with that name until the app writes it (it retries on every open) |
+| Team sync (add, remove, refresh) | An owner's or manager's app | Keeps the team's access current | A gone name keeps access until the next sync; nothing new leaks after the refresh |
+| Release, revoke, rebuild | R; anyone for rebuilds | Users can verify the site | The extension reports "unknown" and releases no keys |
+| Doorbell ring | The writer's app | Members see changes in seconds | Members find them at the next 30 s re-read |
 | Arkiv writes and renewals | Writers and managers | Their own data | Entries expire after about 182 days; Swarm data stays until the stamp runs out |
 
 No funds move in the product beyond gas dust.
@@ -161,6 +207,8 @@ No funds move in the product beyond gas dust.
 | Our API | Public keys of named drives; upload and drip requests per key; weak timing hints | IPs (when routed); room → owner (proof-of-work requests, batched drips) |
 | RPC providers / Anon-RPC exits | Requests, not who sent them | – |
 | Our Swarm gateway, if HTTPS isn't routed | Your IP ↔ which encrypted blobs you fetched | Contents, names, identities |
+| Our API and Bee node (doorbells) | Your IP ↔ which doorbell chunk addresses you listen to, and when | Which folder a topic belongs to, or anything in a ring |
+| Anyone (key log) | A name's public keys and when they changed; how many devices it lists | Device labels (sealed), which folders it's in |
 
 ## CROPS
 
@@ -176,9 +224,12 @@ No funds move in the product beyond gas dust.
   generic HTTPS. No analytics, trackers or third-party scripts: the page's security policy only allows our own scripts.
 - **S (security):** keys come from one domain-bound signature (or a passkey) and stay on the device, encrypted at rest
   under a non-extractable key. In-app keys hold only gas dust, and the registry can't be upgraded by anyone. Dangerous
-  roles stay with the main wallet. Every Arkiv entity is validated against onchain roles. Not audited.
+  roles stay with the main wallet. Every Arkiv entity is validated against onchain roles. Recipients' keys are checked
+  against their public key log before every share. Not audited.
 - **Main compromise:** keys live in the browser so there are no wallet pop-ups. **Escape:** the main wallet keeps every
-  dangerous power, and passkeys are planned.
+  dangerous power; with the extension, "Keep keys in the extension" means the website never stores them and gets them
+  only after its code matches a published, reproducible release (the moment that matters: a swapped site gets a red
+  warning instead of your keys).
 
 ## What's still exposed
 

@@ -135,3 +135,27 @@ At the owner's request, after merging `plan-a` (A1–A4), Plan A's API and clien
 - Both apps now use the real client. The website and extension build with it.
 - **Not run live yet:** needs funded keys, the Arkiv access key, a Bee node or batch, and the deployed API. The order:
   `bootstrap` → start the API → `e2e`. Until then nothing has been checked against Sepolia, Arkiv or Swarm.
+
+## Add-ons F3 (verified frontend) and the add-on UI
+
+- **Reproducible build (check):** `generateBuildId` = git commit, `SOURCE_DATE_EPOCH` = the commit's time. Two clean
+  builds (`rm -rf out .next && pnpm build`) of the same tree: every `.html`, `.js` and `.css` identical (`shasum`
+  diff: 0 lines; 123 files). `pnpm --filter @cloakroom/core release manifest` prints the root hash.
+- **Extension:** the content script lists the page, every script and stylesheet (performance entries plus the DOM);
+  the background re-downloads and hashes them, and accepts only a release signed by `WXT_RELEASE_SIGNER` and not
+  revoked, whose manifest from Swarm hashes to its `rootHash`. Badge per tab (✓, !, ?), a red full-page overlay on a
+  mismatch with "Open the verified copy" (`https://<cid>.bzz.link/`, CIDv1 of the site's Swarm reference), and the popup
+  shows the active tab's result. Keys go to the page only after a fresh check passes, on a MessageChannel port.
+- **(check) MV3 can't read response bodies,** hence the re-download. This catches files swapped for everyone; it can
+  miss a host that serves bad code to one targeted visitor only (README, Add-ons, Limits). Not built: Firefox's
+  `filterResponseData`.
+- **Website:** Settings → "Keep my keys in the extension" (the seed then stays in memory only and comes from the
+  extension at each load); without the extension it says to install it to verify the page first.
+- **Add-on UI:** profile page `/u/?n=<name>` (fingerprint, "Verify in person", key history, forged entries, own
+  devices); share dialog (fingerprint, a warning with "The words match: trust the new key", a Team tab with "N members
+  found (M have no Cloakroom key)"); members panel ("Via acme.eth", Exclude, last synced, Sync now, Stop sharing);
+  Settings (your key, devices, link another ENS name with the wallet's `signTypedData`); folder view "Live" or
+  "Checking every 30 s"; extension background keeps subscriptions (re-made each minute if the worker was stopped) and
+  notifies.
+- **Not checked in a browser yet:** none of the add-on screens has been exercised against live data (no deployment
+  yet); the extension's verification needs a published release. Web and extension builds pass.

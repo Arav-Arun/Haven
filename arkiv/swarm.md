@@ -29,6 +29,22 @@ to what was uploaded", with the Swarm reference and padded size printed for each
 - One Arkiv entity key and its Swarm reference, with an openable link: _from `docs/evidence.md` after the e2e run_
 - Timestamp in the demo video where Swarm is used: _added after recording_
 
+**Live updates: Swarm pub/sub (add-on F4, GSOC).**
+- A "doorbell" is a GSOC (graffiti single-owner chunk) write: [`packages/core/src/doorbell.ts`](../packages/core/src/doorbell.ts).
+  Its topic is `HKDF(E_v[epoch], "doorbell/<folder>")`, so only current members can compute it, and it changes every
+  epoch with the key chain.
+- Everyone who knows the topic mines the same chunk key: the first `HKDF(topic, "gsoc/<i>")` whose chunk address
+  shares `DOORBELL_PROXIMITY` leading bits with our Bee node's overlay (read from Bee's `/addresses` and served at
+  `GET /config`), so the node hears the write.
+- The payload `{type, arkivKey}` is sealed (AES-256-GCM) and padded to exactly 256 bytes. It never carries trusted
+  data: the receiver re-reads Arkiv and runs the validator before showing anything.
+- Writes: `POST /doorbell` checks the SOC signature and size, then `POST /soc/{owner}/{id}?sig=` to Bee with our
+  batch. Subscriptions: the API upgrades `/doorbell/subscribe/<address>` and pipes it to Bee's `/gsoc/subscribe/`.
+- Fallback: with no doorbell config, or when the WebSocket drops, the app re-reads Arkiv every 30 seconds instead.
+- **Not yet verified live:** whether a Bee light node delivers GSOC messages (GSOC is documented for nodes whose
+  neighbourhood stores the chunk). If it doesn't, run a full node or leave `DOORBELL_PROXIMITY` empty; the polling
+  fallback keeps the app working. See `docs/checks-a.md`.
+
 **What got in our way.**
 - A Bee node with a public API lets anyone with the batch ID upload against it, and this file has to publish the batch
   ID. We put the node on a private network and expose only a read-only gateway.

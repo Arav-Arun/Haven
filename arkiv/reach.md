@@ -14,5 +14,10 @@ gives for free (`you.cloakroom.eth`) with no gas.
 **Can they try it today?** Yes, on testnets: the website (with "Try it", no wallet needed), the installable phone app
 and the Chrome extension. Sign-in is one wallet signature; there's no app to install and no gas to buy.
 
+**Useful beyond Cloakroom.** The public key directory (`cloak.keylog`) is a standalone piece: any chat, email or
+file app that wants to encrypt to an ENS name can read a name's key and its signed history with one Arkiv query, no
+API key from us and no Cloakroom code (README, "One runnable Arkiv query"). The release log does the same for "is this
+the published build of this website".
+
 **Will we keep building?** Yes. Next: passkey sign-in (no wallet at all), groups with automatic key refresh, a Firefox
 build, and moving to mainnet once ENSv2 launches there.

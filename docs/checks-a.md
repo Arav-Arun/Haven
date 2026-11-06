@@ -280,3 +280,41 @@ every role question is answered by the real contract's history. Run `forge build
 - **Child folders are listed from logs (`eth_getLogs`).** This is the plan's "(check)" item. The scan starts at the
   registry's creation block and halves the range when a provider refuses one. Whether the chosen RPC accepts it is
   part of the live run; the fallback (a sealed `cloak.index` entity per owner) stays available.
+
+## Add-ons F1, F2, F4 (core and API), done on plan-b
+
+Spec: the add-ons build spec (F1 key log, F2 subtree sharing, F3 verified frontend, F4 doorbells). Names follow the
+repo (`cloak.*`, `cloakroom.eth`) rather than the spec's older `hush.*`, `hushdrive.eth`.
+
+- **Interface:** `packages/types` is frozen on branches, so the new members live in `packages/core/src/extras.ts`
+  (`CloakroomClient extends DriveClient`); `docs/requests-b.md` asks for them on `main`.
+- **F1 check, the signer.** The spec says "the signer is the name's current drive-root K". That holds for
+  `<label>.cloakroom.eth` (`driveOwner(findExactRegistry(name))`). Other names (needed for F2: `priya.acme.eth`) have no
+  drive root, so their controller is the token owner in the parent registry (`getStatus`, `getExpiry`, `getTokenId`,
+  `ownerOf`). Validity goes by the EIP-712 signature, not `$creator`, so the API relays entries (`POST /keylog`) and
+  users need no tGLM; a forged entry is ignored and listed.
+- **F1 deviation:** the fingerprint uses the first 8 bytes of `keccak256(compressed key)`, one word per byte from a
+  frozen 256-word list (64 bits), instead of 4 bytes as 8 words (which would be 4 bits per word).
+- **F1 deviation:** `spendingPublicKey` is stored compressed (0x + 66 hex): uncompressed is over Arkiv's 128-byte str
+  limit. Empty values are written as `"none"` (Arkiv attributes are set or absent).
+- **F2 check: listing subnames.** `LabelRegistered(tokenId, labelHash, label, owner, expiry, sender)` carries the label
+  string, so no `LabelStore` read is needed; it's the same event our own `listChildren` already uses (DriveRegistry
+  inherits it from `PermissionedRegistry`). The scan of someone else's registry starts at its creation block, found by
+  binary search over `eth_getCode` (needs an RPC that serves past state). **Not yet run against a live third-party
+  registry.**
+- **F2:** the "until the sync runs" refresh-request case can't arise as written: only managers can read the rule
+  (it's in the sealed roster), and a manager's app always holds the folder secret, so it refreshes directly.
+- **F4 check: GSOC with bee-js 13.2.0 and our node.** Implemented against Bee's HTTP API directly (no bee-js
+  dependency): SOC upload `POST /soc/{owner}/{id}?sig=`, subscription `GET /gsoc/subscribe/{address}` (WebSocket,
+  proxied by the API, which keeps Bee private), BMT chunk address (tested against Swarm's known empty-chunk address
+  `b34ca8c2…`), EIP-191 SOC signature. **Not verified live:** whether a Bee *light* node (`infra/bee`) delivers GSOC
+  messages; GSOC is documented for nodes in the chunk's neighbourhood. **Fallback, already built:** with no doorbell
+  config (`DOORBELL_PROXIMITY` empty) or a dropped socket, the client re-reads Arkiv every 30 s. Spec's feed fallback
+  was replaced by this, since it works without a postage write per poll.
+- **F4:** the personal inbox doorbell was not built: as the spec notes, the first share is still found by the Arkiv
+  scan, and every later event comes through the room doorbell.
+- **Tests:** `packages/core/test/addons.test.ts`, 18 tests (key chains: valid, gap, broken link, tampered, forged,
+  wrong signer; agreement; trust on first use; fingerprints; expired and revoked devices; subtree add, revoke, exclude,
+  transfer, cap, and that the sealed roster contains neither `acme` nor its namehash; doorbell 256-byte payloads,
+  wrong-topic and forged rings, topic per epoch, mining; release manifests). Core: 68 tests pass. API: 9 (adds
+  `/keylog` and `/doorbell` refusals).
