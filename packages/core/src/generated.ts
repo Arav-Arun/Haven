@@ -2335,6 +2335,7 @@ export const verifiableFactoryAbi = [
 
 export const sepoliaDeployment = {
   "chainId": 11155111,
+  "forkBlock": 12073875,
   "ensv2": {
     "ETHRegistrar": "0xf633e7FC17e2bbE0D0965D18ec1821dcB754a3d3",
     "ETHRegistry": "0xD4eBcbBdF463C9c45784603Db0dDD499BC44A8B4",
@@ -2343,8 +2344,12 @@ export const sepoliaDeployment = {
     "PermissionedResolverImpl": "0x115eb53F0c60696633855F90b138178Fb40b2b2C",
     "VerifiableFactory": "0xDa70306C98E97eCe36F997a21368e53298572991",
     "UniversalResolverV2": "0x24E1D8e068620B647CA097f961A61055f4f42D72",
+    "UniversalHelper": "0xd453e5Bdb62CC3beA84341B1e306319C8Ffd7DFe",
     "LabelStore": "0xed8246FF02203a4d4cb262bD78bEAA7408A57cAE",
-    "ContractNamer": "0x606f2453484f4Fa85b6E5FDB0E0bf777064bf9F3"
+    "ContractNamer": "0x606f2453484f4Fa85b6E5FDB0E0bf777064bf9F3",
+    "StandardRentPriceOracle": "0x8196665D4ca7488B6474a9EC8E7d2719FB42263A",
+    "MockUSDC": "0x240b0316Df57887DBBE58b586508b19e633a14aa",
+    "MockDAI": "0xF6faC8A58a0BE13b9197f27C41B73162Fe32572b"
   },
   "cloakroom": {}
 } as const;

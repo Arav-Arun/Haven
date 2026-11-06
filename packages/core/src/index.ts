@@ -9,6 +9,7 @@ export * from "./epochs";
 export * from "./errors";
 export * from "./keycopies";
 export * from "./keys";
+export * from "./naming";
 export * from "./padding";
 export * from "./receipts";
 export * from "./records";

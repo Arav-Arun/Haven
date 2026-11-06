@@ -24,18 +24,21 @@ contract DeployDriveRegistry is Script {
         require(block.chainid == 11155111, "Sepolia only");
         string memory json = vm.readFile(string.concat(vm.projectRoot(), "/deployments/sepolia.json"));
         address labelStore = json.readAddress(".ensv2.LabelStore");
-        address namer = json.readAddress(".ensv2.ContractNamer");
         address userRegistryImpl = json.readAddress(".ensv2.UserRegistryImpl");
+        uint256 deployerKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
+        // The implementation's namer (who may give it a reverse name) is our deployer, the way ENS's own
+        // UserRegistryImpl names ENS's owner account. Proxies don't inherit it: they are initialized separately.
+        address namer = vm.addr(deployerKey);
 
-        // Same wiring checks as the fork test, against the live chain, before spending gas.
-        require(labelStore.code.length > 0 && namer.code.length > 0, "ENSv2 addresses have no code");
+        // Same wiring check as the fork test, against the live chain, before spending gas.
+        require(labelStore.code.length > 0, "LabelStore has no code");
         require(address(UserRegistry(userRegistryImpl).LABEL_STORE()) == labelStore, "LabelStore differs from ENS's");
-        require(UserRegistry(userRegistryImpl).isContractNamer(namer), "ContractNamer differs from ENS's");
 
-        vm.startBroadcast(vm.envUint("DEPLOYER_PRIVATE_KEY"));
+        vm.startBroadcast(deployerKey);
         impl = new DriveRegistry(ILabelStore(labelStore), namer);
         vm.stopBroadcast();
 
         console.log("DriveRegistry implementation:", address(impl));
+        console.log("block:", block.number);
     }
 }

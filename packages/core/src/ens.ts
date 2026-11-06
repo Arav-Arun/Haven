@@ -27,7 +27,7 @@ import {
 import { getEnsText } from "viem/actions";
 import { normalize } from "viem/ens";
 
-import { ensv2, txUrl, universalResolverV2Abi } from "./addresses";
+import { ensv2, txUrl, universalHelperAbi } from "./addresses";
 import { randomBytes } from "./crypto";
 import { revertCode, toDriveError } from "./errors";
 import { driveRegistryAbi, verifiableFactoryAbi } from "./generated";
@@ -143,8 +143,8 @@ export async function getCloakKey(client: SepoliaReader, name: string): Promise<
 export async function findRegistry(client: SepoliaReader, name: string): Promise<Address | null> {
   try {
     const registry = await client.readContract({
-      address: ensv2.UniversalResolverV2,
-      abi: universalResolverV2Abi,
+      address: ensv2.UniversalHelper,
+      abi: universalHelperAbi,
       functionName: "findExactRegistry",
       args: [dnsEncode(name)],
     });
@@ -351,7 +351,7 @@ export async function listChildren(
 const errorAbi = [...driveRegistryAbi, ...verifiableFactoryAbi].filter((e) => e.type === "error");
 
 /** Simulates, sends and waits for one transaction; reports it as a receipt step; throws a DriveError on failure. */
-async function send(
+export async function sendTx(
   writer: SepoliaWriter,
   label: string,
   to: Address,
@@ -421,28 +421,49 @@ export interface DeployDriveParams {
   factory?: Address;
 }
 
-/** Deploys a DriveRegistry proxy through the stock VerifiableFactory, initialised atomically. */
+/**
+ * Deploys a proxy of `implementation` through the stock VerifiableFactory and runs `init` in the same transaction, so
+ * nobody can initialise it first. The salt is random, so the address can't be predicted or linked.
+ */
+export async function deployProxy(
+  writer: SepoliaWriter,
+  params: { implementation: Address; init: Hex; label: string; factory?: Address },
+  step: StepSink = ignoreSteps,
+): Promise<{ proxy: Address; blockNumber: bigint }> {
+  const salt = BigInt(toHex(randomBytes(32)));
+  const data = encodeFunctionData({
+    abi: verifiableFactoryAbi,
+    functionName: "deployProxy",
+    args: [params.implementation, salt, params.init],
+  });
+  const receipt = await sendTx(writer, params.label, params.factory ?? ensv2.VerifiableFactory, data, step);
+  const [deployed] = parseEventLogs({ abi: verifiableFactoryAbi, eventName: "ProxyDeployed", logs: receipt.logs });
+  if (!deployed) throw new DriveError("UNKNOWN", "ProxyDeployed event missing");
+  return { proxy: getAddress(deployed.args.proxyAddress), blockNumber: receipt.blockNumber };
+}
+
+/** Deploys a DriveRegistry proxy (a drive root, folder, room or group), initialised atomically. */
 export async function deployDrive(
   writer: SepoliaWriter,
   params: DeployDriveParams,
   step: StepSink = ignoreSteps,
 ): Promise<{ registry: Address; blockNumber: bigint }> {
-  const factory = params.factory ?? ensv2.VerifiableFactory;
   const init = encodeFunctionData({
     abi: driveRegistryAbi,
     functionName: "initializeDrive",
     args: [params.driveKey, params.mainWallet ?? zeroAddress],
   });
-  const salt = BigInt(toHex(randomBytes(32))); // random, so the address can't be predicted or linked
-  const data = encodeFunctionData({
-    abi: verifiableFactoryAbi,
-    functionName: "deployProxy",
-    args: [params.implementation, salt, init],
-  });
-  const receipt = await send(writer, "Create folder registry", factory, data, step);
-  const [deployed] = parseEventLogs({ abi: verifiableFactoryAbi, eventName: "ProxyDeployed", logs: receipt.logs });
-  if (!deployed) throw new DriveError("UNKNOWN", "ProxyDeployed event missing");
-  return { registry: getAddress(deployed.args.proxyAddress), blockNumber: receipt.blockNumber };
+  const { proxy, blockNumber } = await deployProxy(
+    writer,
+    {
+      implementation: params.implementation,
+      init,
+      label: "Create folder registry",
+      ...(params.factory ? { factory: params.factory } : {}),
+    },
+    step,
+  );
+  return { registry: proxy, blockNumber };
 }
 
 export interface RegisterParams {
@@ -471,7 +492,7 @@ export async function registerName(writer: SepoliaWriter, params: RegisterParams
       params.expiry,
     ],
   });
-  return send(writer, `Register ${params.label}`, params.parent, data, step);
+  return sendTx(writer, `Register ${params.label}`, params.parent, data, step);
 }
 
 export interface CreateFolderParams {
@@ -514,7 +535,7 @@ export async function grantRoleUntil(
     functionName: "grantRolesUntil",
     args: [roleBits(role), account, toUntil(until)],
   });
-  return send(writer, `Grant ${role}`, registry, data, step);
+  return sendTx(writer, `Grant ${role}`, registry, data, step);
 }
 
 /** Removes every drive role (and admin bit) from `account` now. */
@@ -529,13 +550,13 @@ export async function revokeAccess(
     functionName: "revokeRootRoles",
     args: [ALL_DRIVE_ROLES, account],
   });
-  return send(writer, "Remove access", registry, data, step);
+  return sendTx(writer, "Remove access", registry, data, step);
 }
 
 /** Frees the holder slot of an expired grant. Anyone may call it; the history stays. */
 export async function sweep(writer: SepoliaWriter, registry: Address, account: Address, step: StepSink = ignoreSteps) {
   const data = encodeFunctionData({ abi: driveRegistryAbi, functionName: "sweep", args: [account] });
-  return send(writer, "Free an expired slot", registry, data, step);
+  return sendTx(writer, "Free an expired slot", registry, data, step);
 }
 
 /** An expiring link name `l-<random>` in a folder's registry. It points nowhere; it only carries the end date. */
