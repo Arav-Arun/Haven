@@ -33,7 +33,7 @@ function Shared() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Shared with me</h1>
+        <h1 className="text-3xl font-bold tracking-[-0.035em]">Shared with me</h1>
         <p className="mt-1 max-w-prose text-sm text-muted">
           Your tickets. Each one is held by a random address only you can link to your name.
         </p>

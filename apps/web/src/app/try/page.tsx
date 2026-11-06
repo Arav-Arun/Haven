@@ -59,7 +59,7 @@ function PersonaCard({ persona, client, onReady }: { persona: Persona; client: D
       {identity?.ensName ? (
         <Ticket address={identity.driveKey} href={`${config.explorerUrl}/address/${identity.driveKey}`} title={identity.ensName} subtitle={`The ${persona}`} role="owner" until={null} now={now} />
       ) : (
-        <div className="flex flex-col gap-3 rounded-lg border border-line bg-card p-4">
+        <div className="flex flex-col gap-3 surface rounded-2xl p-4">
           <h2 className="font-semibold">The {persona}</h2>
           <p className="text-sm text-muted">
             {persona === "founder"
@@ -100,7 +100,7 @@ export default function TryIt() {
       </header>
       <main className="flex flex-col gap-6 pb-16 pt-4">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Try it without a wallet</h1>
+          <h1 className="text-4xl font-bold tracking-[-0.04em]">Try it without a wallet</h1>
           <p className="mt-2 max-w-prose text-muted">
             Two people, both played by you in this tab. Each gets a fresh key made on this device and a real name on the Sepolia
             test network. Nothing is set up in advance: you make the room, add your own files, and share them.
@@ -117,7 +117,7 @@ export default function TryIt() {
               <PersonaCard persona="investor" client={investor} onReady={onInvestor} />
             </div>
             {ready.founder && ready.investor && (
-              <div className="flex flex-col gap-3 rounded-lg border border-line bg-card p-4">
+              <div className="flex flex-col gap-3 surface rounded-2xl p-4">
                 <p>
                   Start as the founder: make a room, drop in a file, and share it with <strong>{ready.investor.ensName}</strong>{" "}
                   for a few minutes. Then switch to the investor from the bar at the top.

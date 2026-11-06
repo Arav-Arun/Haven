@@ -24,8 +24,8 @@ function Choice({
   name: string;
 }) {
   return (
-    <label className={cx("flex cursor-pointer gap-3 rounded-md border p-3", checked ? "border-ink" : "border-line")}>
-      <input type="radio" name={name} checked={checked} onChange={onSelect} className="mt-1 accent-ink" />
+    <label className={cx("flex cursor-pointer gap-3 rounded-xl border p-3", checked ? "border-action bg-action-soft/50" : "border-line bg-white")}>
+      <input type="radio" name={name} checked={checked} onChange={onSelect} className="mt-1 accent-action" />
       <span className="text-sm">
         <span className="font-medium">{title}</span>
         <span className="block text-muted">{about}</span>

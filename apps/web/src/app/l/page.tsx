@@ -47,7 +47,7 @@ export default function OpenLink() {
         )}
         {result && (
           <>
-            <h1 className="text-2xl font-semibold tracking-tight">{result.file.name}</h1>
+            <h1 className="text-3xl font-bold tracking-[-0.035em]">{result.file.name}</h1>
             <FilePreview
               blob={result.blob}
               name={result.file.name ?? "file"}

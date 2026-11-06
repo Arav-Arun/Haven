@@ -27,14 +27,14 @@ export function FilePreview({ blob, name, mime, onDownload }: { blob: Blob; name
 
   if (!url) return null;
   let body: ReactNode;
-  if (mime.startsWith("image/")) body = <img src={url} alt={name} className="mx-auto max-h-[70vh] rounded-md object-contain" />;
-  else if (mime.startsWith("video/")) body = <video src={url} controls className="max-h-[70vh] w-full rounded-md bg-ink" />;
+  if (mime.startsWith("image/")) body = <img src={url} alt={name} className="mx-auto max-h-[70vh] rounded-xl object-contain" />;
+  else if (mime.startsWith("video/")) body = <video src={url} controls className="max-h-[70vh] w-full rounded-xl bg-ink" />;
   else if (mime.startsWith("audio/")) body = <audio src={url} controls className="w-full" />;
   else if (mime === "application/pdf")
-    body = <iframe src={url} title={name} className="h-[70vh] w-full rounded-md border border-line bg-paper" />;
+    body = <iframe src={url} title={name} className="h-[70vh] w-full rounded-xl border border-line bg-paper" />;
   else if (isText(mime))
     body = (
-      <pre className="max-h-[70vh] overflow-auto whitespace-pre-wrap rounded-md border border-line bg-paper p-3 text-sm">
+      <pre className="max-h-[70vh] overflow-auto whitespace-pre-wrap rounded-xl border border-line bg-paper p-3 text-sm">
         {text}
         {blob.size > TEXT_LIMIT && "\n…"}
       </pre>
@@ -48,7 +48,7 @@ export function FilePreview({ blob, name, mime, onDownload }: { blob: Blob; name
         <span>
           {mime || "Unknown type"}, {formatBytes(blob.size)}. Decrypted on this device.
         </span>
-        <button onClick={onDownload} className="inline-flex items-center gap-1.5 rounded-md border border-line bg-card px-3 py-1.5 text-ink">
+        <button onClick={onDownload} className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-card px-3 py-1.5 text-ink">
           <Download size={16} aria-hidden /> Download
         </button>
       </div>

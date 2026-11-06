@@ -3,6 +3,7 @@
 import type { DeviceInfo } from "@haven/core";
 import { extensionPresent } from "@haven/platform";
 import { Button, ErrorNote, FingerprintWords, Skeleton, formatAgo, formatDate, inputClass } from "@haven/ui";
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAccount, useSignTypedData } from "wagmi";
@@ -29,7 +30,7 @@ export function Devices({ now }: { now: number }) {
     }
   };
   return (
-    <section className="rounded-lg border border-line bg-card p-5 text-sm">
+    <section className="surface rounded-2xl p-5 text-sm">
       <h2 className="font-medium">Your devices</h2>
       <p className="mt-1 text-muted">
         Each device you sign in on is listed in your public log (its label is encrypted to you). A device not used for 90 days
@@ -67,16 +68,24 @@ export function MyKey() {
   const info = useLoad(identity?.ensName ? (c) => c.lookupKey(identity.ensName!) : null, [identity?.ensName]);
   if (!identity?.ensName) return null;
   return (
-    <section className="rounded-lg border border-line bg-card p-5 text-sm">
+    <section className="surface rounded-2xl p-5 text-sm">
       <h2 className="font-medium">Your public key</h2>
       <p className="mt-1 text-muted">
         Anyone sharing with {identity.ensName} encrypts to this key. Its history is public on Arkiv, so a swapped key would show.
       </p>
       {info.loading && !info.data && <Skeleton rows={1} />}
       <ErrorNote error={info.error} />
-      {info.data && <FingerprintWords words={info.data.fingerprint} className="mt-3" />}
-      <Link className="mt-3 inline-block underline" href={`/u/?n=${encodeURIComponent(identity.ensName)}`}>
-        Open your public profile
+      {info.data && (
+        <div className="mt-4 rounded-xl bg-paper px-3.5 py-3">
+          <p className="text-xs font-medium text-muted">Fingerprint, to compare in person</p>
+          <FingerprintWords words={info.data.fingerprint} className="mt-2 gap-1.5 [&>span]:px-2 [&>span]:py-0.5 [&>span]:text-xs" />
+        </div>
+      )}
+      <Link
+        className="mt-4 inline-flex items-center gap-1.5 font-semibold text-action hover:underline"
+        href={`/u/?n=${encodeURIComponent(identity.ensName)}`}
+      >
+        Open your public profile <ArrowRight size={14} aria-hidden />
       </Link>
     </section>
   );
@@ -93,7 +102,7 @@ export function LinkName() {
   const [done, setDone] = useState<string | null>(null);
   if (!client || !identity) return null;
   return (
-    <section className="rounded-lg border border-line bg-card p-5 text-sm">
+    <section className="surface rounded-2xl p-5 text-sm">
       <h2 className="font-medium">Link another ENS name</h2>
       <p className="mt-1 text-muted">
         If your team gives you a name like you.team.eth, link it here so folders shared with &quot;everyone at team.eth&quot; reach you.
@@ -144,7 +153,7 @@ export function KeysInExtension() {
   }, []);
   if (profile !== "me") return null;
   return (
-    <section className="rounded-lg border border-line bg-card p-5 text-sm">
+    <section className="surface rounded-2xl p-5 text-sm">
       <h2 className="font-medium">Verified page before keys</h2>
       {present === false ? (
         <p className="mt-1 text-muted">
@@ -160,7 +169,7 @@ export function KeysInExtension() {
           <label className="mt-3 flex items-center gap-2">
             <input
               type="checkbox"
-              className="accent-ink"
+              className="accent-action"
               checked={on}
               disabled={pending || present === null}
               onChange={async (e) => {

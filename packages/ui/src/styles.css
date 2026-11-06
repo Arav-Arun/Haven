@@ -1,52 +1,209 @@
 /*
- * Haven's look. Import after "tailwindcss" in each app's stylesheet.
- * The one bold element is the access ticket (.ticket): a coat-check stub whose serial number is the real random
- * address the chain shows. Everything else stays quiet.
+ * Haven's look, the same as the landing page (apps/web/src/app/landing.css): a pale sky page, white cards, deep navy
+ * ink and one bright blue for actions. Import after "tailwindcss" in each app's stylesheet.
+ * The one bold element is the access ticket (.ticket): a claim stub whose serial number is the real random address
+ * the chain shows. Everything else stays quiet.
  */
 @source "./";
 
 @theme {
-  --color-paper: #f1f2ee;
-  --color-card: #fafbf8;
-  --color-ink: #16302a;
-  --color-muted: #56655f;
-  --color-line: #d6dbd3;
-  --color-ticket: #f3ddb0;
-  --color-ticket-edge: #d8b97f;
-  --color-stamp: #9c2b21;
+  --color-paper: #eef3fa;
+  --color-card: #ffffff;
+  --color-ink: #0d1b33;
+  --color-muted: #5a6b86;
+  --color-line: #dbe4f1;
+  --color-action: #1f4fd1;
+  --color-action-soft: #e8efff;
+  --color-ticket: #f7faff;
+  --color-ticket-edge: #c4d5f2;
+  --color-stamp: #1f4fd1;
   --color-private: #1d6b4b;
-  --color-private-soft: #dcede4;
-  --color-danger: #b3261e;
-  --color-danger-soft: #f8e1dd;
+  --color-private-soft: #e7f5ee;
+  --color-danger: #a3261d;
+  --color-danger-soft: #fdeceb;
   --color-warn: #8a5a00;
-  --color-warn-soft: #f7ecd2;
+  --color-warn-soft: #f9f0dc;
 
   --font-sans: var(--font-hanken, ui-sans-serif), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-display: var(--font-shoulders, ui-sans-serif), "Arial Narrow", ui-sans-serif, sans-serif;
+  --font-display: var(--font-hanken, ui-sans-serif), ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer base {
   html,
-  body {
-    background: var(--color-paper);
+  body,
+  .page-surface {
+    /* The landing's sky, faded down to the page colour near the top. */
+    background: linear-gradient(180deg, #a9c6f5 0, #c9dcf8 160px, #e4edfb 320px, var(--color-paper) 520px) no-repeat, var(--color-paper);
     color: var(--color-ink);
   }
+  ::selection {
+    background: rgb(31 79 209 / 0.18);
+  }
   :focus-visible {
-    outline: 2px solid var(--color-ink);
+    outline: 2px solid var(--color-action);
     outline-offset: 2px;
   }
   dialog::backdrop {
-    background: rgb(22 48 42 / 0.35);
+    background: rgb(13 27 51 / 0.35);
+    backdrop-filter: blur(4px);
   }
 }
 
 @layer components {
-  /* A coat-check stub: buff stock, a perforated tear line on the left, notches top and bottom. */
+  /*
+   * Rising-circle hover (the React Bits PillNav pattern, in CSS): a circle grows up from the bottom of the pill while
+   * the label rolls up and out and a copy rolls in, in --fx-text. Markup comes from FxLabel; set --fx-fill and
+   * --fx-text per use. Only for pointers that can hover, so a tap on a phone never leaves it stuck.
+   */
+  .fx {
+    --fx-fill: var(--color-action);
+    --fx-text: #fff;
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    /* Its own layer: without it Chrome can skip the rounded clip while the circle animates. */
+    transform: translateZ(0);
+  }
+  .fx-circle {
+    position: absolute;
+    left: 50%;
+    top: 100%;
+    z-index: -1;
+    /* Centred on the bottom edge and wide enough to cover both top corners of any pill up to ~5rem tall. */
+    width: calc(100% + 5rem);
+    aspect-ratio: 1;
+    border-radius: 9999px;
+    background: var(--fx-fill);
+    transform: translate(-50%, -50%) scale(0);
+    transition: transform 200ms cubic-bezier(0.33, 1, 0.68, 1);
+    pointer-events: none;
+  }
+  .fx-stack {
+    position: relative;
+    z-index: 1;
+    display: inline-grid;
+    gap: inherit;
+  }
+  .fx-stack > * {
+    grid-area: 1 / 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: inherit;
+    transition:
+      transform 200ms cubic-bezier(0.33, 1, 0.68, 1),
+      opacity 200ms ease;
+  }
+  .fx-hover {
+    color: var(--fx-text);
+    opacity: 0;
+    transform: translateY(calc(100% + 12px));
+  }
+  @media (hover: hover) {
+    .fx:not(:disabled):hover .fx-circle {
+      transform: translate(-50%, -50%) scale(1);
+      transition-duration: 300ms;
+    }
+    .fx:not(:disabled):hover .fx-label {
+      transform: translateY(calc(-100% - 8px));
+      transition-duration: 300ms;
+    }
+    .fx:not(:disabled):hover .fx-hover {
+      transform: none;
+      opacity: 1;
+      transition-duration: 300ms;
+    }
+  }
+
+  /*
+   * Clay buttons: soft, puffy pills. A light inner highlight at the top left, a darker inner shade at the bottom
+   * right and a soft drop shadow. The inner shading is drawn on ::after, above the .fx circle and below the label,
+   * so the pill stays puffy while the hover fill rises. Blue fills white on hover; white fills blue.
+   *   .btn-action  the main action (blue)    .btn-clay  everything else (white)    .btn-danger  destructive (red)
+   */
+  .btn-action,
+  .btn-clay,
+  .btn-danger {
+    position: relative;
+    isolation: isolate;
+    border-radius: 9999px;
+    transition:
+      transform 160ms ease,
+      box-shadow 160ms ease;
+  }
+  .btn-action::after,
+  .btn-clay::after,
+  .btn-danger::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+  }
+  .btn-action {
+    --fx-fill: #ffffff;
+    --fx-text: var(--color-action);
+    background: linear-gradient(160deg, #5b8dff 0%, #3466ec 55%, var(--color-action) 100%);
+    color: #fff;
+    box-shadow:
+      0 12px 22px -10px rgb(31 79 209 / 0.6),
+      0 3px 6px -2px rgb(31 79 209 / 0.3);
+  }
+  .btn-action::after {
+    box-shadow:
+      inset 3px 3px 6px rgb(255 255 255 / 0.45),
+      inset -3px -4px 8px rgb(10 30 110 / 0.35);
+  }
+  .btn-clay {
+    --fx-fill: var(--color-action);
+    --fx-text: #fff;
+    background: linear-gradient(160deg, #ffffff 0%, #f3f7ff 100%);
+    color: var(--color-action);
+    box-shadow:
+      0 12px 22px -12px rgb(28 64 140 / 0.45),
+      0 3px 6px -3px rgb(28 64 140 / 0.2);
+  }
+  .btn-clay::after {
+    box-shadow:
+      inset 3px 3px 6px #ffffff,
+      inset -3px -4px 8px rgb(120 150 210 / 0.35);
+  }
+  .btn-danger {
+    --fx-fill: #ffffff;
+    --fx-text: var(--color-danger);
+    background: linear-gradient(160deg, #d2453a 0%, var(--color-danger) 100%);
+    color: #fff;
+    box-shadow:
+      0 12px 22px -10px rgb(163 38 29 / 0.55),
+      0 3px 6px -2px rgb(163 38 29 / 0.25);
+  }
+  .btn-danger::after {
+    box-shadow:
+      inset 3px 3px 6px rgb(255 255 255 / 0.35),
+      inset -3px -4px 8px rgb(80 10 5 / 0.35);
+  }
+  :is(.btn-action, .btn-clay, .btn-danger):not(:disabled):hover {
+    transform: translateY(-1px);
+  }
+  :is(.btn-action, .btn-clay, .btn-danger):not(:disabled):active {
+    transform: translateY(1px) scale(0.98);
+  }
+
+  /* A white card on the sky page. */
+  .surface {
+    background: var(--color-card);
+    border: 1px solid rgb(255 255 255 / 0.9);
+    box-shadow:
+      0 1px 2px rgb(13 27 51 / 0.04),
+      0 18px 40px -26px rgb(28 64 140 / 0.35);
+  }
+
+  /* A claim stub: pale blue stock, a perforated tear line on the left, notches top and bottom. */
   .ticket {
     position: relative;
-    background-color: var(--color-ticket);
+    background: linear-gradient(155deg, #ffffff, var(--color-ticket) 60%, #edf3ff);
     border: 1px solid var(--color-ticket-edge);
-    border-radius: 6px;
+    border-radius: 14px;
     -webkit-mask:
       radial-gradient(circle 7px at 72px 0, #0000 98%, #000) top / 100% 51% no-repeat,
       radial-gradient(circle 7px at 72px 100%, #0000 98%, #000) bottom / 100% 51% no-repeat;
@@ -66,6 +223,197 @@
     filter: grayscale(0.85);
     opacity: 0.75;
   }
+}
+
+/*
+ * Kinetic menu (KineticMenu.tsx): the app's main menu. Three layers slide in from the right one after another (sky,
+ * deep blue, then the page the links sit on), the links roll up into place, the rest fades in. Closing slides the
+ * whole panel out at once; "closed" then resets everything to its start without animating.
+ */
+.kinetic-dialog {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: hidden;
+}
+.kinetic-dialog::backdrop {
+  background: transparent;
+  backdrop-filter: none;
+}
+.kinetic-menu {
+  --kinetic-ease: cubic-bezier(0.65, 0.01, 0.05, 0.99);
+  position: absolute;
+  inset: 0;
+}
+.kinetic-menu[data-state="closed"] * {
+  transition: none !important;
+}
+.kinetic-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgb(13 27 51 / 0.35);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  opacity: 0;
+  transition: opacity 700ms var(--kinetic-ease);
+}
+.kinetic-menu[data-state="open"] .kinetic-overlay {
+  opacity: 1;
+}
+.kinetic-panel {
+  position: absolute;
+  inset-block: 0;
+  right: 0;
+  display: flex;
+  width: min(520px, 100vw);
+  transition: transform 700ms var(--kinetic-ease);
+}
+.kinetic-menu[data-state="closing"] .kinetic-panel {
+  transform: translateX(120%);
+}
+.kinetic-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  transform: translateX(101%);
+  transition: transform 575ms var(--kinetic-ease) calc(var(--i) * 120ms);
+}
+.kinetic-layer:nth-child(1) {
+  background: #8fb5f2;
+}
+.kinetic-layer:nth-child(2) {
+  background: #3f78e3;
+}
+.kinetic-layer-page {
+  background: linear-gradient(180deg, #d4e3fb 0, var(--color-paper) 320px) no-repeat, var(--color-paper);
+  box-shadow: -30px 0 60px -30px rgb(13 27 51 / 0.35);
+}
+.kinetic-menu:not([data-state="closed"]) .kinetic-layer {
+  transform: none;
+}
+.kinetic-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  overflow-y: auto;
+  padding: 1.5rem 2rem 2rem;
+}
+/* Each link rolls up from below its own row, which clips it. */
+.kinetic-item {
+  overflow: hidden;
+}
+.kinetic-link {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 0.3rem 0;
+  transform: translateY(140%) rotate(10deg);
+  transform-origin: left bottom;
+  transition: transform 700ms var(--kinetic-ease) calc(350ms + var(--i) * 50ms);
+}
+.kinetic-menu:not([data-state="closed"]) .kinetic-link {
+  transform: none;
+}
+.kinetic-link-index {
+  min-width: 1.6rem;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-action);
+  font-variant-numeric: tabular-nums;
+}
+.kinetic-link-text {
+  font-size: clamp(2.4rem, 6vw, 3.75rem);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.045em;
+  color: var(--color-ink);
+  transition:
+    color 300ms ease,
+    transform 450ms var(--kinetic-ease);
+}
+.kinetic-link:hover .kinetic-link-text,
+.kinetic-link:focus-visible .kinetic-link-text {
+  color: var(--color-action);
+  transform: translateX(0.15em);
+}
+.kinetic-link:focus-visible {
+  outline: none;
+}
+/* The screen you're on: blue, with a dot after it. */
+.kinetic-link.is-current .kinetic-link-text {
+  color: var(--color-action);
+}
+.kinetic-link.is-current .kinetic-link-text::after {
+  content: "";
+  display: inline-block;
+  width: 0.16em;
+  height: 0.16em;
+  margin-left: 0.18em;
+  border-radius: 9999px;
+  background: currentColor;
+  vertical-align: 0.12em;
+}
+.kinetic-fade {
+  opacity: 0;
+  transform: translateY(50%);
+  transition:
+    opacity 600ms var(--kinetic-ease) calc(650ms + var(--i) * 40ms),
+    transform 600ms var(--kinetic-ease) calc(650ms + var(--i) * 40ms);
+}
+.kinetic-menu:not([data-state="closed"]) .kinetic-fade {
+  opacity: 1;
+  transform: none;
+}
+/* Background shapes: hovering a screen wakes its own, each piece popping in on its own delay. */
+.kinetic-shape {
+  position: absolute;
+  right: -10%;
+  bottom: -6%;
+  width: 95%;
+  height: auto;
+  pointer-events: none;
+}
+.kinetic-shape .shape-el {
+  opacity: 0;
+  transform: scale(0.5) rotate(-10deg);
+  transform-box: fill-box;
+  transform-origin: center;
+  transition:
+    opacity 300ms ease-in,
+    transform 300ms ease-in;
+}
+.kinetic-shape[data-active] .shape-el {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 600ms ease calc(var(--i) * 80ms),
+    transform 600ms cubic-bezier(0.34, 1.56, 0.64, 1) calc(var(--i) * 80ms);
+}
+/* The toggle: "Menu" rolls up to "Close" and the plus turns into a cross while the menu is open. */
+.kinetic-toggle-text {
+  display: flex;
+  flex-direction: column;
+  height: 1.25em;
+  overflow: hidden;
+  line-height: 1.25em;
+}
+.kinetic-toggle-text > span,
+.kinetic-toggle-icon {
+  transition: transform 700ms cubic-bezier(0.65, 0.01, 0.05, 0.99);
+}
+.kinetic-toggle[aria-expanded="true"] .kinetic-toggle-text > span {
+  transform: translateY(-100%);
+}
+.kinetic-toggle[aria-expanded="true"] .kinetic-toggle-icon {
+  transform: rotate(315deg);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -2,7 +2,7 @@
 
 import type { HavenClient } from "@haven/core";
 import type { Identity } from "@haven/types";
-import { EmptyState, Skeleton } from "@haven/ui";
+import { EmptyState, FxLabel, Skeleton } from "@haven/ui";
 import { KeyRound, Plug, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -44,8 +44,8 @@ export function RequireIdentity({ children }: { children: (client: HavenClient, 
     return (
       <EmptyState icon={<KeyRound size={22} />} title="Sign in to see your files">
         <p>Your keys are made on this device from a wallet signature or a passkey. Nothing to install.</p>
-        <Link href="/onboarding" className="rounded-md bg-ink px-3.5 py-2 font-medium text-paper">
-          Sign in
+        <Link href="/onboarding" className="btn-action fx inline-flex rounded-full px-4.5 py-2 text-sm font-semibold">
+          <FxLabel>Sign in</FxLabel>
         </Link>
       </EmptyState>
     );

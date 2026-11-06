@@ -1,0 +1,25 @@
+/* The loading cover (Intro.tsx). It is in the prerendered page, so it covers every page load from the first paint. */
+.haven-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #eef3fa;
+  cursor: pointer;
+  transition:
+    opacity 700ms ease,
+    filter 700ms ease;
+  /* Safety net: if the script never runs, the cover still goes away (after the longest wait Intro.tsx allows). */
+  animation: haven-intro-failsafe 600ms ease 12s forwards;
+}
+.haven-intro-leave {
+  opacity: 0;
+  filter: blur(6px);
+  pointer-events: none;
+}
+@keyframes haven-intro-failsafe {
+  to {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+}

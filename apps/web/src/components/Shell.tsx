@@ -1,6 +1,6 @@
 "use client";
 
-import { AppShell, ReceiptsDrawer, useNow, type NavItem } from "@haven/ui";
+import { AppShell, FxLabel, ReceiptsDrawer, useNow, type NavItem } from "@haven/ui";
 import { DoorClosed, HardDrive, Inbox, ReceiptText, Settings, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -23,7 +23,7 @@ function PersonaBar() {
   if (profile === "me") return null;
   const other = profile === "founder" ? "investor" : "founder";
   return (
-    <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-md bg-ink px-3 py-2 text-sm text-paper">
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-ink px-4 py-2.5 text-sm text-white shadow-[0_14px_30px_-18px_rgb(13_27_51/0.6)]">
       <span>
         Try it: you&apos;re the {profile}
         {identity?.ensName ? ` (${identity.ensName})` : ""}.
@@ -61,17 +61,19 @@ export function Shell({ children }: { children: ReactNode }) {
       actions={
         <button
           onClick={() => setOpen(true)}
-          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-ink/80 hover:bg-line/60"
+          className="btn-clay fx inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold"
           aria-label={`Receipts${pending ? ", an action is in progress" : ""}`}
         >
-          <ReceiptText size={18} aria-hidden />
-          <span className="hidden sm:inline">Receipts</span>
-          {pending && <span className="h-2 w-2 animate-pulse rounded-full bg-private" aria-hidden />}
+          <FxLabel>
+            <ReceiptText size={18} aria-hidden />
+            <span className="hidden sm:inline">Receipts</span>
+            {pending && <span className="h-2 w-2 animate-pulse rounded-full bg-private" aria-hidden />}
+          </FxLabel>
         </button>
       }
     >
       {config.demoMode && (
-        <p className="mb-4 rounded-md bg-warn-soft px-3 py-2 text-sm text-warn">Test network, 1-minute access windows.</p>
+        <p className="mb-4 rounded-2xl border border-white/80 bg-white/60 px-4 py-2.5 text-sm text-muted backdrop-blur">Test network, 1-minute access windows.</p>
       )}
       <PersonaBar />
       {children}

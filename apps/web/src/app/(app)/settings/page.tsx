@@ -42,7 +42,7 @@ function ConnectExtension() {
 
   if (!client || !identity) return null;
   return (
-    <section className="rounded-lg border border-line bg-card p-5 text-sm">
+    <section className="surface rounded-2xl p-5 text-sm">
       <h2 className="font-medium">Browser extension</h2>
       {!present ? (
         <p className="mt-1 text-muted">
@@ -58,7 +58,7 @@ function ConnectExtension() {
             Only do this on your own computer.
           </p>
           <label className="flex items-center gap-2">
-            <input type="checkbox" className="accent-ink" checked={persist} onChange={(e) => setPersist(e.target.checked)} />
+            <input type="checkbox" className="accent-action" checked={persist} onChange={(e) => setPersist(e.target.checked)} />
             Keep it signed in after the browser restarts
           </label>
           <Button
@@ -91,7 +91,7 @@ function ConnectExtension() {
 function Install() {
   const { state, install } = useInstall();
   return (
-    <section className="rounded-lg border border-line bg-card p-5 text-sm">
+    <section className="surface rounded-2xl p-5 text-sm">
       <h2 className="font-medium">Phone app</h2>
       {state === "installed" && <p className="mt-1 text-muted">Installed. Haven opens from your home screen, even offline.</p>}
       {state === "can-install" && (
@@ -141,7 +141,7 @@ function Account() {
   };
 
   return (
-    <section className="rounded-lg border border-line bg-card p-5 text-sm">
+    <section className="surface rounded-2xl p-5 text-sm">
       <h2 className="font-medium">Account{profile !== "me" && ` (Try it: the ${profile})`}</h2>
       <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
         <dt className="text-muted">Name</dt>
@@ -213,7 +213,7 @@ export default function SettingsPage() {
 
   return (
     <div className="flex max-w-2xl flex-col gap-6">
-      <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+      <h1 className="text-3xl font-bold tracking-[-0.035em]">Settings</h1>
       <Account />
       <MyKey />
       <SettingsDevices />
@@ -222,7 +222,7 @@ export default function SettingsPage() {
       <ConnectExtension />
       <KeysInExtension />
 
-      <section className="rounded-lg border border-line bg-card p-5">
+      <section className="surface rounded-2xl p-5">
         <h2 className="font-medium">Private network</h2>
         <p className="mt-1 text-sm text-muted">
           Every lookup this app makes goes through the network you pick, so RPC providers can&apos;t see who is asking.
@@ -232,11 +232,11 @@ export default function SettingsPage() {
           {options.map((n) => {
             const reason = unavailableReason(n);
             return (
-              <label key={n} className={`flex gap-3 rounded-md border p-3 ${n === current ? "border-ink" : "border-line"} ${reason ? "opacity-60" : "cursor-pointer"}`}>
+              <label key={n} className={`flex gap-3 rounded-xl border p-3 ${n === current ? "border-action bg-action-soft/50" : "border-line bg-white"} ${reason ? "opacity-60" : "cursor-pointer"}`}>
                 <input
                   type="radio"
                   name="network"
-                  className="mt-1 accent-ink"
+                  className="mt-1 accent-action"
                   checked={n === current}
                   disabled={!!reason}
                   onChange={() => chooseNetwork(n)}
@@ -253,7 +253,7 @@ export default function SettingsPage() {
         </fieldset>
       </section>
 
-      <section className="rounded-lg border border-line bg-card p-5 text-sm">
+      <section className="surface rounded-2xl p-5 text-sm">
         <h2 className="font-medium">What is routed right now</h2>
         <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
           <dt className="text-muted">Status</dt>

@@ -2,17 +2,37 @@
 
 import { LoaderCircle, TriangleAlert, X } from "lucide-react";
 import { useEffect, useId, useRef, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { SkyTile } from "./Clouds";
 import { describeError } from "./errors";
 import { cx } from "./format";
 
 type Variant = "primary" | "secondary" | "quiet" | "danger";
 
+// Clay pills (styles.css) with the rising-circle hover (.fx): blue fills white, white fills blue. "quiet" stays flat.
 const VARIANT: Record<Variant, string> = {
-  primary: "bg-ink text-paper hover:bg-ink/90",
-  secondary: "border border-line bg-card text-ink hover:border-ink/40",
-  quiet: "text-ink hover:bg-line/60",
-  danger: "bg-danger text-paper hover:bg-danger/90",
+  primary: "btn-action fx",
+  secondary: "btn-clay fx",
+  quiet: "text-ink hover:bg-ink/5",
+  danger: "btn-danger fx",
 };
+
+/**
+ * The inside of an .fx pill: the circle that rises on hover, the label, and a copy of the label that rolls in.
+ * The copy is hidden from screen readers, so the name is read once.
+ */
+export function FxLabel({ children }: { children: ReactNode }) {
+  return (
+    <>
+      <span className="fx-circle" aria-hidden />
+      <span className="fx-stack">
+        <span className="fx-label">{children}</span>
+        <span className="fx-hover" aria-hidden>
+          {children}
+        </span>
+      </span>
+    </>
+  );
+}
 
 export function Button({
   variant = "secondary",
@@ -28,13 +48,13 @@ export function Button({
       disabled={disabled || pending}
       aria-busy={pending || undefined}
       className={cx(
-        "inline-flex min-h-10 items-center justify-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-55",
+        "inline-flex min-h-10 items-center justify-center gap-2 rounded-full px-4.5 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-55",
         VARIANT[variant],
         className,
       )}
     >
       {pending && <LoaderCircle size={16} className="animate-spin" aria-hidden />}
-      {children}
+      {variant === "quiet" ? children : <FxLabel>{children}</FxLabel>}
     </button>
   );
 }
@@ -68,17 +88,17 @@ export function Dialog({
       onClick={(e) => e.target === ref.current && onClose()}
       aria-labelledby={titleId}
       className={cx(
-        "m-auto w-[calc(100%-2rem)] rounded-lg border border-line bg-card p-0 text-ink shadow-[0_18px_50px_-20px_rgb(22_48_42/0.45)]",
+        "m-auto w-[calc(100%-2rem)] rounded-3xl border border-white bg-card p-0 text-ink shadow-[0_30px_70px_-24px_rgb(13_27_51/0.5)]",
         wide ? "max-w-3xl" : "max-w-lg",
       )}
     >
       {open && (
-        <div className="flex flex-col gap-4 p-5">
+        <div className="flex flex-col gap-4 p-6">
           <div className="flex items-start justify-between gap-4">
-            <h2 id={titleId} className="text-lg font-semibold">
+            <h2 id={titleId} className="text-xl font-bold tracking-[-0.02em]">
               {title}
             </h2>
-            <button onClick={onClose} className="rounded p-1 text-muted hover:text-ink" aria-label="Close">
+            <button onClick={onClose} className="rounded-full p-1.5 text-muted hover:bg-ink/5 hover:text-ink" aria-label="Close">
               <X size={18} aria-hidden />
             </button>
           </div>
@@ -94,7 +114,7 @@ export function ErrorNote({ error, className }: { error: unknown; className?: st
   if (!error) return null;
   const e = describeError(error);
   return (
-    <div role="alert" className={cx("flex gap-2 rounded-md bg-danger-soft px-3 py-2 text-sm text-danger", className)}>
+    <div role="alert" className={cx("flex gap-2 rounded-xl bg-danger-soft px-3.5 py-2.5 text-sm text-danger", className)}>
       <TriangleAlert size={16} className="mt-0.5 shrink-0" aria-hidden />
       <p>
         <span className="font-medium">{e.title}.</span> {e.detail}
@@ -105,11 +125,9 @@ export function ErrorNote({ error, className }: { error: unknown; className?: st
 
 export function EmptyState({ icon, title, children }: { icon: ReactNode; title: string; children?: ReactNode }) {
   return (
-    <div className="flex flex-col items-start gap-3 rounded-lg border border-dashed border-line px-5 py-8">
-      <span className="text-muted" aria-hidden>
-        {icon}
-      </span>
-      <h3 className="font-medium">{title}</h3>
+    <div className="flex flex-col items-start gap-3 rounded-2xl border border-dashed border-[#c4d5f2] bg-white/60 px-6 py-8">
+      <SkyTile>{icon}</SkyTile>
+      <h3 className="font-semibold">{title}</h3>
       {children && <div className="flex max-w-prose flex-col items-start gap-3 text-sm text-muted">{children}</div>}
     </div>
   );
@@ -119,11 +137,11 @@ export function Skeleton({ rows = 3 }: { rows?: number }) {
   return (
     <div className="flex flex-col gap-2" aria-busy="true" aria-label="Loading">
       {Array.from({ length: rows }, (_, i) => (
-        <div key={i} className="h-12 animate-pulse rounded-md bg-line/60" />
+        <div key={i} className="h-12 animate-pulse rounded-xl bg-white/70" />
       ))}
     </div>
   );
 }
 
 export const inputClass =
-  "w-full rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink placeholder:text-muted/70 focus:border-ink focus:outline-none";
+  "w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-sm text-ink placeholder:text-muted/70 focus:border-action focus:outline-none focus:ring-4 focus:ring-action/10";

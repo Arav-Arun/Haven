@@ -20,7 +20,7 @@ async function updateBadge() {
   const shares = ((await chrome.storage.local.get(NEW_SHARES_KEY))[NEW_SHARES_KEY] as number | undefined) ?? 0;
   const waiting = (await readInbox()).length;
   const n = shares + waiting;
-  await chrome.action.setBadgeBackgroundColor({ color: "#16302a" });
+  await chrome.action.setBadgeBackgroundColor({ color: "#1f4fd1" });
   await chrome.action.setBadgeText({ text: n ? String(Math.min(n, 99)) : "" });
 }
 

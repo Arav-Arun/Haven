@@ -20,7 +20,7 @@ function View({ folder }: { folder: Address }) {
   );
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold tracking-tight">Public view</h1>
+      <h1 className="text-3xl font-bold tracking-[-0.035em]">Public view</h1>
       {view.loading && !view.data && <Skeleton rows={5} />}
       <ErrorNote error={view.error} />
       {view.data && (

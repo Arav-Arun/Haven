@@ -34,7 +34,7 @@ function ThisTab() {
   const copy = result.siteSwarmRef ? verifiedCopyUrl(result.siteSwarmRef) : null;
   if (result.status === "verified")
     return (
-      <section className="flex gap-2 rounded-lg border border-line bg-card p-3 text-sm">
+      <section className="flex gap-2 surface rounded-2xl p-3 text-sm">
         <ShieldCheck size={18} className="shrink-0 text-private" aria-hidden />
         <div>
           <p className="font-medium">Verified release {result.version}</p>
@@ -47,7 +47,7 @@ function ThisTab() {
     );
   if (result.status === "mismatch")
     return (
-      <section className="flex gap-2 rounded-lg border border-danger bg-card p-3 text-sm">
+      <section className="flex gap-2 rounded-2xl border border-danger bg-card p-3 text-sm">
         <ShieldAlert size={18} className="shrink-0 text-danger" aria-hidden />
         <div className="flex flex-col gap-1">
           <p className="font-medium text-danger">This tab's code doesn't match any published release</p>
@@ -61,7 +61,7 @@ function ThisTab() {
       </section>
     );
   return (
-    <section className="flex gap-2 rounded-lg border border-line bg-card p-3 text-sm">
+    <section className="flex gap-2 surface rounded-2xl p-3 text-sm">
       <ShieldQuestion size={18} className="shrink-0 text-muted" aria-hidden />
       <p className="text-muted">This tab couldn't be checked: {result.detail}</p>
     </section>
@@ -96,7 +96,7 @@ function Inbox({ client, folders, onChange }: { client: DriveClient; folders: Fo
   useEffect(() => void load(), [load]);
   if (!items.length) return null;
   return (
-    <section className="flex flex-col gap-2 rounded-lg border border-line bg-card p-3">
+    <section className="flex flex-col gap-2 surface rounded-2xl p-3">
       <h2 className="text-sm font-medium">Saved from the web ({items.length})</h2>
       <ul className="flex flex-col gap-1 text-sm">
         {items.map((f) => (

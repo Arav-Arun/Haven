@@ -21,7 +21,7 @@ const KIND: Record<KeyInfo["history"][number]["kind"], string> = {
 /** Add-on F1: the panel two people use to check each other's key face to face. */
 function VerifyInPerson({ info }: { info: KeyInfo }) {
   return (
-    <section className="rounded-lg border border-line bg-card p-5 text-sm">
+    <section className="surface rounded-2xl p-5 text-sm">
       <h2 className="font-medium">Verify in person</h2>
       <p className="mt-1 text-muted">
         Ask {info.ensName} to open their own profile and read these eight words aloud. If every word matches, files you share
@@ -44,7 +44,7 @@ function Profile({ name }: { name: string }) {
   return (
     <div className="flex flex-col gap-5">
       <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">{k.ensName}</h1>
+        <h1 className="text-3xl font-bold tracking-[-0.035em]">{k.ensName}</h1>
         {k.problem ? (
           <p className="inline-flex items-center gap-1.5 text-sm text-danger">
             <ShieldAlert size={16} aria-hidden /> The public key log is broken: {k.problem}. Nothing can be shared with this name.
@@ -76,7 +76,7 @@ function Profile({ name }: { name: string }) {
 
       {k.current && <VerifyInPerson info={k} />}
 
-      <section className="rounded-lg border border-line bg-card p-5 text-sm">
+      <section className="surface rounded-2xl p-5 text-sm">
         <h2 className="font-medium">Key history</h2>
         <p className="mt-1 text-muted">An append-only log on Arkiv. Anyone can read it with one query, and every change shows here.</p>
         {k.history.length === 0 && <p className="mt-3 text-muted">No entries.</p>}
@@ -99,7 +99,7 @@ function Profile({ name }: { name: string }) {
       </section>
 
       {k.ignored.length > 0 && (
-        <section className="rounded-lg border border-danger/40 bg-danger-soft p-5 text-sm text-danger">
+        <section className="rounded-2xl border border-danger/40 bg-danger-soft p-5 text-sm text-danger">
           <h2 className="font-medium">Ignored: {k.ignored.length} forged {k.ignored.length === 1 ? "entry" : "entries"}</h2>
           <p className="mt-1">Written about this name by someone who doesn&apos;t control it, so no app should use them.</p>
           <ul className="mt-2 flex flex-col gap-1 text-xs">

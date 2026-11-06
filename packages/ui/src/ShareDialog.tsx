@@ -55,7 +55,7 @@ export function FingerprintWords({ words, className }: { words: string[]; classN
     <span className={cx("inline-flex flex-wrap items-center gap-1", className)} aria-label={`Key fingerprint: ${words.join(" ")}`}>
       <Fingerprint size={12} aria-hidden className="text-muted" />
       {words.map((w, i) => (
-        <span key={i} className="rounded-sm bg-ink/8 px-1 font-mono text-[11px]">
+        <span key={i} className="rounded-md bg-ink/8 px-1 font-mono text-[11px]">
           {w}
         </span>
       ))}
@@ -252,7 +252,7 @@ export function ShareDialog({
           }}
         >
           {(groups.length > 0 || onShareTeam) && (
-            <div className="flex gap-1 rounded-md bg-line/50 p-1 text-sm" role="radiogroup" aria-label="Share with">
+            <div className="flex gap-1 rounded-xl bg-line/50 p-1 text-sm" role="radiogroup" aria-label="Share with">
               {(["name", ...(onShareTeam ? (["team"] as const) : []), ...(groups.length ? (["group"] as const) : [])] as const).map((k) => (
                 <button
                   key={k}
@@ -333,7 +333,7 @@ export function ShareDialog({
                 {previewError ? <span className="text-danger">{describeError(previewError).title}</span> : null}
               </span>
               {preview && preview !== "checking" && preview.ready.length + preview.noKey.length > 0 && (
-                <ul className="max-h-28 overflow-auto rounded-md border border-line bg-paper/60 p-2 text-xs">
+                <ul className="max-h-28 overflow-auto rounded-xl border border-line bg-paper/60 p-2 text-xs">
                   {preview.ready.map((n) => (
                     <li key={n}>{n}</li>
                   ))}
@@ -368,7 +368,7 @@ export function ShareDialog({
             <legend className="mb-1">Role</legend>
             {(["viewer", "editor", "manager"] as const).map((r) => (
               <label key={r} className="flex cursor-pointer items-baseline gap-2">
-                <input type="radio" name="role" checked={role === r} onChange={() => setRole(r)} className="accent-ink" />
+                <input type="radio" name="role" checked={role === r} onChange={() => setRole(r)} className="accent-action" />
                 <span>
                   <span className="font-medium">{ROLE_LABEL[r]}</span> <span className="text-muted">{ROLE_ABOUT[r]}</span>
                 </span>
@@ -385,7 +385,7 @@ export function ShareDialog({
                   type="button"
                   aria-pressed={preset === p}
                   onClick={() => setPreset(p)}
-                  className={cx("rounded-md border px-2.5 py-1", preset === p ? "border-ink bg-ink text-paper" : "border-line bg-card")}
+                  className={cx("rounded-xl border px-2.5 py-1", preset === p ? "border-action bg-action text-white" : "border-line bg-card")}
                 >
                   {label}
                 </button>
@@ -405,7 +405,7 @@ export function ShareDialog({
           </fieldset>
 
           <label className="flex cursor-pointer items-start gap-2 text-sm">
-            <input type="checkbox" checked={hide} onChange={(e) => setHide(e.target.checked)} className="mt-1 accent-ink" />
+            <input type="checkbox" checked={hide} onChange={(e) => setHide(e.target.checked)} className="mt-1 accent-action" />
             <span>
               Hide from other members
               <span className="block text-muted">Other members see only a random address, not this name.</span>
@@ -413,7 +413,7 @@ export function ShareDialog({
           </label>
 
           {to === "name" && key && keyBlocked && (
-            <div role="alert" className="flex flex-col gap-2 rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">
+            <div role="alert" className="flex flex-col gap-2 rounded-xl bg-danger-soft px-3 py-2 text-sm text-danger">
               <p className="flex items-start gap-2">
                 <ShieldAlert size={16} className="mt-0.5 shrink-0" aria-hidden />
                 {key.problem
