@@ -1,0 +1,570 @@
+// ENS on Sepolia (CLOAKROOM_PLAN.md section 6): reads through UniversalResolverV2 and the DriveRegistry views, and the
+// everyday writes signed by K or K_room. Every write is simulated first (so a revert comes back as a named error),
+// then sent, waited for, and reported as a "sepolia-tx" receipt step.
+//
+// Clients are passed in, so the caller picks the route: one anonTransport per isolation key (stealth address or room).
+
+import { DriveError, type AccessVia, type Address, type Hex, type Role } from "@cloakroom/types";
+import {
+  type Account,
+  type Chain,
+  concatBytes,
+  decodeErrorResult,
+  encodeFunctionData,
+  getAddress,
+  isAddressEqual,
+  keccak256,
+  type Log,
+  parseEventLogs,
+  type PublicClient,
+  stringToBytes,
+  toHex,
+  type TransactionReceipt,
+  type Transport,
+  type WalletClient,
+  zeroAddress,
+} from "viem";
+import { getEnsText } from "viem/actions";
+import { normalize } from "viem/ens";
+
+import { ensv2, txUrl, universalResolverV2Abi } from "./addresses";
+import { randomBytes } from "./crypto";
+import { revertCode, toDriveError } from "./errors";
+import { driveRegistryAbi, verifiableFactoryAbi } from "./generated";
+import { ignoreSteps, type StepSink } from "./receipts";
+
+// ---------------------------------------------------------------- roles
+
+const admin = (roles: bigint) => roles << 128n;
+
+export const ROLE_REGISTRAR = 1n << 0n;
+export const ROLE_DRIVE_READ = 1n << 40n;
+export const ROLE_DRIVE_WRITE = 1n << 44n;
+export const ROLE_DRIVE_SHARE = 1n << 48n;
+export const DRIVE_ROLES = ROLE_DRIVE_READ | ROLE_DRIVE_WRITE | ROLE_DRIVE_SHARE;
+export const ALL_DRIVE_ROLES = DRIVE_ROLES | admin(DRIVE_ROLES);
+/** `until` meaning "no end date" (DriveRegistry.NO_END). */
+export const NO_END = 2n ** 64n - 1n;
+
+/** The bitmap granted for each role: viewers read, editors also write, managers hold every drive bit and admin bit. */
+export function roleBits(role: Role): bigint {
+  switch (role) {
+    case "viewer":
+      return ROLE_DRIVE_READ;
+    case "editor":
+      return ROLE_DRIVE_READ | ROLE_DRIVE_WRITE;
+    case "manager":
+      return ALL_DRIVE_ROLES;
+  }
+}
+
+/** The highest role a bitmap carries, or null if it carries no drive role. */
+export function roleOf(bits: bigint): Role | null {
+  if (bits & ROLE_DRIVE_SHARE) return "manager";
+  if (bits & ROLE_DRIVE_WRITE) return "editor";
+  if (bits & ROLE_DRIVE_READ) return "viewer";
+  return null;
+}
+
+/** Every role a bitmap carries, for the Public view. */
+export function rolesIn(bits: bigint): Role[] {
+  const roles: Role[] = [];
+  if (bits & ROLE_DRIVE_READ) roles.push("viewer");
+  if (bits & ROLE_DRIVE_WRITE) roles.push("editor");
+  if (bits & ROLE_DRIVE_SHARE) roles.push("manager");
+  return roles;
+}
+
+/** `until` as the contract takes it. null means no end. */
+export function toUntil(until: number | null): bigint {
+  if (until === null) return NO_END;
+  if (!Number.isInteger(until) || until <= 0) throw new DriveError("UNKNOWN", "until must be a unix time in seconds");
+  return BigInt(until);
+}
+
+export function fromUntil(until: bigint): number | null {
+  return until === NO_END ? null : Number(until);
+}
+
+// ---------------------------------------------------------------- names
+
+/** DNS wire format, as UniversalResolverV2 takes names. */
+export function dnsEncode(name: string): Hex {
+  const labels = normalize(name).split(".").filter((l) => l.length > 0);
+  const parts: Uint8Array[] = [];
+  for (const label of labels) {
+    const bytes = stringToBytes(label);
+    if (bytes.length > 255) throw new DriveError("UNKNOWN", "label too long");
+    parts.push(new Uint8Array([bytes.length]), bytes);
+  }
+  parts.push(new Uint8Array([0]));
+  return toHex(concatBytes(parts));
+}
+
+/** LibLabel.id: the labelhash as a uint256, which every registry accepts as `anyId`. */
+export function labelId(label: string): bigint {
+  return BigInt(keccak256(stringToBytes(label)));
+}
+
+const LABEL_ALPHABET = "abcdefghijklmnopqrstuvwxyz234567"; // 32 symbols, so each random byte maps without bias
+
+/** A random label such as "f-k2x9q7mz". Random so it reveals nothing and can't be guessed. */
+export function randomLabel(prefix: "f" | "r" | "l" | "g", length = 10): string {
+  const bytes = randomBytes(length);
+  return `${prefix}-${Array.from(bytes, (b) => LABEL_ALPHABET[b & 31]).join("")}`;
+}
+
+// ---------------------------------------------------------------- clients
+
+export type SepoliaReader = PublicClient<Transport, Chain | undefined>;
+
+export interface SepoliaWriter {
+  public: SepoliaReader;
+  wallet: WalletClient<Transport, Chain, Account>;
+}
+
+// ---------------------------------------------------------------- reads
+
+/** The cloak.key text record (the recipient's spending public key), or null if the name has none. */
+export async function getCloakKey(client: SepoliaReader, name: string): Promise<string | null> {
+  try {
+    const value = await getEnsText(client, {
+      name: normalize(name),
+      key: "cloak.key",
+      universalResolverAddress: ensv2.UniversalResolverV2,
+    });
+    return value === null || value === "" ? null : value;
+  } catch (error) {
+    throw toDriveError(error, `cloak.key of ${name}`);
+  }
+}
+
+/** The registry a name points to (a folder, a drive root, or rooms.cloakroom.eth's registry), or null. */
+export async function findRegistry(client: SepoliaReader, name: string): Promise<Address | null> {
+  try {
+    const registry = await client.readContract({
+      address: ensv2.UniversalResolverV2,
+      abi: universalResolverV2Abi,
+      functionName: "findExactRegistry",
+      args: [dnsEncode(name)],
+    });
+    return isAddressEqual(registry, zeroAddress) ? null : getAddress(registry);
+  } catch (error) {
+    throw toDriveError(error, `registry of ${name}`);
+  }
+}
+
+export interface OnchainAccess {
+  roles: bigint;
+  from: number;
+  until: number | null;
+  via: AccessVia | null;
+}
+
+const VIA: (AccessVia | null)[] = [null, "owner", "direct", "parent", "group"];
+
+/** Live access of `account` in a DriveRegistry. Expired grants read as no roles. */
+export async function accessOf(client: SepoliaReader, registry: Address, account: Address): Promise<OnchainAccess> {
+  try {
+    const [roles, from, until, via] = await client.readContract({
+      address: registry,
+      abi: driveRegistryAbi,
+      functionName: "accessOf",
+      args: [account],
+    });
+    return { roles, from: Number(from), until: fromUntil(until), via: VIA[via] ?? null };
+  } catch (error) {
+    throw toDriveError(error, "accessOf");
+  }
+}
+
+export async function driveOwner(client: SepoliaReader, registry: Address): Promise<Address> {
+  try {
+    return getAddress(
+      await client.readContract({ address: registry, abi: driveRegistryAbi, functionName: "driveOwner" }),
+    );
+  } catch (error) {
+    throw toDriveError(error, "driveOwner");
+  }
+}
+
+/** Whether `account` held every bit of `roleBitmap` at unix time `t`, from the registry's own history. */
+export async function wasAllowed(
+  client: SepoliaReader,
+  registry: Address,
+  account: Address,
+  roleBitmap: bigint,
+  t: number,
+): Promise<boolean> {
+  return (await wasAllowedMany(client, registry, [account], roleBitmap, [t]))[0] ?? false;
+}
+
+const WAS_ALLOWED_BATCH = 100;
+
+/** wasAllowed for many (account, time) pairs, in batches of 100 per view call. */
+export async function wasAllowedMany(
+  client: SepoliaReader,
+  registry: Address,
+  accounts: readonly Address[],
+  roleBitmap: bigint,
+  times: readonly number[],
+): Promise<boolean[]> {
+  if (accounts.length !== times.length) throw new Error("accounts and times differ in length");
+  const out: boolean[] = [];
+  try {
+    for (let i = 0; i < accounts.length; i += WAS_ALLOWED_BATCH) {
+      const batch = await client.readContract({
+        address: registry,
+        abi: driveRegistryAbi,
+        functionName: "wasAllowedMany",
+        args: [
+          accounts.slice(i, i + WAS_ALLOWED_BATCH),
+          roleBitmap,
+          times.slice(i, i + WAS_ALLOWED_BATCH).map((t) => BigInt(Math.max(0, Math.floor(t)))),
+        ],
+      });
+      out.push(...batch);
+    }
+  } catch (error) {
+    throw toDriveError(error, "wasAllowedMany");
+  }
+  return out;
+}
+
+export interface AccessInterval {
+  roles: bigint;
+  from: number;
+  until: number | null;
+  /** When the interval was closed early (revoked or changed), or null while it is open. */
+  endedAt: number | null;
+}
+
+export async function historyOf(client: SepoliaReader, registry: Address, account: Address): Promise<AccessInterval[]> {
+  try {
+    const intervals = await client.readContract({
+      address: registry,
+      abi: driveRegistryAbi,
+      functionName: "historyOf",
+      args: [account],
+    });
+    return intervals.map((i) => ({
+      roles: i.roles,
+      from: Number(i.from),
+      until: fromUntil(i.until),
+      endedAt: i.endedAt === 0n ? null : Number(i.endedAt),
+    }));
+  } catch (error) {
+    throw toDriveError(error, "historyOf");
+  }
+}
+
+/** AVAILABLE in a PermissionedRegistry (never registered, or expired). */
+export async function isLabelAvailable(client: SepoliaReader, registry: Address, label: string): Promise<boolean> {
+  try {
+    const status = await client.readContract({
+      address: registry,
+      abi: driveRegistryAbi,
+      functionName: "getStatus",
+      args: [labelId(label)],
+    });
+    return status === 0;
+  } catch (error) {
+    throw toDriveError(error, "getStatus");
+  }
+}
+
+export async function getSubregistry(client: SepoliaReader, registry: Address, label: string): Promise<Address | null> {
+  try {
+    const sub = await client.readContract({
+      address: registry,
+      abi: driveRegistryAbi,
+      functionName: "getSubregistry",
+      args: [label],
+    });
+    return isAddressEqual(sub, zeroAddress) ? null : getAddress(sub);
+  } catch (error) {
+    throw toDriveError(error, "getSubregistry");
+  }
+}
+
+export interface ChildName {
+  label: string;
+  /** The registry the label points to now, or null (expired, unregistered, or not a folder, e.g. a link). */
+  registry: Address | null;
+  /** The token owner at registration. */
+  owner: Address;
+  expiry: bigint;
+  blockNumber: bigint;
+}
+
+export interface ListChildrenOptions {
+  /** First block to scan: the registry's creation block, or the DriveRegistry implementation's deployment block. */
+  fromBlock: bigint;
+  toBlock?: bigint;
+  /** Largest block range per eth_getLogs call; halved automatically when a provider refuses a range. */
+  maxRange?: bigint;
+}
+
+/**
+ * Child names of a registry, from its LabelRegistered events (eth_getLogs), each checked against the live
+ * getSubregistry so expired or re-pointed names don't show. The latest registration of a label wins.
+ */
+export async function listChildren(
+  client: SepoliaReader,
+  registry: Address,
+  options: ListChildrenOptions,
+): Promise<ChildName[]> {
+  const event = driveRegistryAbi.find((e) => e.type === "event" && e.name === "LabelRegistered");
+  if (!event || event.type !== "event") throw new Error("LabelRegistered missing from the ABI");
+  const latest = options.toBlock ?? (await client.getBlockNumber());
+  let range = options.maxRange ?? 50_000n;
+  const logs: Log[] = [];
+  let from = options.fromBlock;
+  while (from <= latest) {
+    const to = from + range - 1n > latest ? latest : from + range - 1n;
+    try {
+      logs.push(...(await client.getLogs({ address: registry, event, fromBlock: from, toBlock: to })));
+      from = to + 1n;
+    } catch (error) {
+      if (range <= 1n) throw toDriveError(error, "listing child names");
+      range /= 2n; // providers cap the range of eth_getLogs; retry the same start with a smaller one
+    }
+  }
+  const parsed = parseEventLogs({ abi: driveRegistryAbi, eventName: "LabelRegistered", logs });
+  const byLabel = new Map<string, ChildName>();
+  for (const log of parsed) {
+    byLabel.set(log.args.label, {
+      label: log.args.label,
+      registry: null,
+      owner: getAddress(log.args.owner),
+      expiry: log.args.expiry,
+      blockNumber: log.blockNumber,
+    });
+  }
+  const children = [...byLabel.values()];
+  for (const child of children) child.registry = await getSubregistry(client, registry, child.label);
+  return children;
+}
+
+// ---------------------------------------------------------------- writes
+
+const errorAbi = [...driveRegistryAbi, ...verifiableFactoryAbi].filter((e) => e.type === "error");
+
+/** Simulates, sends and waits for one transaction; reports it as a receipt step; throws a DriveError on failure. */
+async function send(
+  writer: SepoliaWriter,
+  label: string,
+  to: Address,
+  data: Hex,
+  step: StepSink,
+): Promise<TransactionReceipt> {
+  const account = writer.wallet.account;
+  try {
+    await writer.public.call({ account, to, data });
+  } catch (error) {
+    throw decodeRevert(error, label);
+  }
+  let hash: Hex;
+  try {
+    hash = await writer.wallet.sendTransaction({ account, chain: writer.wallet.chain, to, data });
+  } catch (error) {
+    throw toDriveError(error, label);
+  }
+  let receipt: TransactionReceipt;
+  try {
+    receipt = await writer.public.waitForTransactionReceipt({ hash });
+  } catch (error) {
+    step({ kind: "sepolia-tx", label, hash, explorerUrl: txUrl("sepolia", hash), ok: false });
+    throw toDriveError(error, label);
+  }
+  const ok = receipt.status === "success";
+  step({ kind: "sepolia-tx", label, hash, explorerUrl: txUrl("sepolia", hash), ok });
+  if (!ok) throw new DriveError("UNKNOWN", `${label}: transaction reverted`);
+  return receipt;
+}
+
+/** Names the custom error a simulated call reverted with, using our ABIs. */
+function decodeRevert(error: unknown, label: string): DriveError {
+  const data = revertData(error);
+  if (data) {
+    try {
+      const { errorName } = decodeErrorResult({ abi: errorAbi, data });
+      return new DriveError(revertCode(errorName), `${label}: ${errorName}`);
+    } catch {
+      // not one of ours: fall through
+    }
+  }
+  return toDriveError(error, label);
+}
+
+/** Finds the raw revert data inside a viem error chain. */
+function revertData(error: unknown): Hex | null {
+  let current: unknown = error;
+  for (let depth = 0; current && depth < 10; depth++) {
+    const data = (current as { data?: unknown }).data;
+    if (typeof data === "string" && data.startsWith("0x") && data.length >= 10) return data as Hex;
+    if (data && typeof data === "object" && typeof (data as { data?: unknown }).data === "string") {
+      return (data as { data: Hex }).data;
+    }
+    current = (current as { cause?: unknown }).cause;
+  }
+  return null;
+}
+
+export interface DeployDriveParams {
+  /** The DriveRegistry implementation (cloakroom.driveRegistryImpl). */
+  implementation: Address;
+  /** K or K_room: gets the everyday roles. */
+  driveKey: Address;
+  /** W, which gets the dangerous roles; null for a room (K_room then holds everything). */
+  mainWallet: Address | null;
+  factory?: Address;
+}
+
+/** Deploys a DriveRegistry proxy through the stock VerifiableFactory, initialised atomically. */
+export async function deployDrive(
+  writer: SepoliaWriter,
+  params: DeployDriveParams,
+  step: StepSink = ignoreSteps,
+): Promise<{ registry: Address; blockNumber: bigint }> {
+  const factory = params.factory ?? ensv2.VerifiableFactory;
+  const init = encodeFunctionData({
+    abi: driveRegistryAbi,
+    functionName: "initializeDrive",
+    args: [params.driveKey, params.mainWallet ?? zeroAddress],
+  });
+  const salt = BigInt(toHex(randomBytes(32))); // random, so the address can't be predicted or linked
+  const data = encodeFunctionData({
+    abi: verifiableFactoryAbi,
+    functionName: "deployProxy",
+    args: [params.implementation, salt, init],
+  });
+  const receipt = await send(writer, "Create folder registry", factory, data, step);
+  const [deployed] = parseEventLogs({ abi: verifiableFactoryAbi, eventName: "ProxyDeployed", logs: receipt.logs });
+  if (!deployed) throw new DriveError("UNKNOWN", "ProxyDeployed event missing");
+  return { registry: getAddress(deployed.args.proxyAddress), blockNumber: receipt.blockNumber };
+}
+
+export interface RegisterParams {
+  /** The registry the label goes into. */
+  parent: Address;
+  label: string;
+  /** Token owner. Registered with no token roles: the registry's root roles already govern the name. */
+  owner: Address;
+  subregistry: Address | null;
+  resolver?: Address | null;
+  roleBitmap?: bigint;
+  /** Unix seconds; NO_END for a folder that lives as long as its parent. */
+  expiry: bigint;
+}
+
+export async function registerName(writer: SepoliaWriter, params: RegisterParams, step: StepSink = ignoreSteps) {
+  const data = encodeFunctionData({
+    abi: driveRegistryAbi,
+    functionName: "register",
+    args: [
+      params.label,
+      params.owner,
+      params.subregistry ?? zeroAddress,
+      params.resolver ?? zeroAddress,
+      params.roleBitmap ?? 0n,
+      params.expiry,
+    ],
+  });
+  return send(writer, `Register ${params.label}`, params.parent, data, step);
+}
+
+export interface CreateFolderParams {
+  /** The registry the folder's label goes into: the drive root or a parent folder (K holds ROLE_REGISTRAR there). */
+  parent: Address;
+  implementation: Address;
+  driveKey: Address;
+  mainWallet: Address | null;
+  label?: string;
+  factory?: Address;
+}
+
+/** A folder: K deploys a DriveRegistry proxy, then registers a random label pointing at it. */
+export async function createFolder(
+  writer: SepoliaWriter,
+  params: CreateFolderParams,
+  step: StepSink = ignoreSteps,
+): Promise<{ registry: Address; label: string; blockNumber: bigint }> {
+  const label = params.label ?? randomLabel("f");
+  const { registry, blockNumber } = await deployDrive(writer, params, step);
+  await registerName(
+    writer,
+    { parent: params.parent, label, owner: params.driveKey, subregistry: registry, expiry: NO_END },
+    step,
+  );
+  return { registry, label, blockNumber };
+}
+
+/** Grants a role until `until` (null = no end). Also renews or shortens an existing grant. */
+export async function grantRoleUntil(
+  writer: SepoliaWriter,
+  registry: Address,
+  account: Address,
+  role: Role,
+  until: number | null,
+  step: StepSink = ignoreSteps,
+) {
+  const data = encodeFunctionData({
+    abi: driveRegistryAbi,
+    functionName: "grantRolesUntil",
+    args: [roleBits(role), account, toUntil(until)],
+  });
+  return send(writer, `Grant ${role}`, registry, data, step);
+}
+
+/** Removes every drive role (and admin bit) from `account` now. */
+export async function revokeAccess(
+  writer: SepoliaWriter,
+  registry: Address,
+  account: Address,
+  step: StepSink = ignoreSteps,
+) {
+  const data = encodeFunctionData({
+    abi: driveRegistryAbi,
+    functionName: "revokeRootRoles",
+    args: [ALL_DRIVE_ROLES, account],
+  });
+  return send(writer, "Remove access", registry, data, step);
+}
+
+/** Frees the holder slot of an expired grant. Anyone may call it; the history stays. */
+export async function sweep(writer: SepoliaWriter, registry: Address, account: Address, step: StepSink = ignoreSteps) {
+  const data = encodeFunctionData({ abi: driveRegistryAbi, functionName: "sweep", args: [account] });
+  return send(writer, "Free an expired slot", registry, data, step);
+}
+
+/** An expiring link name `l-<random>` in a folder's registry. It points nowhere; it only carries the end date. */
+export async function createLinkName(
+  writer: SepoliaWriter,
+  params: { folder: Address; owner: Address; expiresAt: number; label?: string },
+  step: StepSink = ignoreSteps,
+): Promise<{ label: string }> {
+  const label = params.label ?? randomLabel("l");
+  await registerName(
+    writer,
+    { parent: params.folder, label, owner: params.owner, subregistry: null, expiry: BigInt(params.expiresAt) },
+    step,
+  );
+  return { label };
+}
+
+/**
+ * Mount (namespace aliasing): `<label>.<my drive>` points at another folder's registry. Never for rooms, which would
+ * publish a link between the room and the drive.
+ */
+export async function mountFolder(
+  writer: SepoliaWriter,
+  params: { driveRoot: Address; owner: Address; label: string; target: Address },
+  step: StepSink = ignoreSteps,
+) {
+  return registerName(
+    writer,
+    { parent: params.driveRoot, label: params.label, owner: params.owner, subregistry: params.target, expiry: NO_END },
+    step,
+  );
+}

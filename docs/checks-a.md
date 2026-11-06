@@ -195,3 +195,88 @@ skipping the `cloak.key` comparison, unbinding welcomes from their folder, paddi
   - Imports are extensionless, so Next.js can compile core without extra configuration.
 - **For A6, epoch-key cost:** deriving E[0] from E[N] takes 8,760 SHA-256 calls, a few ms in Node. Readers should
   cache derived keys per folder version.
+
+---
+
+## A4: ENS, Arkiv, validator, Swarm client
+
+Code: `packages/core/src/` — `ens.ts`, `arkiv.ts`, `validator.ts`, `swarm.ts`, plus `records.ts` (the sealed contents
+of each entity), `receipts.ts`, `errors.ts` and `addresses.ts` (the single place addresses come from, generated from
+`contracts/deployments/sepolia.json`). Tests: `packages/core/test/`. Live check: `packages/core/scripts/a4-live.ts`
+(`pnpm --filter @cloakroom/core a4`).
+
+| Done when | Status |
+|---|---|
+| A script on Sepolia + Arkiv + Bee creates a room | **Script ready, not run yet.** Blocked on: `SEPOLIA_RPC_URL`; Sepolia ETH for the deployer and relayer; the `DriveRegistry` implementation deployed (A2); `cloakroom.eth` and `rooms.cloakroom.eth` registered with the relayer as registrar (check 1); tGLM for the relayer; `BEE_URL` and `POSTAGE_BATCH_ID` from B |
+| …writes and reads each schema | Script ready. It writes all eight schemas (rotation, roster, welcome, two key copies, three files, a tomb, a refresh request, a link) from the room key, the stealth editor and an attacker, reads each back, and decrypts them |
+| …shows the validator hiding a planted write from an address without WRITE | Script ready. Locally: **pass** against a real `DriveRegistry` (below) |
+
+**Local evidence (no network needed): 48 tests pass in about 2 s.** The ENS and validator tests start `anvil` and
+deploy the compiled `ContractNamer`, `LabelStore`, `VerifiableFactory` and `DriveRegistry` from `contracts/out`, so
+every role question is answered by the real contract's history. Run `forge build` in `contracts/` first.
+- **`ens.ts` (5 tests):**
+  - deploys a drive and a child folder through the factory;
+  - lists children from `LabelRegistered` logs (forcing 2-block ranges to exercise the provider-limit fallback);
+  - link names and mounts;
+  - grants with an end, and access/history/`wasAllowed` before, during and after it;
+  - sweeping an expired grant;
+  - removal closing the interval at the removal time;
+  - a manager can't share beyond its own end; an editor can't share;
+  - reverts come back named: `NAME_TAKEN`, `NOT_AUTHORIZED`, `EXPIRED`.
+- **`validator.ts` (2 tests):** one folder with a planted write for every rule — hidden as `no-role` (outsider,
+  viewer, editor after removal), `not-readonly`, `back-dated`, `unknown-version`, `stale-version` and
+  `refresh-open` — plus:
+  - refresh requests from a non-member group or a group viewer;
+  - an outsider's tomb;
+  - rotations from an outsider or with a bad schedule;
+  - planted key copies;
+  - a manager may still write during an open refresh;
+  - a re-upload after a tomb shows.
+- **Mutation check on the validator: 17/17 killed.** Each rule was broken in turn (skip read-only, ignore group
+  membership, answer every role question yes, drop stale/unknown version, drop back-dating, block managers too, never
+  close a refresh, let a later duplicate rotation win, let a tomb delete later files, accept any schedule, ignore
+  block order, let viewers write, let a group viewer open a refresh, stop counting malformed entities, accept key
+  copies from editors), and a test failed every time. The first run left 3 survivors; one was an equivalent mutant
+  and two exposed missing test cases, which were added.
+- **`records.ts` and `swarm.ts` (7 tests):**
+  - file meta opens only with its epoch key at its exact folder, file id, version, epoch and Swarm reference
+    (property test);
+  - roster halves can't be swapped; link bundles are bound to their name;
+  - a signed upload verifies only the exact body, signer, folder and a fresh time;
+  - uploads and downloads go through a local HTTP server standing in for the API and Bee, and the receipt marks a
+    call `direct` when the private network can't carry HTTPS;
+  - unpadded uploads and odd-sized downloads are refused.
+
+### Decisions and findings
+- **Arkiv's `$createdAt` is a block number, not a time** (SDK 1.0.1 types: "Block the entity was created at"). It can
+  be selected but not filtered or sorted on. The validator therefore reads each block's timestamp once (`BlockClock`)
+  and asks `wasAllowed` at that time. Ordering between Arkiv entities (which rotation was latest when a file was
+  written, whether a refresh was open) uses block numbers, which are exact. The live script also checks that
+  `$createdAt` equals the creating transaction's block (check 5).
+- **Every entity is created read-only, and validity goes by `$creator`.** Arkiv lets an owner patch an entity or hand
+  it to another address, so a writer could otherwise change an entry after losing access, or launder it through a new
+  owner. Entities without the read-only flag are hidden. Entries that managers renew (files, key copies, rosters,
+  rotations, tombs) also allow permissionless extension, so a manager can renew an editor's entry without being able to
+  change it.
+- **Three schema additions beyond the plan's table:**
+  - `cloak.rotation.name`: the folder's display name, sealed with `E_v[0]` so every reader of version v can open it;
+    the plan didn't say where display names live;
+  - `cloak.refresh.group`: the validator needs to know which group's managers may open the request;
+  - `cloak.link.folder`: which folder's managers may write the link.
+- **Welcome notes store `e·G` compressed (33 bytes).** Uncompressed it's 132 hex characters, over Arkiv's 128-byte
+  string limit.
+- **Refresh requests count only from a group that is itself a member of the folder.** Otherwise any group manager
+  anywhere could block a folder's editors.
+- **Sealed contents are bound to their place.** File meta uses folder, file id, version, epoch and Swarm reference as
+  associated data, so a valid blob can't be copied into another entry. The two roster halves and link bundles are
+  bound the same way.
+- **Uploads are signed per body.** The writer signs an EIP-191 message naming the folder, its own address, the
+  body's SHA-256 and the time. The API (A5) verifies it with the same `verifyUpload`, then checks `wasAllowed(WRITE)`
+  now. Only padding-bucket sizes are accepted, both ways.
+- **Writes are simulated before sending,** so a revert comes back as a named error (`NAME_TAKEN`, `NOT_AUTHORIZED`,
+  `EXPIRED`, `RATE_LIMITED` for the 15-holder cap) rather than a bare failure.
+- **Folder tokens are registered with no token roles.** The registry's root roles (K everyday, W dangerous) already
+  govern the name, so the hot key gains nothing on the token.
+- **Child folders are listed from logs (`eth_getLogs`).** This is the plan's "(check)" item. The scan starts at the
+  registry's creation block and halves the range when a provider refuses one. Whether the chosen RPC accepts it is
+  part of the live run; the fallback (a sealed `cloak.index` entity per owner) stays available.
