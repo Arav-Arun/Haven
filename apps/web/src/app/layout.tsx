@@ -3,6 +3,7 @@ import { Hanken_Grotesk } from "next/font/google";
 import type { ReactNode } from "react";
 import "@rainbow-me/rainbowkit/styles.css";
 import "./globals.css";
+import { Intro } from "@/components/intro/Intro";
 import { Providers } from "./providers";
 
 // Fonts are downloaded at build time and served from our own origin: no font requests leave the app.
@@ -56,6 +57,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         </head>
       )}
       <body className="min-h-dvh font-sans antialiased">
+        <Intro />
         <Providers>{children}</Providers>
       </body>
     </html>
