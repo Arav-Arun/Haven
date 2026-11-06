@@ -464,6 +464,11 @@ export function createApi(env: ApiEnv) {
       if (running) return c.json<RoomResponse>(await running);
       if (!counters.hit(`room:${r.roomKey}`, 1, 1, DAY)) throw new DriveError("RATE_LIMITED", "one room per key");
       if (!counters.hit("rooms", 1, LIMITS.roomsPerDay, DAY)) throw new DriveError("RATE_LIMITED", "daily cap reached");
+      // The room's key needs Arkiv gas for its first records: send it now, alongside the Sepolia transaction, so it
+      // has usually arrived by the time the room exists (the app then skips waiting for a drip).
+      void arkivQueue.run(() => sendGlm(arkivRelayer, roomKey, env.DRIP_ARKIV_WEI)).catch((e: unknown) =>
+        console.error(`[api] room gas failed: ${e instanceof Error ? e.message : String(e)}`),
+      );
       const job = remember(
         roomJobs,
         roomKey,
