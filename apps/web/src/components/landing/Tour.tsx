@@ -164,8 +164,8 @@ function VerifyMock({ s }: { s: number }) {
       <div className={`flex items-center gap-3 rounded-xl px-3.5 py-3 text-[13px] ${s === 0 ? "bg-[#f3f6fb]" : ok ? "bg-[#e7f5ee] text-[#155a3d]" : "bg-[#fdeceb] text-[#a3261d]"}`}>
         {s === 0 ? <Radio size={16} className="text-[#1f4fd1]" /> : ok ? <BadgeCheck size={16} /> : <ShieldAlert size={16} />}
         <div>
-          <p className="font-semibold">{s === 0 ? "Checking every file this page loaded…" : ok ? "Verified release" : "This page's code doesn't match any release"}</p>
-          <p className="opacity-75">{s === 0 ? "Comparing with the build published on Arkiv and Swarm" : ok ? "Matches the published, reproducible build. Keys released." : "Your keys stay in the extension. Open the verified copy instead."}</p>
+          <p className="font-semibold">{s === 0 ? "Rebuilding this commit from source…" : ok ? "Matches signed release" : "This build doesn't match any signed release"}</p>
+          <p className="opacity-75">{s === 0 ? "Comparing every file with the release signed on Arkiv" : ok ? "The same files haven.eth points to on Swarm." : "Use the signed copy on Swarm instead."}</p>
         </div>
       </div>
       <div className="mt-3 grid grid-cols-6 gap-1.5">
@@ -206,7 +206,7 @@ const TABS: {
   { id: "teams", label: "Teams and groups", icon: Users, track: { name: "ENS subnames", logo: "/ens.webp" }, title: "Share with a whole team, privately.", points: ["“Everyone at acme.eth” follows the team's ENS names", "Leave the team in ENS and access goes too", "The rule stays encrypted: the chain never learns the team"], Mock: TeamMock },
   { id: "public", label: "Public view", icon: Eye, track: { name: "Arkiv + Swarm", logo: "/arkive.png" }, title: "See exactly what the world sees.", points: ["Every folder shows what's public about it", "Members, names and contents are not in it", "Read live, so you can check it yourself"], Mock: PublicMock },
   { id: "keylog", label: "Key log", icon: Fingerprint, track: { name: "Arkiv", logo: "/arkive.png" }, title: "A public key log for every name.", points: ["Each name's keys, signed and in order, on Arkiv", "Compare eight words in person to be sure", "Forged entries are shown, and ignored"], Mock: KeyLogMock },
-  { id: "verify", label: "Verified site", icon: BadgeCheck, track: { name: "Ethereum Foundation", logo: "/eth.png" }, title: "Your keys only go to the real site.", points: ["The extension hashes every file a page loads", "It must match a published, reproducible release", "A swapped site gets a warning, not your keys"], Mock: VerifyMock },
+  { id: "verify", label: "Signed releases", icon: BadgeCheck, track: { name: "Ethereum Foundation", logo: "/eth.png" }, title: "Every release is signed and on Swarm.", points: ["Each build is signed and recorded on Arkiv", "haven.eth points to the exact files on Swarm", "Anyone can rebuild a commit and check it matches"], Mock: VerifyMock },
   { id: "live", label: "Live updates", icon: Radio, track: { name: "Swarm", logo: "/swarm.png" }, title: "New files appear in seconds.", points: ["A Swarm doorbell rings when something changes", "Its topic changes every hour, for members only", "Nothing shows until Arkiv confirms it"], Mock: LiveMock },
 ];
 

@@ -90,7 +90,6 @@ export function PullUpFooter({ children, surface = "page-surface" }: { children:
 /** Where to go next. The landing page's sections are in its own nav, so the footer doesn't repeat them. */
 const LINKS = [
   { label: "Open Haven", href: "/drive/" },
-  { label: "Chrome extension", href: "/extension/" },
   ...(haven.appRegistry ? [{ label: "Contracts on Etherscan", href: `${config.explorerUrl}/address/${haven.appRegistry}`, external: true }] : []),
   { label: "Source code", href: "https://github.com/Arav-Arun/ETHGlobalMumbai", external: true },
 ] as { label: string; href: string; external?: boolean }[];

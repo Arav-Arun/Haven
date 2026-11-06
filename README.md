@@ -30,7 +30,6 @@ License: [MIT](LICENSE).
 |---|---|
 | Website | Live link added at deploy time. Sign in with a wallet, or press **Try it** with no wallet (two fresh identities in one tab) |
 | Phone | Open the website → Settings → **Install the app**. Android also gets "Share to Haven" |
-| Browser extension | Load `apps/extension/.output/chrome-mv3` unpacked (or the zip from the GitHub release), then website Settings → **Connect extension** |
 
 Everything runs on Sepolia (ENSv2), Arkiv's Rabdi testnet and Swarm. Nothing is mocked or pre-seeded: every value on
 screen is read live.
@@ -40,7 +39,7 @@ screen is read live.
 ## How it works
 
 ```
- browser / phone / extension                                         public networks
+ browser / phone                                                     public networks
  ┌───────────────────────────────┐   Anon-RPC (Nym/Nox/Tor)   ┌─────────────────────────────────────┐
  │ keys from one signature       │ ─────────────────────────▶ │ Sepolia: ENSv2 names, DriveRegistry │
  │ AES-256-GCM, padded buckets   │   one isolation key per    │   roles that end, access history    │
@@ -126,8 +125,8 @@ What's different about this use:
   Names, file metadata, member lists and keys are sealed (AES-256-GCM). Even so, every screen is one indexed query.
 - **A public key directory keyed by ENS name** (`haven.keylog`). It's a signed, hash-chained history of each name's
   encryption key. Any app can look up a name's key, and tell a swapped key from a real change, with one Arkiv query.
-- **A release log that guards your keys** (`haven.release`, `haven.rebuild`). The extension gives your keys only to a
-  website build whose file hashes match a signed release on Arkiv.
+- **A signed release log** (`haven.release`, `haven.rebuild`). Every website build is signed on Arkiv with its file
+  hashes, and anyone who rebuilds a commit can post a matching `haven.rebuild`.
 - **Swarm bonus.**
   - **Storage:** file contents live on Swarm as padded ciphertext, and Arkiv holds the sealed pointer.
   - **Live updates:** Swarm GSOC "doorbells" tell members to re-check Arkiv.
@@ -138,15 +137,15 @@ Thirteen entity types in total, defined in [`packages/core/src/arkiv.ts`](packag
 ### Ethereum Foundation: Anon-RPC on every call, isolated per identity
 
 - **On by default everywhere:**
-  - **Coverage:** web, phone app and extension.
+  - **Coverage:** web and phone app.
   - **Traffic:** all JSON-RPC traffic for Sepolia (ENS, roles) and Arkiv.
   - **Networks:** Nym, Nox or Tor, chosen in Settings. Turning it off shows a red "Not private" banner.
 - **One isolation key per room and per stealth address.** Even an Anon-RPC exit can't tell that two of your rooms, or
   two of your shares, belong to the same person.
 - **Every call is labelled.** The receipts panel marks each request "Private" or "Direct". Settings checks whether file
   traffic can be routed by making a real request rather than assuming.
-- **A verified frontend.** The extension re-hashes the website's files and checks them against signed, reproducible
-  releases before giving the site your keys. A swapped site (the Bybit case) gets a red warning instead.
+- **A signed, reproducible frontend.** Each release's file hashes are signed on Arkiv and the build is stored on
+  Swarm, with `haven.eth`'s contenthash pointing to it, so anyone can rebuild a commit and check what is served.
 - **No trackers.** There are no analytics and no third-party scripts. Fonts are self-hosted, and a strict
   Content-Security-Policy allows only our own scripts.
 
@@ -162,7 +161,7 @@ Thirteen entity types in total, defined in [`packages/core/src/arkiv.ts`](packag
     data stays on Sepolia, Arkiv and Swarm.
 - **O:**
   - **License:** MIT.
-  - **Run it yourself:** contracts, core, API, website, phone app, extension and Bee node config all build and run from
+  - **Run it yourself:** contracts, core, API, website, phone app and Bee node config all build and run from
     this repo alone. You supply only your own testnet keys, RPC URL, Arkiv access key and Swarm postage batch.
 - **P:**
   - **RPC providers, Arkiv and the Anon-RPC exits** see requests but not who sent them. Requests are split by room and
@@ -178,7 +177,7 @@ Thirteen entity types in total, defined in [`packages/core/src/arkiv.ts`](packag
   - **Keys:** derived on the device from one domain-bound signature, never sent anywhere, and stored encrypted under a
     non-extractable WebCrypto key.
   - **Files:** every file and record is encrypted before it leaves the device.
-  - **Trust assumptions:** you trust the website code (the extension verifies it), your wallet, and the ENSv2 contracts
+  - **Trust assumptions:** you trust the website code (signed releases let you check it), your wallet, and the ENSv2 contracts
     (pre-launch). `DriveRegistry` is unaudited. Our API, the RPCs, Arkiv and Swarm only ever see ciphertext.
 
 More detail on P is in "Who can link what" below.
@@ -230,15 +229,12 @@ It's safe to re-run. `pnpm --filter @haven/core a1` then checks a claim, a room,
 
 Set `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` for mobile wallet links. Without it, only injected browser wallets work.
 
-**4. Extension.** Fill in `apps/extension/.env` (see its `.env.example`), then run `pnpm --filter @haven/extension zip`.
-
-**5. Website release (verified frontend).**
+**4. Website release (signed frontend).**
 1. Commit, then run `pnpm --filter @haven/web build`.
 2. Set `RELEASE_PRIVATE_KEY`, `DEPLOYER_PRIVATE_KEY`, `BEE_URL` and `POSTAGE_BATCH_ID`, then run
    `pnpm --filter @haven/core release publish <version>`.
 
-This uploads the site to Swarm, writes `haven.release` on Arkiv and points `haven.eth` at the Swarm copy. Put the
-printed release address in the extension's `WXT_RELEASE_SIGNER`. Anyone can rebuild a commit and run
+This uploads the site to Swarm, writes `haven.release` on Arkiv and points `haven.eth` at the Swarm copy. Anyone can rebuild a commit and run
 `release rebuild <rootHash>`.
 
 **6. End to end.** With the API running and `API_URL` set, run `pnpm --filter @haven/core e2e`. Three random
@@ -289,7 +285,7 @@ const log = await arkiv.select().from(KeyLogSchema).where(eq("ensName", str("inv
 | Each user's drive key K | Their own folders' entities | Derived on the device |
 | Each room's key K_room | That room's entities | Derived on the device; not linked to K |
 | Each member's stealth address | Their file entries | Derived per share |
-| Release key R | Arkiv: `haven.release`, `haven.unrelease` | From `RELEASE_PRIVATE_KEY`; the extension's `WXT_RELEASE_SIGNER` |
+| Release key R | Arkiv: `haven.release`, `haven.unrelease` | From `RELEASE_PRIVATE_KEY` |
 | Any rebuilder | Arkiv: `haven.rebuild` | Their own key |
 
 ---
@@ -326,8 +322,8 @@ No funds move in the product beyond gas dust.
 
 - **What someone already opened, they keep.** No system can stop a reader copying plaintext.
 - **Metadata is public.** Membership counts, end dates and timing are public, even in unlinked rooms.
-- **Keys live in the browser.** XSS or a malicious extension would expose them. They hold only gas dust and can't
-  upgrade anything. "Keep keys in the extension" means the website gets them only after its code is verified.
+- **Keys live in the browser.** XSS or a malicious browser extension would expose them. They hold only gas dust and can't
+  upgrade anything.
 - **Member cap.** ENS caps each role at 15 holders per folder. `sweep` frees expired slots.
 - **Not production-ready.** ENSv2 on Sepolia is pre-launch, and `DriveRegistry` is unaudited.
 
@@ -339,10 +335,9 @@ No funds move in the product beyond gas dust.
 |---|---|
 | `contracts/` | `DriveRegistry.sol` (Foundry: unit, fuzz, invariant and fork tests against live Sepolia ENSv2) |
 | `packages/core/` | The protocol and `createDriveClient`: keys, epochs, stealth shares, ENS, Arkiv, validator, Swarm |
-| `packages/platform/` | Anon-RPC wiring, encrypted IndexedDB, extension storage |
+| `packages/platform/` | Anon-RPC wiring, encrypted IndexedDB |
 | `packages/ui/` | Shared React components |
 | `apps/web/` | Website and installable phone app (a Next.js static export, so it also runs from Swarm) |
-| `apps/extension/` | Chrome extension (WXT, MV3) |
 | `apps/api/` | The relayer API (Hono) |
 | `infra/bee/` | A Bee node on Fly.io |
 | `arkiv/` | Arkiv judging files |

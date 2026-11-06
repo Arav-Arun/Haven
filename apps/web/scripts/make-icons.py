@@ -17,7 +17,6 @@ from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parents[3]
 WEB = ROOT / "apps/web/public"
-EXT = ROOT / "apps/extension/public"
 MARK = WEB / "haven-mark.webp"
 
 
@@ -67,16 +66,11 @@ def icon(size: int, mark_share: float, full_bleed: bool) -> Image.Image:
 def main() -> None:
     if "--from" in sys.argv:
         mark_from(Path(sys.argv[sys.argv.index("--from") + 1])).save(MARK, "WEBP", lossless=True, method=6)
-    EXT.mkdir(parents=True, exist_ok=True)
-    (EXT / "icon").mkdir(exist_ok=True)
-    Image.open(MARK).save(EXT / "haven-mark.webp", "WEBP", lossless=True, method=6)
     icon(512, 0.64, False).save(WEB / "icon-512.png", optimize=True)
     icon(192, 0.64, False).save(WEB / "icon-192.png", optimize=True)
     icon(512, 0.5, True).save(WEB / "icon-maskable-512.png", optimize=True)  # inside the maskable safe zone
     icon(180, 0.6, True).save(WEB / "apple-touch-icon.png", optimize=True)
     icon(64, 0.66, False).save(WEB / "favicon.png", optimize=True)
-    for size in (16, 32, 48, 128):
-        icon(size, 0.66, False).save(EXT / "icon" / f"{size}.png", optimize=True)
 
 if __name__ == "__main__":
     main()

@@ -1,7 +1,0 @@
-@import "tailwindcss";
-@import "@haven/ui/styles.css";
-
-body {
-  width: 380px;
-  min-height: 480px;
-}

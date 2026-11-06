@@ -326,6 +326,8 @@ class Client implements HavenClient {
   private ensName: string | null = null;
   private driveRoot: Address | null = null;
   private readonly holdings = new Map<string, Holding>();
+  /** Folders made by this client recently, by registry: kept in lists until the chain's log index shows them. */
+  private readonly recent = new Map<string, { list: string; folder: Folder; at: number }>();
   private readonly fileCache = new Map<string, { record: FileRecord & { createdAt: number }; meta: FileMeta | null }>();
   private readonly direct = new Set<string>();
   private apiInfo: ApiInfo | null = null;
@@ -813,7 +815,7 @@ class Client implements HavenClient {
    * (that read-back, through a private network, was most of the wait after creating something).
    */
   private freshFolder(registry: Address, ensName: string, displayName: string, parent: Address | null, inherit: boolean): Folder {
-    return {
+    const folder: Folder = {
       registry,
       ensName,
       displayName,
@@ -824,6 +826,10 @@ class Client implements HavenClient {
       version: 1,
       refreshPending: false,
     };
+    // Listed right away: the chain's log index can lag a new registration by a few blocks.
+    const list = folder.kind === "room" ? "rooms" : folder.kind === "group" ? "groups" : parent ? lower(parent) : "root";
+    this.recent.set(lower(registry), { list, folder, at: now() });
+    return folder;
   }
 
   async getFolder(folder: Address): Promise<Folder> {
@@ -962,7 +968,14 @@ class Client implements HavenClient {
         }
       }),
     );
-    return folders.filter((f): f is Folder => f !== null && f.version > 0);
+    const listed = folders.filter((f): f is Folder => f !== null && f.version > 0);
+    // Folders made here in the last ten minutes that the chain's log index hasn't caught up with yet.
+    const list = parent === "root" || parent === "rooms" || parent === "groups" ? parent : lower(parent);
+    for (const [id, r] of this.recent) {
+      if (now() - r.at > 600) this.recent.delete(id);
+      else if (r.list === list && !listed.some((f) => lower(f.registry) === id)) listed.unshift(r.folder);
+    }
+    return listed;
   }
 
   async createFolder(parent: Address | "root", displayName: string, opts?: { inherit?: boolean }): Promise<Folder> {

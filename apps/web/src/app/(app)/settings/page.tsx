@@ -11,85 +11,9 @@ import { chooseNetwork, getAnon, selectedNetwork, unavailableReason } from "@/li
 import { config } from "@/lib/config";
 import { useDrive } from "@/lib/drive";
 import { useInstall } from "@/lib/pwa";
-import { Devices, KeysInExtension, LinkName, MyKey } from "@/components/KeyDirectory";
+import { Devices, LinkName, MyKey } from "@/components/KeyDirectory";
 import { useNow } from "@haven/ui";
 
-/**
- * Pairs the browser extension: after the user confirms, the account seed goes to the extension's content script on
- * this page (window.postMessage, this origin only), which hands it to the extension's background worker.
- */
-function ConnectExtension() {
-  const { client, identity } = useDrive();
-  const [present, setPresent] = useState(false);
-  const [persist, setPersist] = useState(false);
-  const [pending, setPending] = useState(false);
-  const [result, setResult] = useState<{ ok: boolean; ensName?: string | null; error?: string } | null>(null);
-  const [error, setError] = useState<unknown>(null);
-
-  useEffect(() => {
-    const onMessage = (e: MessageEvent) => {
-      if (e.source !== window || e.origin !== window.location.origin) return;
-      const d = e.data as { source?: string; type?: string; ok?: boolean; ensName?: string | null; error?: string } | null;
-      if (d?.source !== "haven-ext") return;
-      if (d.type === "present") setPresent(true);
-      if (d.type === "paired") {
-        setPending(false);
-        setResult({ ok: !!d.ok, ensName: d.ensName, error: d.error });
-      }
-    };
-    window.addEventListener("message", onMessage);
-    window.postMessage({ source: "haven-web", type: "ping" }, window.location.origin);
-    return () => window.removeEventListener("message", onMessage);
-  }, []);
-
-  if (!client || !identity) return null;
-  return (
-    <section className="surface rounded-2xl p-5 text-sm">
-      <h2 className="font-medium">Browser extension</h2>
-      {!present ? (
-        <p className="mt-1 text-muted">
-          <Link href="/extension/" className="font-medium text-action underline underline-offset-4">Install the Haven extension for Chrome</Link>, then reload
-          this page. It adds right-click &quot;Save to Haven&quot;, a badge when something is shared with you, and a reminder
-          before access ends.
-        </p>
-      ) : result?.ok ? (
-        <p className="mt-1 text-private">Connected. The extension is signed in as {result.ensName ?? "you"}.</p>
-      ) : (
-        <div className="mt-2 flex flex-col items-start gap-2">
-          <p className="text-muted">
-            Connecting gives the extension in this browser your Haven keys, so it can check for shares and save files.
-            Only do this on your own computer.
-          </p>
-          <label className="flex items-center gap-2">
-            <input type="checkbox" className="accent-action" checked={persist} onChange={(e) => setPersist(e.target.checked)} />
-            Keep it signed in after the browser restarts
-          </label>
-          <Button
-            variant="primary"
-            pending={pending}
-            onClick={async () => {
-              setError(null);
-              setResult(null);
-              setPending(true);
-              try {
-                const seed = await client.exportSeed();
-                window.postMessage({ source: "haven-web", type: "pair", seed: Array.from(seed), persist }, window.location.origin);
-                seed.fill(0);
-              } catch (e) {
-                setError(e);
-                setPending(false);
-              }
-            }}
-          >
-            Connect extension
-          </Button>
-          {result && !result.ok && <p className="text-danger">The extension couldn&apos;t sign in: {result.error}</p>}
-          <ErrorNote error={error} />
-        </div>
-      )}
-    </section>
-  );
-}
 
 function Install() {
   const { state, install } = useInstall();
@@ -134,7 +58,7 @@ function Account() {
       else {
         await client.signOut();
         // The quick-start lists of this tab belong to the account that just left.
-        for (const k of Object.keys(sessionStorage)) if (k.startsWith("haven:view:")) sessionStorage.removeItem(k);
+        for (const k of Object.keys(localStorage)) if (k.startsWith("haven:view:")) localStorage.removeItem(k);
         setIdentity(null);
         router.push("/");
       }
@@ -224,8 +148,6 @@ export default function SettingsPage() {
       <SettingsDevices />
       <LinkName />
       <Install />
-      <ConnectExtension />
-      <KeysInExtension />
 
       <section className="surface rounded-2xl p-5">
         <h2 className="font-medium">Private network</h2>

@@ -14,7 +14,7 @@ schemas, the validator, Swarm uploads, naming), following the plan step by step.
 that ENSv2's role hooks can't be overridden) were run, and their results recorded in `docs/checks-a.md`.
 
 **Person B (Arav Arun): apps, then the client and API.** Claude wrote the platform package (Anon-RPC wiring for web
-and extension, encrypted storage), the UI package, the website and phone app, and the extension. After merging A's
+and encrypted storage), the UI package, and the website and phone app (a browser extension was built, then removed). After merging A's
 branch, at Arav's request, Claude also wrote the API (`apps/api`), `createDriveClient` and the bootstrap and
 end-to-end scripts. Results are recorded in `docs/checks-b.md`.
 

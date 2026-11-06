@@ -3,7 +3,7 @@
 // The rest of the landing page: the four networks (and prize tracks), privacy, apps, questions, the closing call.
 // Every sentence describes what the code does today.
 
-import { ArrowRight, Check, Eye, EyeOff, Monitor, Plus, Puzzle, Smartphone } from "lucide-react";
+import { ArrowRight, Check, Eye, EyeOff, Monitor, Plus, Smartphone } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
@@ -77,7 +77,7 @@ const TRACKS = [
     prize: "Anon-RPC · CROPS",
     logo: "/eth.png",
     lead: "Private lookups. Keys stay yours.",
-    points: ["Lookups go through Anon-RPC, and receipts flag any that couldn't", "The extension only trusts the signed, published build", "No trackers. Open source, MIT"],
+    points: ["Lookups go through Anon-RPC, and receipts flag any that couldn't", "Every release is signed, and haven.eth points to it on Swarm", "No trackers. Open source, MIT"],
     span: "",
   },
 ];
@@ -181,14 +181,13 @@ export function Privacy() {
 const APPS = [
   { icon: Monitor, name: "Website", body: "Your drive, rooms and shares in any browser. Nothing to install." },
   { icon: Smartphone, name: "Phone app", body: "Add it to your home screen. On Android, share files to Haven from any app." },
-  { icon: Puzzle, name: "Browser extension", body: "Save files with a right-click, hear about new shares, and keep your keys away from any page that isn't the real one." },
 ];
 
 export function Apps() {
   return (
     <section className="mx-auto max-w-6xl px-5 py-24 lg:py-32">
       <h2 className="display text-center text-5xl text-[#0d1b33] sm:text-6xl">Wherever you are.</h2>
-      <div className="mt-12 grid gap-4 md:grid-cols-3">
+      <div className="mx-auto mt-12 grid max-w-4xl gap-4 md:grid-cols-2">
         {APPS.map(({ icon: I, name, body }) => (
           <div key={name} className="rounded-[28px] bg-white p-7 shadow-[0_18px_44px_-28px_rgb(13_27_51_/_0.4)]">
             <span className="flex size-12 items-center justify-center rounded-2xl bg-[#1f4fd1]/10 text-[#1f4fd1]">
@@ -205,7 +204,7 @@ export function Apps() {
 
 const FAQ = [
   ["Can Haven read my files?", "No. Each file is encrypted on your device with its own key before it's uploaded. Swarm stores only padded ciphertext, and our API never sees a file, a key, or who you shared with."],
-  ["What does the person I share with need?", "An ENS name with a Haven key: a name they claim in Haven, or an ENS name they already own, linked in Settings. They open what you shared in the browser, on their phone, or in the extension."],
+  ["What does the person I share with need?", "An ENS name with a Haven key: a name they claim in Haven, or an ENS name they already own, linked in Settings. They open what you shared in the browser, on their phone or on their phone."],
   ["What happens when access ends?", "Their role ends onchain on the date you set, and their keys stop at that moment, so every file added afterwards is locked for them. No transaction is needed. What they already opened, they keep, as with any file you share."],
   ["Can anyone tell who I shared with?", "No. Each person appears onchain as a new random address that only you and they can link to their name. A data room isn't linked to you at all. The Public view shows exactly what anyone can see."],
   ["Do I need a wallet or crypto?", "No. Try it creates keys without a wallet. With a wallet you sign one message, and the gas for your name and folders is covered on the test networks."],
