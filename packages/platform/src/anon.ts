@@ -151,11 +151,40 @@ export function createAnonFetch(opts: CreateAnonFetchOptions): AnonFetch {
   );
   startDeadline.catch(() => undefined);
 
+  // The mixnet's exits are a small shared pool, and now and then none is free ("No exit offers TLS tunnels") or a relay
+  // is too slow. A request is tried again a couple of times; if it still can't go privately, it goes direct, and the
+  // status says so (so receipts mark it "direct") until a private request gets through again.
+  let degraded = false;
+  const plain = globalThis.fetch.bind(globalThis);
+  // Only "no exit" failures: the request was never sent, so trying again (or direct) can't make anything happen twice.
+  // A timeout may have reached the server, so it is not retried here (the client repeats only the calls that are safe).
+  const transient = (e: unknown) => /no ?tunnel|no exit|NoTunnelExit/i.test(e instanceof Error ? `${e.name} ${e.message}` : String(e));
   const routed = (isolationKey?: string): typeof fetch =>
     (async (input: RequestInfo | URL, init?: RequestInit) => {
       const worker = await Promise.race([workerPromise, startDeadline]);
       const anonInit = isolationKey ? { ...init, anonOptions: { isolationKey } } : init;
-      return worker.fetch(input as string | URL | Request, anonInit);
+      let last: unknown;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const res = await worker.fetch(input as string | URL | Request, anonInit);
+          if (degraded) {
+            degraded = false;
+            setStatus({ network: opts.network, state: "ready", detail: info.label });
+          }
+          return res;
+        } catch (e) {
+          last = e;
+          if (!transient(e)) throw e;
+          await new Promise((ok) => setTimeout(ok, 1000 * (attempt + 1)));
+        }
+      }
+      degraded = true;
+      setStatus({
+        network: opts.network,
+        state: "failed",
+        detail: `No private-network exit is free right now, so requests go direct until one is (${last instanceof Error ? last.message : String(last)})`,
+      });
+      return plain(input as string | URL | Request, init);
     }) as typeof fetch;
 
   return {
