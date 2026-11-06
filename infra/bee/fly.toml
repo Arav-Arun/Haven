@@ -4,8 +4,16 @@
 #   fly volumes create bee_data --config infra/bee/fly.toml --region bom --size 10
 #   fly secrets set --config infra/bee/fly.toml BEE_PASSWORD=… BEE_BLOCKCHAIN_RPC_ENDPOINT=https://<gnosis rpc>
 #   fly deploy --config infra/bee/fly.toml
-# Then fund the node's Gnosis address (GET /addresses → ethereum) with ~0.01 xDAI and 2–3 xBZZ, and buy a batch:
-#   fly ssh console --config infra/bee/fly.toml -C "wget -qO- --method=POST http://localhost:1633/stamps/100000000/20"
+# Then fund the node's Gnosis address (GET /addresses → ethereum) with a little xDAI (gas for its chequebook and the
+# batch) and xBZZ, and buy ONE batch. Depth 19 = 112 MB usable (enough for the site copy and demo files); cost is
+# 2^depth × amount PLUR (1 xBZZ = 1e16 PLUR), and amount = live price × 17280 blocks/day × days. Read the live price
+# first (GET /chainstate → currentPrice); the contract refuses less than 1 day (minimumValidityBlocks = 17280). At
+# 201172 PLUR/chunk/block (2026-11-06), 7 days at depth 19 is amount 24333765120, about 1.28 xBZZ:
+#   fly ssh console --config infra/bee/fly.toml -C "wget -qO- http://localhost:1633/chainstate"
+#   fly ssh console --config infra/bee/fly.toml -C "wget -qO- --post-data= http://localhost:1633/stamps/<amount>/19"
+# Extend it later instead of buying another: POST /stamps/topup/<batchID>/<amount>.
+# The node's key (in the bee_data volume, encrypted with BEE_PASSWORD) owns the batch: keep the password safe, and
+# don't delete the volume while the batch is in use.
 app = "haven-bee"
 primary_region = "bom"
 
