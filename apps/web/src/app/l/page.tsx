@@ -5,7 +5,6 @@ import { ErrorNote, FilePreview, Skeleton, Wordmark, saveBlob } from "@haven/ui"
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ClientUnavailable } from "@/components/Gate";
-import { NetworkBadge } from "@/components/NetworkBadge";
 import { useDrive } from "@/lib/drive";
 
 /**
@@ -35,7 +34,6 @@ export default function OpenLink() {
         <Link href="/">
           <Wordmark />
         </Link>
-        <NetworkBadge compact />
       </header>
       <main className="flex flex-col gap-4 pb-16 pt-4">
         {restoring && <Skeleton rows={4} />}

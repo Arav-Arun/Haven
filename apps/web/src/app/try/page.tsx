@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { ClientUnavailable } from "@/components/Gate";
-import { NetworkBadge } from "@/components/NetworkBadge";
 import { config } from "@/lib/config";
 import { makeClient, useDrive, type Profile } from "@/lib/drive";
 
@@ -98,7 +97,6 @@ export default function TryIt() {
         <Link href="/">
           <Wordmark />
         </Link>
-        <NetworkBadge compact />
       </header>
       <main className="flex flex-col gap-6 pb-16 pt-4">
         <div>

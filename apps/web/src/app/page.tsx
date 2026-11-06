@@ -7,12 +7,9 @@ import { Apps, BuiltOn, Closing, Faq, Privacy, Tracks } from "@/components/landi
 import { Nav } from "@/components/landing/Nav";
 import { Clouds } from "@/components/landing/Sky";
 import { Steps } from "@/components/landing/Steps";
-import { TicketStack } from "@/components/landing/Tickets";
 import { Tour } from "@/components/landing/Tour";
 import { MissingConfig } from "@/components/MissingConfig";
 import { useDrive } from "@/lib/drive";
-
-const PROMISES = ["Encrypted on your device", "Recipients stay hidden", "Access ends on its own"];
 
 export default function Home() {
   const { identity, restoring } = useDrive();
@@ -24,12 +21,12 @@ export default function Home() {
       <Nav cta={signedIn ? { href: "/drive", label: "Open Haven" } : { href: "/onboarding", label: "Start sharing" }} />
 
       <div className="p-2 sm:p-4">
-        <section className="sky relative overflow-hidden rounded-[28px] sm:rounded-[36px]">
+        <section className="sky relative flex min-h-[92svh] flex-col overflow-hidden rounded-[28px] sm:rounded-[36px]">
           <Clouds />
           <div className="relative z-10 px-4 pt-24">
             <MissingConfig />
           </div>
-          <div className="hero-copy relative z-30 mx-auto flex max-w-5xl flex-col items-center px-5 pt-14 text-center sm:pt-20">
+          <div className="hero-copy relative z-30 mx-auto flex max-w-5xl flex-1 flex-col items-center justify-center px-5 pb-40 pt-6 text-center sm:pb-48">
             <h1 className="display text-[12vw] text-white drop-shadow-[0_4px_30px_rgb(20_60_150_/_0.35)] sm:text-7xl lg:text-[88px]">
               Share any file by name.
               <br />
@@ -39,29 +36,14 @@ export default function Home() {
               Haven encrypts files on your device and shares them with any ENS name. Each person gets a private ticket, and
               their access ends on the date you pick.
             </p>
-            <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row">
+            <div className="mt-10 flex justify-center">
               <Link href={primary.href} className="pill-white inline-flex items-center gap-3 rounded-full py-2 pl-7 pr-2 text-[17px] font-semibold">
                 {primary.label}
                 <span className="flex size-10 items-center justify-center rounded-full bg-[#1f4fd1] text-white">
                   <ArrowRight size={18} />
                 </span>
               </Link>
-              {!signedIn && (
-                <Link href="/try" className="rounded-full px-5 py-3 text-[16px] font-semibold text-[#0d1b33]/80 transition-colors hover:bg-white/40 hover:text-[#0d1b33]">
-                  Try it without a wallet
-                </Link>
-              )}
             </div>
-            <ul className="mt-8 flex flex-wrap justify-center gap-2">
-              {PROMISES.map((p) => (
-                <li key={p} className="glass-soft rounded-full px-4 py-2 text-[15px] font-medium text-[#0d1b33]/80">
-                  {p}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="relative z-10 mt-6 pb-10 sm:mt-10">
-            <TicketStack />
           </div>
         </section>
       </div>

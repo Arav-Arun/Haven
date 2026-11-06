@@ -8,7 +8,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { useAccount, useSignMessage } from "wagmi";
 import { ConnectWallet, useWalletKind } from "@/components/ConnectWallet";
-import { NetworkBadge } from "@/components/NetworkBadge";
 import { config } from "@/lib/config";
 import { useDrive } from "@/lib/drive";
 import { HavenMark } from "@/components/landing/Logo";
@@ -215,7 +214,6 @@ export default function Onboarding() {
           <HavenMark size={36} />
           <span className="text-lg font-semibold tracking-tight">Haven</span>
         </Link>
-        <NetworkBadge compact />
       </header>
       <main className="mx-auto w-full max-w-xl px-6 pb-16 pt-7 sm:px-8 sm:pt-12">
         <Link href="/" className="inline-flex items-center gap-2 text-sm text-[#60718d] transition-colors hover:text-[#2563eb]">
