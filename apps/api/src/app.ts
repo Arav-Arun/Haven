@@ -239,7 +239,9 @@ export function createApi(env: ApiEnv) {
   const arkivUrl = arkivEndpoint(env.ARKIV_RPC_URL, env.ARKIV_ACCESS_KEY);
   const arkiv = arkivReader({ rpcUrl: env.ARKIV_RPC_URL, accessKey: env.ARKIV_ACCESS_KEY, anon: passthroughAnon() });
   const counters = new Counters();
+  // One queue per chain: each chain has its own nonces, so an Arkiv write never waits behind a Sepolia receipt.
   const queue = new Queue();
+  const arkivQueue = new Queue();
   const history = registryHistory(sepoliaClient);
   const arkivClock = new BlockClock(arkiv);
 
@@ -251,13 +253,15 @@ export function createApi(env: ApiEnv) {
     const batch = [...pending.values()];
     pending.clear();
     for (const to of batch) {
+      const failed = (e: unknown) => console.error(`[api] drip failed: ${e instanceof Error ? e.message : String(e)}`);
+      // Both chains at once: the Arkiv gas no longer waits for the Sepolia receipt.
+      void arkivQueue.run(() => sendGlm(arkivRelayer, to, env.DRIP_ARKIV_WEI)).catch(failed);
       await queue
         .run(async () => {
           const hash = await writer.wallet.sendTransaction({ account: relayer, chain: sepolia, to, value: env.DRIP_SEPOLIA_WEI });
           await sepoliaClient.waitForTransactionReceipt({ hash });
-          await sendGlm(arkivRelayer, to, env.DRIP_ARKIV_WEI);
         })
-        .catch((e: unknown) => console.error(`[api] drip failed: ${e instanceof Error ? e.message : String(e)}`));
+        .catch(failed);
     }
   };
   const timer = setInterval(() => void sendBatch(), env.DRIP_BATCH_SECONDS * 1000);
@@ -348,7 +352,7 @@ export function createApi(env: ApiEnv) {
         if (devices.some((x) => x.record.deviceId === d.deviceId && x.why === "revoked")) throw new DriveError("NOT_AUTHORIZED", "that device was revoked");
         op = deviceOp({ ...d, label: hexToBytes(d.label), sig: r.sig });
       }
-      const { txHash, keys } = await queue.run(() => writeEntities(arkivRelayer, [op], "Key log entry"));
+      const { txHash, keys } = await arkivQueue.run(() => writeEntities(arkivRelayer, [op], "Key log entry"));
       return c.json<KeyLogRelayResponse>({ entityKey: keys[0]!, txHash });
     } catch (e) {
       return fail(c, e);
@@ -591,7 +595,7 @@ export function createApi(env: ApiEnv) {
       const joined = writers.find((w) => isAddressEqual(w.member, member));
       if (joined) return c.json<ZkJoinResponse>({ entityKey: joined.key, txHash: null });
       if (!counters.hit(`zkjoin:${folder}`, 1, LIMITS.zkJoinsPerFolderPerDay, DAY)) throw new DriveError("RATE_LIMITED", "too many joins for this folder today");
-      const { txHash, keys } = await queue.run(() => writeEntities(arkivRelayer, [zkJoinOp({ folder, member, commitment: r.commitment, sig: r.sig })], "Writer group join"));
+      const { txHash, keys } = await arkivQueue.run(() => writeEntities(arkivRelayer, [zkJoinOp({ folder, member, commitment: r.commitment, sig: r.sig })], "Writer group join"));
       return c.json<ZkJoinResponse>({ entityKey: keys[0]!, txHash });
     } catch (e) {
       return fail(c, e);
@@ -633,7 +637,7 @@ export function createApi(env: ApiEnv) {
       await checkGroupProof(fields.folder, proof);
       spend(proof);
       if (!counters.hit(`zkfile:${fields.folder}`, 1, LIMITS.zkFilesPerFolderPerDay, DAY)) throw new DriveError("RATE_LIMITED", "too many entries for this folder today");
-      const { txHash, keys } = await queue.run(() => writeEntities(arkivRelayer, [zkFileOp({ ...fields, proof: hexToBytes(r.proof) })], "Anonymous file entry"));
+      const { txHash, keys } = await arkivQueue.run(() => writeEntities(arkivRelayer, [zkFileOp({ ...fields, proof: hexToBytes(r.proof) })], "Anonymous file entry"));
       return c.json<ZkFileResponse>({ entityKey: keys[0]!, txHash });
     } catch (e) {
       return fail(c, e);
