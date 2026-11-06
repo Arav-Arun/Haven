@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#16302a"/>
+  <mask id="m"><rect x="96" y="160" width="320" height="192" rx="18" fill="#fff"/>
+    <circle cx="192" cy="160" r="22"/><circle cx="192" cy="352" r="22"/></mask>
+  <rect x="96" y="160" width="320" height="192" fill="#f3ddb0" mask="url(#m)"/>
+  <circle cx="192" cy="200" r="5" fill="#d8b97f"/><circle cx="192" cy="222" r="5" fill="#d8b97f"/><circle cx="192" cy="244" r="5" fill="#d8b97f"/><circle cx="192" cy="266" r="5" fill="#d8b97f"/><circle cx="192" cy="288" r="5" fill="#d8b97f"/><circle cx="192" cy="310" r="5" fill="#d8b97f"/>
+  <rect x="232" y="206" width="152" height="30" rx="4" fill="#9c2b21"/><rect x="232" y="258" width="128" height="14" rx="4" fill="#16302a"/><rect x="232" y="290" width="98" height="14" rx="4" fill="#16302a"/>
+</svg>

@@ -1,0 +1,6 @@
+.output/
+.wxt/
+public/anon-rpc/
+.env
+.env.*
+!.env.example
