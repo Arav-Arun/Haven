@@ -232,7 +232,9 @@ export default function SettingsPage() {
         </p>
         <fieldset className="mt-4 flex flex-col gap-3">
           <legend className="sr-only">Choose a private network</legend>
-          {options.map((n) => {
+          {/* Only the networks this deployment can run. On Sepolia that's Nox and Off: Nym and Tor register their
+              workers on mainnet, so they appear only when a mainnet RPC is configured. */}
+          {options.filter((n) => !unavailableReason(n)).map((n) => {
             const reason = unavailableReason(n);
             return (
               <label key={n} className={`flex gap-3 rounded-xl border p-3 ${n === current ? "border-action bg-action-soft/50" : "border-line bg-white"} ${reason ? "opacity-60" : "cursor-pointer"}`}>
