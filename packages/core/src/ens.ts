@@ -108,8 +108,8 @@ export function labelId(label: string): bigint {
 
 const LABEL_ALPHABET = "abcdefghijklmnopqrstuvwxyz234567"; // 32 symbols, so each random byte maps without bias
 
-/** A random label such as "f-k2x9q7mz". Random so it reveals nothing and can't be guessed. */
-export function randomLabel(prefix: "f" | "r" | "l" | "g", length = 10): string {
+/** A random label such as "f-k2x9q7mz" (f folder, r room, l link, g group, m mount). Reveals nothing, can't be guessed. */
+export function randomLabel(prefix: "f" | "r" | "l" | "g" | "m", length = 10): string {
   const bytes = randomBytes(length);
   return `${prefix}-${Array.from(bytes, (b) => LABEL_ALPHABET[b & 31]).join("")}`;
 }
@@ -352,7 +352,7 @@ export async function nameController(client: SepoliaReader, name: string): Promi
  * as Alchemy and Infura do). Used to start a log scan of someone else's registry at its first block.
  */
 export async function creationBlock(client: SepoliaReader, address: Address): Promise<bigint> {
-  let hi = await client.getBlockNumber();
+  let hi = await client.getBlockNumber({ cacheTime: 0 });
   const code = await client.getCode({ address, blockNumber: hi });
   if (!code || code === "0x") throw new DriveError("NOT_FOUND", `no contract at ${address}`);
   let lo = 0n;
@@ -398,7 +398,8 @@ export async function listChildren(
 ): Promise<ChildName[]> {
   const event = driveRegistryAbi.find((e) => e.type === "event" && e.name === "LabelRegistered");
   if (!event || event.type !== "event") throw new Error("LabelRegistered missing from the ABI");
-  const latest = options.toBlock ?? (await client.getBlockNumber());
+  // cacheTime 0: viem otherwise reuses a block number up to one polling interval old, missing names registered since.
+  const latest = options.toBlock ?? (await client.getBlockNumber({ cacheTime: 0 }));
   let range = options.maxRange ?? 50_000n;
   const logs: Log[] = [];
   let from = options.fromBlock;

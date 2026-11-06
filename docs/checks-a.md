@@ -7,13 +7,13 @@ as the submodule `contracts/lib/contracts-v2`. Toolchain: Foundry 1.8.7, solc 0.
 
 | # | Check | Result |
 |---|---|---|
-| 1 | Register `cloakroom.eth` and `rooms.cloakroom.eth` | Pending (deployer not funded yet) |
+| 1 | Register `cloakroom.eth` and `rooms.cloakroom.eth` | **Pass on a fork of live Sepolia** (`DriveRegistry.fork.t.sol`, below). Live run ready: `pnpm --filter @cloakroom/core bootstrap`; needs Sepolia ETH |
 | 2 | `DriveRegistry` at `48b3e2d` | **Pass, with one fallback** (2c, below) |
-| 3 | PermissionedResolver sets `cloak.key`, deployer keeps no roles | Pending (needs Sepolia funds) |
-| 4 | Namespace aliasing; expired subname stops resolving | Pending (needs Sepolia funds) |
-| 5 | Arkiv: `$createdAt`, custom transport, expiry, tGLM transfer | Pending (needs Arkiv access key) |
+| 3 | PermissionedResolver sets `cloak.key`, deployer keeps no roles | **Pass on the fork** (and on a local chain with the live resolver bytecode, `apps/api` tests). Live run ready: `pnpm --filter @cloakroom/core a1` |
+| 4 | Namespace aliasing; expired subname stops resolving | **Pass on the fork.** Live run ready: `a1` |
+| 5 | Arkiv: `$createdAt`, custom transport, expiry, tGLM transfer | Answered from the SDK source (`$createdAt` is a block number). The live run is part of `a4`; needs tGLM and the Bee handoff |
 | 8 | Fluidkey kit: keys, S from P, recipient recovers S's key | **Pass** (below) |
-| 9 | Wallets sign the fixed message identically | Pending. Only MetaMask is available; Rabby and Ledger will be reported as untested |
+| 9 | Wallets sign the fixed message identically | Page ready: `pnpm --filter @cloakroom/core check9`, then open http://localhost:8799 with MetaMask (needs you). Self-tested with a local key. Rabby and Ledger: untested |
 
 Keys (in the gitignored repo-root `.env`, never committed): deployer `0xBFfd32f336D5201c0388C71Fd9e9754eC0692a54`,
 relayer `0xaF3a34364A03119637c9517fdD914F7194F319F7`. Decision: the deployer registers `cloakroom.eth`; the name moves
@@ -109,10 +109,10 @@ addresses go to `packages/core/src/generated.ts` via `pnpm --filter @cloakroom/c
 
 | Done when | Status |
 |---|---|
-| `forge test` passes, including invariants and the fork test | **Partly.** 33 pass: 26 unit/fuzz (1,024 fuzz runs each), the invariant suite (256 runs × 64 calls, 0 unexpected reverts), and the 6 check-2 tests. The **2 fork tests are skipped**: they need `SEPOLIA_RPC_URL` and a pinned `SEPOLIA_FORK_BLOCK` |
-| Implementation verified on Etherscan | Pending: needs Sepolia ETH on the deployer and `ETHERSCAN_API_KEY`. The script is ready: `script/DeployDriveRegistry.s.sol` |
-| Demo proxy on Sepolia: grant → `wasAllowed` true → time passes → false, with the interval still readable | Pending deployment. Shown locally by `test_viewerAccessEndsExactlyAtUntil_andHistoryStaysReadable` and by the fork lifecycle test |
-| `upgradeToAndCall` reverts when called by K | Shown in tests (`test_upgradeReverts_forOwnerAndWallet_withAnyTarget`, a fuzz over any caller, and invariants); onchain demo pending |
+| `forge test` passes, including invariants and the fork test | **Pass, 35 tests:** 26 unit/fuzz (1,024 fuzz runs each), the invariant suite (256 runs × 64 calls, 0 unexpected reverts), the 6 check-2 tests, and the 2 fork tests against live Sepolia (block pinned in `deployments/sepolia.json`). The fork run used a public RPC, which only keeps recent state, so it ran at the then-latest block |
+| Implementation verified on Etherscan | Pending funds and `ETHERSCAN_API_KEY`. `pnpm --filter @cloakroom/core bootstrap` deploys it (about 31.3M gas, measured on a fork) and runs `forge verify-contract` |
+| Demo proxy on Sepolia: grant → `wasAllowed` true → time passes → false, with the interval still readable | **Pass on the fork.** Live run ready: `pnpm --filter @cloakroom/core a1` |
+| `upgradeToAndCall` reverts when called by K | Shown in tests (`test_upgradeReverts_forOwnerAndWallet_withAnyTarget`, a fuzz over any caller, and invariants) and on the fork for K and W. Live run ready: `a1` |
 
 ### What the contract does beyond the plan, and why
 - **History lives in `_grantRoles` / `_revokeRoles`**, not in the hooks (check 2c).
@@ -207,7 +207,7 @@ of each entity), `receipts.ts`, `errors.ts` and `addresses.ts` (the single place
 
 | Done when | Status |
 |---|---|
-| A script on Sepolia + Arkiv + Bee creates a room | **Script ready, not run yet.** Blocked on: `SEPOLIA_RPC_URL`; Sepolia ETH for the deployer and relayer; the `DriveRegistry` implementation deployed (A2); `cloakroom.eth` and `rooms.cloakroom.eth` registered with the relayer as registrar (check 1); tGLM for the relayer; `BEE_URL` and `POSTAGE_BATCH_ID` from B |
+| A script on Sepolia + Arkiv + Bee creates a room | **Script ready, not run yet.** Needs `bootstrap` first (Sepolia ETH, `SEPOLIA_RPC_URL`), tGLM for the relayer, and `BEE_URL` + `POSTAGE_BATCH_ID` from B. Room creation itself passes on the fork and in the `apps/api` tests |
 | …writes and reads each schema | Script ready. It writes all eight schemas (rotation, roster, welcome, two key copies, three files, a tomb, a refresh request, a link) from the room key, the stealth editor and an attacker, reads each back, and decrypts them |
 | …shows the validator hiding a planted write from an address without WRITE | Script ready. Locally: **pass** against a real `DriveRegistry` (below) |
 
@@ -280,6 +280,113 @@ every role question is answered by the real contract's history. Run `forge build
 - **Child folders are listed from logs (`eth_getLogs`).** This is the plan's "(check)" item. The scan starts at the
   registry's creation block and halves the range when a provider refuses one. Whether the chosen RPC accepts it is
   part of the live run; the fallback (a sealed `cloak.index` entity per owner) stays available.
+- **Update after A4: the registry walk uses `UniversalHelper`.** The live deployment moved `findExactRegistry` and
+  the other registry-walk functions out of UniversalResolverV2 (see the next section). `findRegistry` now calls
+  UniversalHelper. `cloak.key` still resolves through UniversalResolverV2, whose `resolveWithGateways` viem's
+  `getEnsText` uses.
+
+---
+
+## The live Sepolia ENSv2 is newer than the pinned source
+
+Found while preparing A5. All of it was checked onchain, read-only.
+
+**Which source the live deployment is.**
+- Every address in the plan's section 6 matches the deployment records of ENS branch `audit-results-19102026` at
+  `6aac7c6` (2026-10-20, "Update NM_0965_ENS_FINAL.pdf"). That branch is 65 commits ahead of `main@48b3e2d`, which we
+  pinned and which is still the newest commit on `main`.
+- The `UserRegistryImpl` was deployed on 2026-11-04 (block 12063582). It was built with solc 0.8.25 and 1,000
+  optimizer runs.
+
+**What differs, and what we do about it:**
+
+| Difference | Effect on us | Handled by |
+|---|---|---|
+| The registry walk (`findExactRegistry`, `findRegistries`, …) moved from UniversalResolverV2 to a new `UniversalHelper` (`0xd453…`, same docs page) | `findExactRegistry` on UniversalResolverV2 reverts | `findRegistry` calls UniversalHelper. Resolution (`resolve`, `findResolver`) stays on UniversalResolverV2 |
+| `UserRegistry.initialize` and `PermissionedResolver.initialize` take `Grant[]` (and the resolver also takes `bytes[] calls`) | The plan's "`initialize(grants, calls)`" is this newer API | `naming.ts` encodes the live signatures, checked against the onchain selectors |
+| PermissionedResolver keeps records by DNS-encoded name: `setText(bytes name, …)`, read through ENSIP-10 `resolve(name, data)` | `cloak.key` is written with the name, not the node | `deployResolver` |
+| ENS's `UserRegistryImpl` gives the implementation-namer role to ENS's owner account, not to `ContractNamer` | Our old deploy script required `isContractNamer(ContractNamer)`, which would have aborted the live deploy | Our implementation's namer is our deployer (mirrors ENS); the script that required it is removed |
+| Resolver role bits moved (`ROLE_SET_TEXT` and the upgrade bits did not) | None for us | `naming.ts` uses only the unchanged bits |
+| Registry role bits, the EAC hooks `DriveRegistry` overrides (`_getRoles`, `_grantRoles`, `_revokeRoles`), and `IRegistry` | Identical, so drive bits 40/44/48 are still free | **`DriveRegistry` stays on `48b3e2d`**: re-pinning would add the new HCA dependencies (account-abstraction, nexus and others) and force solc 0.8.25, for no change in behaviour we use |
+
+**Proof that our design works with the live contracts.**
+- `DriveRegistry.fork.t.sol` runs the whole setup and every onchain flow on them:
+  - `cloakroom.eth` through the real ETHRegistrar (commit, wait, register, paid in MockUSDC, which anyone can mint);
+  - `rooms.cloakroom.eth`;
+  - the relayer holding exactly `ROLE_REGISTRAR`;
+  - `/claim` with `cloak.key` read back through `UniversalResolverV2.resolve`, and no role left to the relayer;
+  - the user's resolver frozen against upgrades;
+  - folder and room found by the registry walk through our `DriveRegistry`;
+  - mount aliasing;
+  - an expired name that stops resolving;
+  - grant → expiry → history;
+  - the upgrade freeze for K and W.
+- `cloakroom.eth` was available at the fork block.
+
+**Sepolia now charges about 1,542 gas per byte of deployed code** (Prague charges 200).
+- Measured with `eth_estimateGas` on creations of 1,000, 2,000 and 4,000 bytes. It was already in effect at block
+  12068000.
+- Deploying the `DriveRegistry` implementation (19,847 bytes) costs **31.3M gas**, measured on a fork.
+- Sepolia does not enforce EIP-7825's 2^24 transaction cap: 83 of the last 20,826 transactions were above it, the
+  largest at 69.9M, and the block limit is 200M. So the deploy fits.
+- Forge's local script simulation priced it with the project's Cancun rules and ran the deploy out of gas. The
+  bootstrap therefore deploys with viem, which takes gas from the node's own estimate. On a fork that deploy succeeded
+  (31,322,060 gas).
+- Proxies are small (77 bytes), so per-folder costs barely change.
+- **The gas figures from the fork test below are Cancun-priced.** The live run prints real gas from each receipt.
+
+**Gas from the fork rehearsal (Cancun pricing; sizes the drips):**
+
+| Step | Gas |
+|---|---|
+| `ETHRegistrar.register(cloakroom)` | 255,422 |
+| `/claim` (resolver proxy + drive root proxy + register) | 920,316 |
+| Folder (DriveRegistry proxy + register) | 482,549 |
+| `/room` (DriveRegistry proxy + register) | 432,790 |
+| `grantRolesUntil` (new editor) | 148,233 |
+| `cloakroom.eth` for a year | 8 MockUSDC (free mint) |
+
+---
+
+## A5: API
+
+Code: `apps/api/` (Hono). Two versions were written in parallel: one on `plan-a` and one on `plan-b`, the second as
+part of A6. The merge keeps the `plan-b` version, `createApi` in `src/app.ts`, because `createDriveClient`, the web
+app, the extension and the add-ons (`/keylog`, `/doorbell`, `/arkiv-rpc`, `/bytes/:ref`, `/config`) are built on it.
+Both versions call the same core flows: `claimName`, `createRoom`, `verifyUpload` and `wasAllowed`. The request formats
+are in `packages/core/src/api.ts`. The `plan-a` version is gone, along with its `apiAuth.ts`, `server.ts`, `drips.ts`,
+`limits.ts` and their tests; it is still in the history (commit `eb526ed`). Runbook: `apps/api/README.md`.
+
+| Done when | Status |
+|---|---|
+| Each endpoint works with curl against the deployed URL | **Not deployed yet.** Needs the bootstrap (addresses), `fly auth login` and the Fly secrets |
+| Abuse limits return `RATE_LIMITED` | In code: one name per K per day, one room per key, one drip per key per day, daily caps, the upload quota per key. `apps/api/test/app.test.ts` (9 tests) checks the refusals that need no network |
+
+**Possible hardening, from the `plan-a` version** (not ported in the merge, to keep the client's request formats
+unchanged):
+- sign `/room` and `/drip` with the key they concern;
+- skip drips to keys that already hold the drip amount;
+- add a relayer floor and a daily drip budget;
+- local-chain tests over HTTP.
+
+## Runbook: what to run when the funds are in
+
+1. **Settings in the repo `.env`:**
+   - `SEPOLIA_RPC_URL` (Alchemy/Infura);
+   - `ETHERSCAN_API_KEY`;
+   - Sepolia ETH on the deployer `0xBFfd32f336D5201c0388C71Fd9e9754eC0692a54` (about 0.1 ETH covers the 31.3M-gas
+     deploy at Sepolia's ~1 gwei);
+   - Sepolia ETH on the relayer `0xaF3a34364A03119637c9517fdD914F7194F319F7`.
+2. `pnpm --filter @cloakroom/core rehearse`: the same steps on a local fork of Sepolia, with fork-only ETH.
+3. `pnpm --filter @cloakroom/core bootstrap`: the live A1 check 1 and A2 deploy. Commit `deployments/sepolia.json` and
+   `generated.ts`.
+4. `pnpm --filter @cloakroom/core a1`: the live checks 3 and 4 and the A2 demo, with gas. Paste the output here.
+5. `pnpm --filter @cloakroom/core check9`: MetaMask, twice, by hand.
+6. **The API:** `fly auth login`, `fly secrets set --config apps/api/fly.toml …`, then from the repo root
+   `fly deploy --config apps/api/fly.toml --dockerfile apps/api/Dockerfile .`. curl each endpoint.
+7. **After the tGLM and Bee handoff:** `pnpm --filter @cloakroom/core a4` (the A4 Done-when and check 5).
+
+---
 
 ## Add-ons F1, F2, F4 (core and API), done on plan-b
 

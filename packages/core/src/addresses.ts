@@ -28,12 +28,18 @@ export interface CloakroomDeployment {
   roomsRegistry?: Address;
   /** Block the implementation was deployed in: no Cloakroom registry is older, so log scans start here. */
   driveRegistryImplBlock?: number;
+  /** cloakroom.eth's resolver (contenthash of the Swarm copy). */
+  appResolver?: Address;
+  /** The API's key: holds only ROLE_REGISTRAR on appRegistry and roomsRegistry. */
+  relayer?: Address;
+  /** Owns cloakroom.eth until the team Safe takes over. */
+  deployer?: Address;
 }
 
 export const cloakroom: CloakroomDeployment = sepoliaDeployment.cloakroom as CloakroomDeployment;
 
 export function requireDeployed(
-  name: "driveRegistryImpl" | "appRegistry" | "roomsRegistry",
+  name: "driveRegistryImpl" | "appRegistry" | "roomsRegistry" | "appResolver" | "relayer" | "deployer",
   deployment = cloakroom,
 ): Address {
   const address = deployment[name];
