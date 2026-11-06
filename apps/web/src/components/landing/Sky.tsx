@@ -21,7 +21,13 @@ export function Clouds() {
           style={{ left: `${x}%`, top: `${y}%`, animationDelay: `${d}s` }}
         />
       ))}
-      <svg className="absolute inset-x-0 bottom-0 h-[78%] w-full" viewBox="0 0 1200 700" preserveAspectRatio="xMidYMax slice">
+      {/* On wide screens "slice" crops the top of the drawing, which would cut the blurred clouds in a straight line:
+          the mask fades that edge out. */}
+      <svg
+        className="absolute inset-x-0 bottom-0 h-[78%] w-full mask-[linear-gradient(to_bottom,transparent,#000_35%)]"
+        viewBox="0 0 1200 700"
+        preserveAspectRatio="xMidYMax slice"
+      >
         <defs>
           <filter id="cloud-far" x="-20%" y="-40%" width="140%" height="180%">
             <feTurbulence type="fractalNoise" baseFrequency="0.009" numOctaves="4" seed="7" />

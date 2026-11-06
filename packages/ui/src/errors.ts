@@ -41,11 +41,12 @@ const COPY: Record<DriveErrorCode, { title: string; detail: string }> = {
 /** Turns any thrown value into copy for the screen. DriveError codes get fixed wording; anything else keeps its message. */
 export function describeError(e: unknown): ErrorCopy {
   const code = (e as { code?: unknown } | null)?.code;
-  if (typeof code === "string" && code in COPY) {
+  const message = e instanceof Error ? e.message : typeof e === "string" ? e : "";
+  // UNKNOWN has no fixed wording of its own, so its message (e.g. a wrapped RPC error) is the only clue: keep it.
+  if (typeof code === "string" && code in COPY && !(code === "UNKNOWN" && message && message !== code)) {
     const c = COPY[code as DriveErrorCode];
     return { code: code as DriveErrorCode, ...c };
   }
-  const message = e instanceof Error ? e.message : typeof e === "string" ? e : "";
   // Wallet rejections arrive as viem/EIP-1193 errors with code 4001.
   if (code === 4001 || /user rejected|denied/i.test(message))
     return { code: "UNKNOWN", title: "Cancelled in your wallet", detail: "Nothing was signed or sent." };

@@ -7,7 +7,7 @@ import { Providers } from "./providers";
 
 // Fonts are downloaded at build time and served from our own origin: no font requests leave the app.
 const hanken = Hanken_Grotesk({ subsets: ["latin"], variable: "--font-hanken", display: "swap" });
-const shoulders = Big_Shoulders({ subsets: ["latin"], variable: "--font-shoulders", weight: ["700"], display: "swap", adjustFontFallback: false });
+const shoulders = Big_Shoulders({ subsets: ["latin"], variable: "--font-shoulders", weight: ["700"], display: "swap", fallback: ["Arial Narrow", "sans-serif"] });
 
 export const metadata: Metadata = {
   title: { default: "Haven", template: "%s · Haven" },
