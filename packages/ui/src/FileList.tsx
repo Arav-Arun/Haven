@@ -15,7 +15,7 @@ function Row({ children, locked = false }: { children: ReactNode; locked?: boole
 
 function IconButton({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
   return (
-    <button onClick={onClick} aria-label={label} title={label} className="rounded-md p-2 text-muted hover:bg-line/60 hover:text-ink">
+    <button onClick={onClick} aria-label={label} title={label} className="rounded-xl p-2 text-muted hover:bg-line/60 hover:text-ink">
       {children}
     </button>
   );
@@ -25,7 +25,7 @@ function IconButton({ label, onClick, children }: { label: string; onClick: () =
 export function FolderRows({ folders, onOpen, now }: { folders: Folder[]; onOpen: (f: Folder) => void; now: Timestamp }) {
   if (!folders.length) return null;
   return (
-    <ul className="rounded-lg border border-line bg-card px-3">
+    <ul className="surface rounded-2xl px-3">
       {folders.map((f) => (
         <Row key={f.registry}>
           <button onClick={() => onOpen(f)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
@@ -60,7 +60,7 @@ export interface FileActions {
 export function FileRows({ files, now, ...actions }: { files: FileEntry[]; now: Timestamp } & FileActions) {
   if (!files.length) return null;
   return (
-    <ul className="rounded-lg border border-line bg-card px-3">
+    <ul className="surface rounded-2xl px-3">
       {files.map((f) =>
         f.readable ? (
           <Row key={f.fileId}>
@@ -131,7 +131,7 @@ export function FolderHeader({ folder, now, children }: { folder: Folder; now: T
   return (
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div className="min-w-0">
-        <h1 className="truncate text-2xl font-semibold tracking-tight">{folder.displayName}</h1>
+        <h1 className="truncate text-3xl font-bold tracking-[-0.035em]">{folder.displayName}</h1>
         <p className="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-muted">
           {folder.kind === "room" && <span>Unlinked room.</span>}
           {folder.kind === "group" && (

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Big_Shoulders, Hanken_Grotesk } from "next/font/google";
+import { Hanken_Grotesk } from "next/font/google";
 import type { ReactNode } from "react";
 import "@rainbow-me/rainbowkit/styles.css";
 import "./globals.css";
@@ -7,7 +7,6 @@ import { Providers } from "./providers";
 
 // Fonts are downloaded at build time and served from our own origin: no font requests leave the app.
 const hanken = Hanken_Grotesk({ subsets: ["latin"], variable: "--font-hanken", display: "swap" });
-const shoulders = Big_Shoulders({ subsets: ["latin"], variable: "--font-shoulders", weight: ["700"], display: "swap", fallback: ["Arial Narrow", "sans-serif"] });
 
 export const metadata: Metadata = {
   title: { default: "Haven", template: "%s · Haven" },
@@ -23,7 +22,7 @@ export const metadata: Metadata = {
   },
 };
 
-export const viewport: Viewport = { themeColor: "#f1f2ee", width: "device-width", initialScale: 1, viewportFit: "cover" };
+export const viewport: Viewport = { themeColor: "#eef3fa", width: "device-width", initialScale: 1, viewportFit: "cover" };
 
 /**
  * The page's security policy, as a meta tag so the Swarm copy (which can't set headers) gets it too. Scripts only from
@@ -49,7 +48,7 @@ const CSP = [
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${hanken.variable} ${shoulders.variable}`}>
+    <html lang="en" className={hanken.variable}>
       {process.env.NODE_ENV === "production" && (
         <head>
           <meta httpEquiv="Content-Security-Policy" content={CSP} />

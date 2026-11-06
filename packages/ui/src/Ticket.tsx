@@ -43,7 +43,7 @@ export function Ticket({
           className="group flex w-[72px] shrink-0 flex-col items-center justify-center px-1 text-stamp"
         >
           <span className="text-[10px] leading-none">No.</span>
-          <span className="font-display text-[22px] font-bold leading-none tracking-wide [font-variant-numeric:tabular-nums] group-hover:underline">
+          <span className="font-display text-[22px] font-bold leading-none tracking-[-0.02em] [font-variant-numeric:tabular-nums] group-hover:underline">
             {ticketSerial(address)}
           </span>
           <span className="mt-1 text-[10px] leading-none underline decoration-stamp/40 underline-offset-2">Etherscan</span>
@@ -51,7 +51,7 @@ export function Ticket({
       ) : (
         <div className="flex w-[72px] shrink-0 flex-col items-center justify-center px-1 text-stamp" title={address}>
           <span className="text-[10px] leading-none">No.</span>
-          <span className="font-display text-[22px] font-bold leading-none tracking-wide [font-variant-numeric:tabular-nums]">
+          <span className="font-display text-[22px] font-bold leading-none tracking-[-0.02em] [font-variant-numeric:tabular-nums]">
             {ticketSerial(address)}
           </span>
         </div>
@@ -84,7 +84,7 @@ export function Tag({ tone = "plain", children, title }: { tone?: "plain" | "war
     <span
       title={title}
       className={cx(
-        "inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs",
+        "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs",
         tone === "plain" && "bg-ink/8 text-ink",
         tone === "warn" && "bg-warn-soft text-warn",
         tone === "danger" && "bg-danger-soft text-danger",

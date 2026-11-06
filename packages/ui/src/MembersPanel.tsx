@@ -51,7 +51,7 @@ function TeamRules({
   return (
     <div className="flex flex-col gap-2">
       {rules.map((r) => (
-        <div key={r.parent} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-line bg-card px-3 py-2 text-sm">
+        <div key={r.parent} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-card px-3 py-2 text-sm">
           <div>
             <p className="font-medium">{r.label ? `Everyone in ${r.label}` : `Everyone at ${r.parent}`}</p>
             <p className="text-xs text-muted">
@@ -164,7 +164,7 @@ export function MembersPanel({
             }
           />
           {confirm?.address === m.address && (
-            <div className="mt-2 flex flex-col gap-2 rounded-md border border-line bg-card p-3 text-sm">
+            <div className="mt-2 flex flex-col gap-2 rounded-xl border border-line bg-card p-3 text-sm">
               <p>
                 {m.rule ? `Exclude ${m.label} from ${m.rule}?` : `Remove ${m.label}?`} Keys for this folder and its subfolders will be
                 refreshed now. New files will be locked for them. What they already opened, they keep.
@@ -235,7 +235,7 @@ export function IncomingTickets({
 
 export function RefreshPendingBanner() {
   return (
-    <div role="status" className="flex items-start gap-2 rounded-md bg-warn-soft px-3 py-2 text-sm text-warn">
+    <div role="status" className="flex items-start gap-2 rounded-xl bg-warn-soft px-3 py-2 text-sm text-warn">
       <RefreshCw size={16} className="mt-0.5 shrink-0" aria-hidden />
       <p>
         <span className="font-medium">Waiting for the owner to refresh access.</span> Someone was removed, so new keys are

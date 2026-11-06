@@ -29,7 +29,7 @@ export function Devices({ now }: { now: number }) {
     }
   };
   return (
-    <section className="rounded-lg border border-line bg-card p-5 text-sm">
+    <section className="surface rounded-2xl p-5 text-sm">
       <h2 className="font-medium">Your devices</h2>
       <p className="mt-1 text-muted">
         Each device you sign in on is listed in your public log (its label is encrypted to you). A device not used for 90 days
@@ -67,7 +67,7 @@ export function MyKey() {
   const info = useLoad(identity?.ensName ? (c) => c.lookupKey(identity.ensName!) : null, [identity?.ensName]);
   if (!identity?.ensName) return null;
   return (
-    <section className="rounded-lg border border-line bg-card p-5 text-sm">
+    <section className="surface rounded-2xl p-5 text-sm">
       <h2 className="font-medium">Your public key</h2>
       <p className="mt-1 text-muted">
         Anyone sharing with {identity.ensName} encrypts to this key. Its history is public on Arkiv, so a swapped key would show.
@@ -93,7 +93,7 @@ export function LinkName() {
   const [done, setDone] = useState<string | null>(null);
   if (!client || !identity) return null;
   return (
-    <section className="rounded-lg border border-line bg-card p-5 text-sm">
+    <section className="surface rounded-2xl p-5 text-sm">
       <h2 className="font-medium">Link another ENS name</h2>
       <p className="mt-1 text-muted">
         If your team gives you a name like you.team.eth, link it here so folders shared with &quot;everyone at team.eth&quot; reach you.
@@ -144,7 +144,7 @@ export function KeysInExtension() {
   }, []);
   if (profile !== "me") return null;
   return (
-    <section className="rounded-lg border border-line bg-card p-5 text-sm">
+    <section className="surface rounded-2xl p-5 text-sm">
       <h2 className="font-medium">Verified page before keys</h2>
       {present === false ? (
         <p className="mt-1 text-muted">
@@ -160,7 +160,7 @@ export function KeysInExtension() {
           <label className="mt-3 flex items-center gap-2">
             <input
               type="checkbox"
-              className="accent-ink"
+              className="accent-action"
               checked={on}
               disabled={pending || present === null}
               onChange={async (e) => {

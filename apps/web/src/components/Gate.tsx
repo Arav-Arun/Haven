@@ -44,7 +44,7 @@ export function RequireIdentity({ children }: { children: (client: HavenClient, 
     return (
       <EmptyState icon={<KeyRound size={22} />} title="Sign in to see your files">
         <p>Your keys are made on this device from a wallet signature or a passkey. Nothing to install.</p>
-        <Link href="/onboarding" className="rounded-md bg-ink px-3.5 py-2 font-medium text-paper">
+        <Link href="/onboarding" className="btn-action rounded-full px-4 py-2 font-semibold">
           Sign in
         </Link>
       </EmptyState>

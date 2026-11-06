@@ -49,8 +49,8 @@ export function UploadDropzone({
           take(e.dataTransfer.files);
         }}
         className={cx(
-          "flex flex-col items-center gap-3 rounded-lg border-2 border-dashed px-4 py-6 text-center text-sm transition-colors",
-          over ? "border-ink bg-ink/5" : "border-line",
+          "flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed px-4 py-6 text-center text-sm transition-colors",
+          over ? "border-action bg-action-soft" : "border-[#c4d5f2] bg-white/60",
           disabled && "opacity-60",
         )}
       >
@@ -64,14 +64,14 @@ export function UploadDropzone({
             onClick={() => pick.current?.click()}
             disabled={disabled}
             aria-describedby={hintId}
-            className="inline-flex items-center gap-2 rounded-md bg-ink px-3.5 py-2 font-medium text-paper disabled:opacity-55"
+            className="inline-flex items-center gap-2 btn-action rounded-full px-4 py-2 font-semibold disabled:opacity-55"
           >
             <Upload size={16} aria-hidden /> Choose files
           </button>
           <button
             onClick={() => camera.current?.click()}
             disabled={disabled}
-            className="inline-flex items-center gap-2 rounded-md border border-line bg-card px-3.5 py-2 font-medium sm:hidden"
+            className="inline-flex items-center gap-2 rounded-full border border-line bg-card px-4 py-2 font-medium sm:hidden"
           >
             <Camera size={16} aria-hidden /> Take a photo
           </button>
@@ -90,7 +90,7 @@ export function UploadDropzone({
       {uploads.length > 0 && (
         <ul className="flex flex-col gap-2" aria-label="Uploads">
           {uploads.map((u) => (
-            <li key={u.id} className="rounded-md border border-line bg-card px-3 py-2 text-sm">
+            <li key={u.id} className="rounded-xl border border-line bg-card px-3 py-2 text-sm">
               <div className="flex items-center justify-between gap-3">
                 <span className="truncate font-medium">{u.name}</span>
                 <span className="shrink-0 text-muted">
@@ -108,7 +108,7 @@ export function UploadDropzone({
                 </span>
               </div>
               {u.state === "uploading" && (
-                <progress className="mt-2 h-1.5 w-full accent-ink" value={u.fraction} max={1} aria-label={`Uploading ${u.name}`} />
+                <progress className="mt-2 h-1.5 w-full accent-action" value={u.fraction} max={1} aria-label={`Uploading ${u.name}`} />
               )}
               <p className="mt-1 text-xs text-muted">
                 {formatBytes(u.size)}

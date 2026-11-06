@@ -54,7 +54,7 @@ function LinkDialog({ client, file, onClose }: { client: HavenClient; file: File
         <div className="flex flex-col gap-3 text-sm">
           <p>Anyone with this link can open the file until {formatDate(link.expiresAt)}. The key is in the part after #, which is never sent to a server.</p>
           <div className="flex gap-2">
-            <input readOnly value={link.url} className="w-full rounded-md border border-line bg-paper px-3 py-2" onFocus={(e) => e.target.select()} />
+            <input readOnly value={link.url} className="w-full rounded-xl border border-line bg-paper px-3 py-2" onFocus={(e) => e.target.select()} />
             <Button
               onClick={() => navigator.clipboard.writeText(link.url).then(() => setCopied(true))}
               aria-label="Copy link"
@@ -77,7 +77,7 @@ function LinkDialog({ client, file, onClose }: { client: HavenClient; file: File
                 role="radio"
                 aria-checked={hours === h}
                 onClick={() => setHours(h as number)}
-                className={`rounded-md border px-2.5 py-1 ${hours === h ? "border-ink bg-ink text-paper" : "border-line bg-card"}`}
+                className={`rounded-xl border px-2.5 py-1 ${hours === h ? "border-action bg-action text-white" : "border-line bg-card"}`}
               >
                 {label}
               </button>
@@ -269,7 +269,7 @@ export function FolderView({ client, folder }: { client: HavenClient; folder: Ad
             {zipProgress === null ? "Download folder" : `Downloading ${Math.round(zipProgress * 100)}%`}
           </Button>
         )}
-        <Link href={`/public?f=${folder}`} className="inline-flex min-h-10 items-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium hover:bg-line/60">
+        <Link href={`/public?f=${folder}`} className="inline-flex min-h-10 items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold hover:bg-white/70">
           <Eye size={16} aria-hidden /> Public view
         </Link>
         <a
@@ -277,7 +277,7 @@ export function FolderView({ client, folder }: { client: HavenClient; folder: Ad
           target="_blank"
           rel="noreferrer noopener"
           title="This folder is its own ENS registry contract on Sepolia"
-          className="inline-flex min-h-10 items-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium hover:bg-line/60"
+          className="inline-flex min-h-10 items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold hover:bg-white/70"
         >
           <ExternalLink size={16} aria-hidden /> View on Etherscan
         </a>

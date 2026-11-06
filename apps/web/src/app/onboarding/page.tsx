@@ -89,8 +89,8 @@ function SignStep({ client, onSignedIn }: { client: DriveClient; onSignedIn: (i:
           ? "This wallet is new to Haven. Sign the same message twice: your keys are made from the signature, so your wallet has to give the same one every time."
           : "Sign the message to unlock your keys on this device. Nothing is sent to the chain."}
       </p>
-      <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-md border border-line bg-card p-3 text-xs">{message}</pre>
-      <p className="flex gap-2 rounded-md bg-warn-soft px-3 py-2 text-warn">
+      <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-xl border border-line bg-card p-3 text-xs">{message}</pre>
+      <p className="flex gap-2 rounded-xl bg-warn-soft px-3 py-2 text-warn">
         <TriangleAlert size={16} className="mt-0.5 shrink-0" aria-hidden />
         <span>
           Only sign this on <strong>{host}</strong>. Anyone who gets this signature gets your Haven keys, so never sign it

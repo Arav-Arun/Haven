@@ -6,7 +6,7 @@
   "start_url": "/drive/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f1f2ee",
+  "background_color": "#eef3fa",
   "theme_color": "#3f78e3",
   "icons": [
     { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" },
