@@ -411,6 +411,9 @@ class Client implements HavenClient {
     const reader = createPublicClient({
       chain: sepolia,
       batch: { multicall: true },
+      // Receipt checks every 2 s instead of viem's 4 s: a transaction is seen about a second sooner after its block,
+      // for one more small request through the private network while it waits.
+      pollingInterval: 2_000,
       transport: anonTransport({
         url: this.cfg.sepoliaRpcUrl,
         anon: this.cfg.anon,
@@ -521,7 +524,8 @@ class Client implements HavenClient {
         return await this.api<T>(path, body, step);
       } catch (e) {
         if (attempt >= 4 || toDriveError(e).code !== "NETWORK") throw e;
-        await new Promise((ok) => setTimeout(ok, 5000));
+        // Short: the API answers a repeat with the job it already ran (or is running), so asking again is free.
+        await new Promise((ok) => setTimeout(ok, 1500));
       }
     }
   }
@@ -738,9 +742,11 @@ class Client implements HavenClient {
       } catch (e) {
         step({ kind: "check", label: "Public key log not written yet", detail: `${toDriveError(e).message}; retried when the app next opens`, ok: false });
       }
-      await this.ensureDevice(step).catch(() => undefined);
-      // Gas for K, so it can make folders. Batched by the API; not waited for here.
-      await this.api<DripResponse>("/drip", { address: k.address, registry: claimed.driveRoot }, step).catch(() => undefined);
+      // This device's entry isn't needed to share or be shared with, so it's written after the claim returns; it's
+      // also retried whenever the app opens. (The key log above is: sharing with this name needs it.)
+      void this.receipts.run("Register this device", (s) => this.ensureDevice(s)).catch(() => undefined);
+      // Gas for K: an API that sends it inside the claim's own block skips this request; an older one batches it.
+      void this.api<DripResponse>("/drip", { address: k.address, registry: claimed.driveRoot }, step).catch(() => undefined);
       return this.identity();
     });
   }

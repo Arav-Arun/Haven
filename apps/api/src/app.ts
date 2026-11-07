@@ -86,7 +86,11 @@ import {
   type RoomRequest,
   type RoomResponse,
   type SepoliaWriter,
+  sendTxs,
+  type PlannedTx,
 } from "@haven/core";
+
+const lower = (a: string) => a.toLowerCase();
 import { DriveError, type Address, type Hex } from "@haven/types";
 import { readFile } from "node:fs/promises";
 
@@ -230,7 +234,9 @@ function fail(c: Context, e: unknown) {
 export function createApi(env: ApiEnv) {
   const relayer = privateKeyToAccount(env.RELAYER_PRIVATE_KEY);
   const transport = http(env.SEPOLIA_RPC_URL);
-  const sepoliaClient = createPublicClient({ chain: sepolia, transport }) as PublicClient<Transport, Chain>;
+  // Receipts are checked every second (viem's default is 4 s for Sepolia): the API talks to its RPC directly, and
+  // every user action that goes through the relayer waits on these receipts.
+  const sepoliaClient = createPublicClient({ chain: sepolia, transport, pollingInterval: 1_000 }) as PublicClient<Transport, Chain>;
   const writer: SepoliaWriter = {
     public: sepoliaClient,
     wallet: createWalletClient({ chain: sepolia, transport, account: relayer }),
@@ -251,21 +257,24 @@ export function createApi(env: ApiEnv) {
   // ---------------- drips: queued, then sent together every DRIP_BATCH_SECONDS
   const pending = new Map<string, Address>();
   let nextBatch = Math.floor(Date.now() / 1000) + env.DRIP_BATCH_SECONDS;
+  /** Keys that got their first gas inside their own /claim batch, and when: a drip asked for right after is redundant. */
+  const fundedAtClaim = new Map<string, number>();
   const sendBatch = async () => {
     nextBatch = Math.floor(Date.now() / 1000) + env.DRIP_BATCH_SECONDS;
-    const batch = [...pending.values()];
+    const t = Math.floor(Date.now() / 1000);
+    for (const [k, at] of fundedAtClaim) if (t - at > 120) fundedAtClaim.delete(k);
+    const batch = [...pending.values()].filter((to) => !fundedAtClaim.has(lower(to)));
     pending.clear();
-    for (const to of batch) {
-      const failed = (e: unknown) => console.error(`[api] drip failed: ${e instanceof Error ? e.message : String(e)}`);
-      // Both chains at once: the Arkiv gas no longer waits for the Sepolia receipt.
-      void arkivQueue.run(() => sendGlm(arkivRelayer, to, env.DRIP_ARKIV_WEI)).catch(failed);
-      await queue
-        .run(async () => {
-          const hash = await writer.wallet.sendTransaction({ account: relayer, chain: sepolia, to, value: env.DRIP_SEPOLIA_WEI });
-          await sepoliaClient.waitForTransactionReceipt({ hash });
-        })
-        .catch(failed);
-    }
+    if (batch.length === 0) return;
+    const failed = (e: unknown) => console.error(`[api] drip failed: ${e instanceof Error ? e.message : String(e)}`);
+    // Arkiv gas goes at the same time, on its own queue: it never waits for a Sepolia receipt.
+    for (const to of batch) void arkivQueue.run(() => sendGlm(arkivRelayer, to, env.DRIP_ARKIV_WEI)).catch(failed);
+    // Every Sepolia drip of the batch in one block: one at a time, each waiting for its receipt, held claims and rooms
+    // back by a block per drip. Each drip is optional, so one that can't go out never holds back the others.
+    const drips: PlannedTx[] = batch.map((to) => ({ label: `Gas drip to ${to}`, to, data: "0x", value: env.DRIP_SEPOLIA_WEI, optional: true }));
+    await queue
+      .run(() => sendTxs(writer, drips, (s) => { if ("ok" in s && !s.ok) failed(new Error(s.label)); }))
+      .catch(failed);
   };
   const timer = setInterval(() => void sendBatch(), env.DRIP_BATCH_SECONDS * 1000);
   timer.unref?.();
@@ -430,6 +439,11 @@ export function createApi(env: ApiEnv) {
         claimJobs,
         driveKey,
         (async (): Promise<ClaimResponse> => {
+          // K's first gas: Arkiv now, on its own queue, and Sepolia in the claim's own block, so the first folder
+          // never waits for a drip (as /room does for a room key).
+          void arkivQueue.run(() => sendGlm(arkivRelayer, driveKey, env.DRIP_ARKIV_WEI)).catch((e: unknown) =>
+            console.error(`[api] claim gas failed: ${e instanceof Error ? e.message : String(e)}`),
+          );
           const result = await queue.run(async () =>
             claimName(writer, {
               appRegistry,
@@ -439,8 +453,14 @@ export function createApi(env: ApiEnv) {
               mainWallet: r.mainWallet ? getAddress(r.mainWallet) : null,
               spendingPublicKey: r.spendingPublicKey,
               expiry: await ethNameExpiry(sepoliaClient, "haven"),
+              // Optional: if it can't go out, the claim still succeeds and the app's usual drip covers it.
+              alsoSend: [{ label: "Gas for the new drive key", to: driveKey, data: "0x", value: env.DRIP_SEPOLIA_WEI, optional: true }],
             }),
           );
+          // Only if the gas really arrived (it's optional): otherwise the app's own drip request must go through.
+          if ((await sepoliaClient.getBalance({ address: driveKey }).catch(() => 0n)) >= env.DRIP_SEPOLIA_WEI) {
+            fundedAtClaim.set(lower(driveKey), Math.floor(Date.now() / 1000));
+          }
           return {
             ensName: result.ensName,
             resolver: result.resolver,

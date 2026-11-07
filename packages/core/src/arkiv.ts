@@ -222,12 +222,22 @@ function chainAndTransport(connection: ArkivConnection) {
   };
 }
 
+/**
+ * How often a write checks for its receipt. Arkiv makes a block every 2 s, but its chain config gives viem no block
+ * time, so viem would wait 4 s between checks: about 2 s lost on every write.
+ */
+const ARKIV_POLLING_MS = 1_000;
+
 export function arkivReader(connection: ArkivConnection): ArkivReader {
-  return createPublicClient(chainAndTransport(connection)) as ArkivReader;
+  return createPublicClient({ ...chainAndTransport(connection), pollingInterval: ARKIV_POLLING_MS }) as ArkivReader;
 }
 
 export function arkivWriter(connection: ArkivConnection, privateKey: Hex): ArkivWriter {
-  return createWalletClient({ ...chainAndTransport(connection), account: privateKeyToAccount(privateKey) });
+  return createWalletClient({
+    ...chainAndTransport(connection),
+    account: privateKeyToAccount(privateKey),
+    pollingInterval: ARKIV_POLLING_MS,
+  });
 }
 
 // ---------------------------------------------------------------- records as read back

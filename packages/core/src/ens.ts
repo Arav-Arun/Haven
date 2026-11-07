@@ -537,6 +537,13 @@ export interface PlannedTx {
   label: string;
   to: Address;
   data: Hex;
+  /** Wei sent along (gas for a new key); none if left out. */
+  value?: bigint;
+  /**
+   * Nice to have, not part of the action (a new key's first gas, a drip): left out if its dry run fails, and a failure
+   * on chain is shown but doesn't fail the batch. Optional transactions go after the required ones.
+   */
+  optional?: boolean;
 }
 
 /**
@@ -552,15 +559,24 @@ export async function sendTxs(
   step: StepSink = ignoreSteps,
 ): Promise<TransactionReceipt[]> {
   const account = writer.wallet.account;
+  const firstOptional = txs.findIndex((tx) => tx.optional);
+  if (firstOptional >= 0 && txs.slice(firstOptional).some((tx) => !tx.optional)) {
+    throw new Error("sendTxs: optional transactions must come after the required ones");
+  }
   const gas: bigint[] = [];
+  const kept: PlannedTx[] = [];
   for (const tx of txs) {
     try {
-      await writer.public.call({ account, to: tx.to, data: tx.data });
-      gas.push(await writer.public.estimateGas({ account, to: tx.to, data: tx.data }));
+      await writer.public.call({ account, to: tx.to, data: tx.data, value: tx.value ?? 0n });
+      gas.push(await writer.public.estimateGas({ account, to: tx.to, data: tx.data, value: tx.value ?? 0n }));
+      kept.push(tx);
     } catch (error) {
-      throw decodeRevert(error, tx.label);
+      if (!tx.optional) throw decodeRevert(error, tx.label);
+      step({ kind: "check", label: tx.label, detail: `left out: ${decodeRevert(error, tx.label).message}`, ok: false });
     }
   }
+  txs = kept;
+  if (txs.length === 0) return [];
   const hashes: Hex[] = [];
   let sendError: DriveError | null = null;
   await (writer.serialize ?? unserialised)(async () => {
@@ -579,12 +595,15 @@ export async function sendTxs(
             chain: writer.wallet.chain,
             to: tx.to,
             data: tx.data,
+            value: tx.value ?? 0n,
             nonce: nonce + i,
             gas: (gas[i]! * 6n) / 5n, // the estimate plus 20%
           }),
         );
       } catch (error) {
-        sendError = toDriveError(error, tx.label);
+        // An optional one that couldn't be sent costs nothing: the ones before it are out, and the rest are optional.
+        if (!tx.optional) sendError = toDriveError(error, tx.label);
+        else step({ kind: "check", label: tx.label, detail: `not sent: ${toDriveError(error, tx.label).message}`, ok: false });
         break;
       }
     }
@@ -606,6 +625,7 @@ export async function sendTxs(
     const ok = r.receipt?.status === "success";
     step({ kind: "sepolia-tx", label, hash, explorerUrl: txUrl("sepolia", hash), ok });
     if (r.receipt) receipts.push(r.receipt);
+    if (txs[i]!.optional) continue; // shown as failed above, but it doesn't fail the batch
     failure ??= r.error ? toDriveError(r.error, label) : ok ? null : new DriveError("UNKNOWN", `${label}: transaction reverted`);
   }
   if (failure ?? sendError) throw (failure ?? sendError)!;

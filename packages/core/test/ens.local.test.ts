@@ -175,6 +175,35 @@ describe("sending a registry and its name together (claims and rooms)", () => {
     expect(results.map((r) => r.status)).toEqual(["fulfilled", "rejected", "fulfilled"]);
   });
 
+  it("can send ETH in the same block (a new key's first gas, or a batch of drips)", async () => {
+    const { K, registry: root } = await newDrive(false);
+    const newKeys = [(await chain.newWriter()).address, (await chain.newWriter()).address];
+    const before = await Promise.all(newKeys.map((address) => chain.public.getBalance({ address })));
+    const drive = await planDrive(K.writer, { implementation: chain.implementation, driveKey: K.address, mainWallet: null, factory: chain.factory });
+    const register = registerTx({ parent: root, label: randomLabel("f"), owner: K.address, subregistry: drive.address, expiry: NO_END });
+    const gas = newKeys.map((to) => ({ label: "Gas", to, data: "0x" as const, value: 12345n }));
+    const receipts = await timedBlocks(() => sendTxs(K.writer, [drive, register, ...gas]));
+    expect(new Set(receipts.map((r) => r.blockNumber)).size).toBe(1);
+    const after = await Promise.all(newKeys.map((address) => chain.public.getBalance({ address })));
+    expect(after.map((b, i) => b - before[i]!)).toEqual([12345n, 12345n]);
+  });
+
+  it("leaves out an optional transaction that would fail; the required ones still land together", async () => {
+    const { K, registry: root } = await newDrive(false);
+    const label = randomLabel("f");
+    const steps: ReceiptStep[] = [];
+    const drive = await planDrive(K.writer, { implementation: chain.implementation, driveKey: K.address, mainWallet: null, factory: chain.factory });
+    const register = registerTx({ parent: root, label, owner: K.address, subregistry: drive.address, expiry: NO_END });
+    // The factory has no way to receive ETH, so this one fails its dry run.
+    const rejected = { label: "Gas", to: chain.factory, data: "0x" as const, value: 1n, optional: true };
+    const receipts = await timedBlocks(() => sendTxs(K.writer, [drive, register, rejected], (s) => steps.push(s)));
+    expect(receipts).toHaveLength(2);
+    expect(receipts[0]!.blockNumber).toBe(receipts[1]!.blockNumber);
+    expect(await getSubregistry(chain.public, root, label)).toBe(drive.address);
+    expect(steps).toContainEqual(expect.objectContaining({ kind: "check", label: "Gas", ok: false }));
+    await expect(sendTxs(K.writer, [rejected, register])).rejects.toThrow(/optional transactions must come after/);
+  });
+
   it("sends nothing when any transaction in the batch would fail", async () => {
     const { K, registry: root } = await newDrive(false);
     const label = randomLabel("f");

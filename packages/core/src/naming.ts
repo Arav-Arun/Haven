@@ -23,6 +23,7 @@ import {
   planDrive,
   planProxy,
   type PlannedProxy,
+  type PlannedTx,
   randomLabel,
   registerTx,
   sendTx,
@@ -285,6 +286,8 @@ export interface ClaimParams {
   spendingPublicKey: Hex;
   /** Unix seconds: haven.eth's own expiry, so a user name lives as long as the app name. */
   expiry: bigint;
+  /** More transactions for the same block, after the register (the API sends K its first gas this way). */
+  alsoSend?: PlannedTx[];
 }
 
 export interface ClaimResult {
@@ -327,7 +330,7 @@ export async function claimName(
     roleBitmap: NAME_OWNER_ROLES,
     expiry: params.expiry,
   });
-  const [resolverReceipt, driveReceipt] = await sendTxs(writer, [resolver, drive, register], step);
+  const [resolverReceipt, driveReceipt] = await sendTxs(writer, [resolver, drive, register, ...(params.alsoSend ?? [])], step);
   expectProxy(resolverReceipt!, resolver);
   expectProxy(driveReceipt!, drive);
   return { ensName, resolver: resolver.address, driveRoot: drive.address, driveRootBlock: driveReceipt!.blockNumber };
