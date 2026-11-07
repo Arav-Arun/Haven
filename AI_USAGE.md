@@ -53,14 +53,12 @@ live network, such as Sepolia's higher gas prices for deploying code and creatin
 **Docs.** Claude drafted parts of the README (including the CROPS section), the Arkiv judging files, the architecture
 diagram and a brief for our pitch deck. We edited and corrected them.
 
-## Rules the agents worked under
+## Rules we gave the agents
 
-These are in `CLAUDE.md`:
 - **No mocks, seeded data or fake values:** every value on screen is read live from Sepolia, Arkiv or Swarm.
 - **No third-party scripts, trackers or analytics.**
 - **No keys or secrets committed.**
 - **Contract addresses only from the official ENS docs,** never guessed.
-- **Each person edits only the parts of the repo they own.**
 
 ## What we did ourselves
 
