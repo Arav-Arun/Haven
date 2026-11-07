@@ -1,12 +1,7 @@
 "use client";
 
-// The loading cover: on every page load and every move to another page, a drop of clear glass lands over the screen,
-// spreads into a tile, holds Haven's logo while its rim bends it into colour, then lets go. If the next page is still
-// loading by then, the logo stays until it arrives (up to MAX_WAIT_MS); then the cover fades into the page.
-// Clicking a link starts it at once, so it covers the load instead of following it. Opening a folder inside the same
-// page and #section links don't trigger it. A click or Escape skips it; reduced motion gets the still logo instead.
+// The loading cover plays once on the initial page load. A click or Escape skips it; reduced motion gets a still logo.
 
-import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LIGHT_GLASS, playGlassReveal, prepareLogo, type GlassSettings, type LogoData } from "./glass";
 import "./intro.css";
@@ -16,7 +11,7 @@ const PAGE = "#eef3fa";
 
 const SETTINGS: GlassSettings = { ...LIGHT_GLASS, background: PAGE, tileSize: 360, logoScale: 0.66, finalScale: 0.8 };
 const SPEED = 1.2;
-/** The longest the finished logo waits for a slow page before fading anyway. */
+/** Safety cap if the reveal cannot complete. */
 const MAX_WAIT_MS = 10_000;
 const FADE_MS = 450;
 
@@ -60,7 +55,7 @@ async function drawHavenLogo(): Promise<HTMLCanvasElement> {
   return canvas;
 }
 
-// Drawn and turned into textures once per page load (~100 ms); every later cover reuses it.
+// Drawn and turned into textures once per page load (~100 ms).
 let logoJob: Promise<LogoData> | null = null;
 function havenLogo() {
   logoJob ??= drawHavenLogo().then(prepareLogo);
@@ -72,33 +67,9 @@ function havenLogo() {
 // appear on the first frame the cover is live.
 if (typeof window !== "undefined") void havenLogo().catch(() => undefined);
 
-const pathOf = (p: string) => p.replace(/\/+$/, "") || "/";
-
-/** The page a plain left click on this link would open, or null when it stays on this page or leaves the app. */
-function linkTarget(e: MouseEvent): string | null {
-  if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return null;
-  const a = (e.target as Element | null)?.closest?.("a[href]");
-  if (!(a instanceof HTMLAnchorElement)) return null;
-  if ((a.target && a.target !== "_self") || a.hasAttribute("download")) return null;
-  const url = new URL(a.href, location.href);
-  if (url.origin !== location.origin) return null;
-  const to = pathOf(url.pathname);
-  return to === pathOf(location.pathname) ? null : to;
-}
-
 export function Intro() {
-  const pathname = usePathname();
   const wrap = useRef<HTMLDivElement>(null);
-  const [run, setRun] = useState(0);
   const [phase, setPhase] = useState<"show" | "leave" | "gone">("show");
-  const phaseRef = useRef(phase);
-  phaseRef.current = phase;
-  /** A page change is under way and hasn't arrived yet. */
-  const waiting = useRef(false);
-  /** This cover's reveal has finished. */
-  const revealed = useRef(false);
-  /** The page on screen, as the router last reported it. */
-  const shownPath = useRef(pathname);
 
   const leave = useCallback(() => setPhase((p) => (p === "show" ? "leave" : p)), []);
   const engine = useRef<ReturnType<typeof playGlassReveal>>(null);
@@ -108,22 +79,13 @@ export function Intro() {
     if (engine.current) engine.current.outro(leave);
     else leave();
   }, [leave]);
-  const start = useCallback((pageLoading: boolean) => {
-    waiting.current = pageLoading;
-    revealed.current = false;
-    setPhase("show");
-    setRun((r) => r + 1);
-  }, []);
-
-  // Each cover: play the reveal, then leave once the page underneath is there.
+  // Play the reveal on initial load; navigation leaves the root layout in place.
   useEffect(() => {
     const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
     let cancelled = false;
     let beat: ReturnType<typeof setTimeout> | undefined;
     const finish = () => {
-      revealed.current = true;
-      // A short beat on the finished logo, then the fade. Still waiting: the page change below ends it.
-      if (!waiting.current) beat = setTimeout(finishOut, still ? 900 : 250);
+      beat = setTimeout(finishOut, still ? 900 : 250);
     };
     const cap = setTimeout(leave, MAX_WAIT_MS);
     havenLogo()
@@ -143,38 +105,13 @@ export function Intro() {
       clearTimeout(beat);
       clearTimeout(cap);
     };
-  }, [run, leave, finishOut]);
+  }, [leave, finishOut]);
 
-  // Start on the click, before the next page loads; back and forward start as the history entry changes.
   useEffect(() => {
-    const onClick = (e: MouseEvent) => {
-      if (linkTarget(e)) start(true);
-    };
-    // Back/forward between #sections of the same page isn't a page change.
-    const onPop = () => pathOf(location.pathname) !== pathOf(shownPath.current) && start(true);
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && leave();
-    document.addEventListener("click", onClick, true);
-    window.addEventListener("popstate", onPop);
     window.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("click", onClick, true);
-      window.removeEventListener("popstate", onPop);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [start, leave]);
-
-  // The page changed: it has arrived. A change nothing announced (the app moving you after creating a room) gets a
-  // cover of its own.
-  useEffect(() => {
-    if (shownPath.current === pathname) return;
-    shownPath.current = pathname;
-    if (phaseRef.current === "gone") {
-      start(false);
-      return;
-    }
-    waiting.current = false;
-    if (revealed.current) finishOut();
-  }, [pathname, start, finishOut]);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [leave]);
 
   useEffect(() => {
     if (phase !== "leave") return;
@@ -184,8 +121,8 @@ export function Intro() {
 
   if (phase === "gone") return null;
   return (
-    // Decoration only: screen readers go straight to the page. A fresh element per cover restarts the CSS safety net.
-    <div key={run} aria-hidden className={`haven-intro${phase === "leave" ? " haven-intro-leave" : ""}`} onClick={leave}>
+    // Decoration only: screen readers go straight to the page.
+    <div aria-hidden className={`haven-intro${phase === "leave" ? " haven-intro-leave" : ""}`} onClick={leave}>
       <div ref={wrap} className="absolute inset-0" />
     </div>
   );

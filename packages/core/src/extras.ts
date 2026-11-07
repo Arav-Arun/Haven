@@ -120,6 +120,8 @@ export interface FileProof {
 export interface HavenClient extends DriveClient {
   /** Adds who came in through a team rule ("Via acme.eth") and who follows a parent folder. */
   listMembers(folder: Address): Promise<(Member & { rule?: string; inherited?: boolean })[]>;
+  /** The permanent owner key of a group or folder registry. */
+  folderOwner(folder: Address): Promise<Address>;
 
   // F1
   lookupKey(ensName: string): Promise<KeyInfo>;

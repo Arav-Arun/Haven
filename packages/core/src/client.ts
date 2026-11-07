@@ -1806,6 +1806,12 @@ class Client implements HavenClient {
     );
   }
 
+  async folderOwner(folder: Address): Promise<Address> {
+    const f = getAddress(folder);
+    const h = await this.holding(f);
+    return driveOwner(this.sepolia(undefined, h.address), f);
+  }
+
   async listMembers(folder: Address): Promise<(Member & { rule?: string; inherited?: boolean })[]> {
     const f = getAddress(folder);
     const h = await this.holding(f);

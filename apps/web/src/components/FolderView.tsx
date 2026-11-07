@@ -17,6 +17,7 @@ import {
   saveBlob,
   ShareDialog,
   Skeleton,
+  Ticket,
   UploadDropzone,
   formatDate,
   makeZip,
@@ -173,6 +174,10 @@ export function FolderView({ client, folder }: { client: HavenClient; folder: Ad
   const subfolders = useLoad((c) => c.listFolders(folder), [folder], `subfolders:${folder}`);
   const files = useLoad((c) => c.listFiles(folder), [folder], `files:${folder}`);
   const members = useLoad((c) => c.listMembers(folder), [folder], `members:${folder}`);
+  const groupOwner = useLoad(
+    info.data?.kind === "group" ? async (c) => ({ folder, address: await c.folderOwner(folder) }) : null,
+    [folder, info.data?.kind],
+  );
   const rules = useLoad((c) => c.listSubtreeRules(folder), [folder], `rules:${folder}`);
   const [live, setLive] = useState<LiveStatus | null>(null);
   const reloaders = useRef({ files, members, info, rules });
@@ -354,9 +359,22 @@ export function FolderView({ client, folder }: { client: HavenClient; folder: Ad
       {!(members.error && (members.error as { code?: string }).code === "NOT_AUTHORIZED") && (
         <section className="flex flex-col gap-2">
           <h2 className="text-sm font-medium text-muted">{f.kind === "group" ? "In this group" : "Who holds a ticket"}</h2>
+          {f.kind === "group" && groupOwner.data?.folder === folder && (
+            <Ticket
+              address={groupOwner.data.address}
+              href={`${config.explorerUrl}/address/${groupOwner.data.address}`}
+              title={f.ensName.split(".").slice(1).join(".") || "Group creator"}
+              role="owner"
+              until={null}
+              now={now}
+            />
+          )}
           {members.loading && !members.data && <Skeleton rows={2} />}
           <ErrorNote error={members.error} />
-          {members.data && (
+          {f.kind === "group" && !!groupOwner.error && <ErrorNote error={groupOwner.error} />}
+          {f.kind === "group" && members.data?.length === 0 ? (
+            <p className="text-sm text-muted">No other members yet.</p>
+          ) : members.data && (
             <MembersPanel
               addressUrl={(a) => `${config.explorerUrl}/address/${a}`}
               members={members.data}
