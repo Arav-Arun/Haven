@@ -2906,7 +2906,8 @@ class Client implements HavenClient {
     );
     for (const s of sizes) if (s) swarm.push(s);
 
-    const ensName = h?.ensName ?? "";
+    // A member's holding learns the folder's name from its sealed folder info: open it if this page hasn't yet.
+    const ensName = h?.ensName || (h ? ((await this.getFolder(f).catch(() => null))?.ensName ?? "") : "");
     const kind = ensName ? kindOf(ensName) : "drive";
     const ownerVisible = kind !== "room";
     const ending = members.filter((m) => m.until !== null).length;
@@ -2919,9 +2920,11 @@ class Client implements HavenClient {
       `that ${members.length} address${members.length === 1 ? "" : "es"} hold access` +
       `${ending ? ` (${ending} with an end date)` : ""}, and that it holds ${reading.files.length} file${reading.files.length === 1 ? "" : "s"}` +
       `${padded ? ` of about ${mb >= 1 ? `${Math.round(mb)} MB` : `${Math.max(1, Math.round(padded / 1024))} KB`} padded` : ""}. ` +
-      (ownerVisible
-        ? `Its name shows it belongs to ${ownerNameOf(ensName) ?? "its owner"}. They can't see who the members are, or any names or contents.`
-        : "They can't see who owns it, who the members are, or any names or contents.");
+      (!ensName
+        ? "They can't see who the members are, or any names or contents."
+        : ownerVisible
+          ? `Its name shows it belongs to ${ownerNameOf(ensName) ?? "its owner"}. They can't see who the members are, or any names or contents.`
+          : "They can't see who owns it, who the members are, or any names or contents.");
     return {
       folder: f,
       ensName,
