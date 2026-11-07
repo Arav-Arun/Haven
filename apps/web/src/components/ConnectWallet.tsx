@@ -40,11 +40,14 @@ export function useWalletKind(): WalletKind | null {
       if (!provider?.request) throw new Error("no wallet provider");
       return provider.request({ method: "eth_getCode", params: [address, "latest"] });
     };
-    const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), CHECK_TIMEOUT_MS));
-    Promise.race([client.getCode({ address }), timeout])
-      .catch(viaWallet)
+    const within = <T,>(p: Promise<T>) =>
+      Promise.race([p, new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), CHECK_TIMEOUT_MS))]);
+    within(client.getCode({ address }))
+      .catch(() => within(viaWallet()))
       .then((code) => live && setKind(kindOf(code)))
-      .catch(() => live && setKind("error"));
+      // Still no answer (a phone wallet over WalletConnect can be slow to reply): carry on as a plain key. A contract
+      // wallet is caught at the next step anyway, because its two signatures won't match.
+      .catch(() => live && setKind("eoa"));
     return () => {
       live = false;
     };

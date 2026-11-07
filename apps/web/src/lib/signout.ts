@@ -12,7 +12,7 @@ export function useSignOut() {
   return useCallback(async () => {
     if (!client) return;
     await client.signOut();
-    for (const k of Object.keys(localStorage)) if (k.startsWith("haven:view:")) localStorage.removeItem(k);
+    for (const k of Object.keys(localStorage)) if (k.startsWith("haven:view:") || k.startsWith("haven:receipts:")) localStorage.removeItem(k);
     setIdentity(null);
     router.push("/");
   }, [client, setIdentity, router]);

@@ -93,7 +93,7 @@ export function DriveProvider({ children }: { children: ReactNode }) {
     // The app opens before this device is checked; if it turns out to be revoked, the client signs out and says so here.
     const offSignedOut = client.onSignedOut(() => {
       if (!live) return;
-      for (const k of Object.keys(localStorage)) if (k.startsWith("haven:view:")) localStorage.removeItem(k);
+      for (const k of Object.keys(localStorage)) if (k.startsWith("haven:view:") || k.startsWith("haven:receipts:")) localStorage.removeItem(k);
       setIdentity(null);
     });
     return () => {
@@ -102,6 +102,33 @@ export function DriveProvider({ children }: { children: ReactNode }) {
       offSignedOut();
     };
   }, [client, profile]);
+
+  // Receipts are kept on this device for the signed-in account (the last 50), so the drawer still shows what happened
+  // after a reload. One still running when the page closed is shown as finished: it can't report back any more.
+  const receiptsKey = identity ? `haven:receipts:${profile}:${identity.driveKey}` : null;
+  useEffect(() => {
+    if (!receiptsKey) return;
+    try {
+      const saved = JSON.parse(localStorage.getItem(receiptsKey) ?? "[]") as Receipt[];
+      if (saved.length)
+        setReceipts((now) => {
+          const ids = new Set(now.map((r) => r.id));
+          return [...now, ...saved.filter((r) => !ids.has(r.id)).map((r) => ({ ...r, done: true }))]
+            .sort((a, b) => b.startedAt - a.startedAt)
+            .slice(0, 50);
+        });
+    } catch {
+      // unreadable: start empty
+    }
+  }, [receiptsKey]);
+  useEffect(() => {
+    if (!receiptsKey) return;
+    try {
+      localStorage.setItem(receiptsKey, JSON.stringify(receipts.slice(0, 50)));
+    } catch {
+      // full: not kept, nothing else changes
+    }
+  }, [receiptsKey, receipts]);
 
   const setProfile = useCallback((p: Profile) => {
     if (p === "me") sessionStorage.removeItem(PROFILE_KEY);

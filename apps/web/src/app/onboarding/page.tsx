@@ -51,12 +51,16 @@ function SignStep({ client, onSignedIn }: { client: DriveClient; onSignedIn: (i:
     if (!address) return;
     let live = true;
     setSigs([]);
+    // If this can't be told in time (a slow network on a phone), ask for two signatures: that always works, and a
+    // returning wallet just signs once more.
+    const fallback = setTimeout(() => live && setNeeded((n) => n ?? 2), 12_000);
     client.needsSecondSignature(address).then(
       (two) => live && setNeeded(two ? 2 : 1),
-      (e) => live && setError(e),
+      () => live && setNeeded(2),
     );
     return () => {
       live = false;
+      clearTimeout(fallback);
     };
   }, [client, address]);
 
