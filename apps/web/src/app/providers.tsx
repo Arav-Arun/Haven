@@ -10,7 +10,6 @@ import { createConfig, WagmiProvider } from "wagmi";
 import { anonJsonRpc } from "@/lib/anon";
 import { config } from "@/lib/config";
 import { DriveProvider } from "@/lib/drive";
-import { Activity } from "@/components/Activity";
 import { registerServiceWorker } from "@/lib/pwa";
 
 function connectors() {
@@ -62,7 +61,6 @@ export function Providers({ children }: { children: ReactNode }) {
         <RainbowKitProvider>
           <DriveProvider>
             {children}
-            <Activity />
           </DriveProvider>
         </RainbowKitProvider>
       </QueryClientProvider>
