@@ -455,18 +455,6 @@
   }
 }
 
-/* The activity pill (Activity.tsx): a manual popover, so it sits in the top layer above dialogs, at the bottom centre. */
-.activity-pill {
-  inset: auto auto max(1.25rem, env(safe-area-inset-bottom)) 50%;
-  transform: translateX(-50%);
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  overflow: visible;
-  max-width: min(92vw, 30rem);
-}
-
 /* Tailwind v4 gives buttons the default arrow; every clickable control here shows the hand instead. */
 @layer base {
   button:not(:disabled),
