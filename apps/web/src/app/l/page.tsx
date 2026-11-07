@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ClientUnavailable } from "@/components/Gate";
 import { useDrive } from "@/lib/drive";
+import { BackButton } from "@/components/BackButton";
 
 /**
  * Opens a file link without a wallet. The key is in the URL's #fragment, which browsers never send to a server;
@@ -36,6 +37,7 @@ export default function OpenLink() {
         </Link>
       </header>
       <main className="flex flex-col gap-4 pb-16 pt-4">
+        <BackButton fallback="/" />
         {restoring && <Skeleton rows={4} />}
         {!restoring && !client && <ClientUnavailable reason={unavailable ?? "No client."} />}
         <ErrorNote error={error} />

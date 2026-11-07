@@ -3,10 +3,11 @@
 import { AppShell, FxLabel, ReceiptsDrawer, useNow, type NavItem } from "@haven/ui";
 import { DoorClosed, HardDrive, Inbox, ReceiptText, Settings, UsersRound } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { Suspense, useState, type ReactNode } from "react";
 import { PERSONA, useDrive } from "@/lib/drive";
 import { useSignOut } from "@/lib/signout";
+import { BackButton } from "./BackButton";
 import { NetworkBadge } from "./NetworkBadge";
 
 const NAV: Omit<NavItem, "active">[] = [
@@ -51,6 +52,14 @@ function SignOutButton() {
       <LeaveIcon />
     </button>
   );
+}
+
+/** Back, at the top of every app page. A folder (?f=) draws its own, which goes to its parent folder. */
+function ShellBack() {
+  const path = usePathname();
+  const inFolder = useSearchParams().has("f");
+  if (inFolder) return null;
+  return <BackButton fallback={path.startsWith("/drive") ? "/" : "/drive"} className="mb-4" />;
 }
 
 /** Shown on every screen while a "Try it" persona is active, so no one mistakes whose keys are in use. */
@@ -108,6 +117,9 @@ export function Shell({ children }: { children: ReactNode }) {
         </button>
       }
     >
+      <Suspense fallback={null}>
+        <ShellBack />
+      </Suspense>
       <PersonaBar />
       {children}
       <ReceiptsDrawer

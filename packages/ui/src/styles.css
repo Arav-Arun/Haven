@@ -47,6 +47,17 @@
     background: rgb(13 27 51 / 0.35);
     backdrop-filter: blur(4px);
   }
+  /* Scrollbars inside dialogs and drawers: thin, no track or arrows, and only a faint thumb while you're over a box
+     that actually scrolls (overflow: auto already hides it when everything fits). */
+  dialog,
+  dialog * {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+  dialog:hover,
+  dialog *:hover {
+    scrollbar-color: rgb(13 27 51 / 0.18) transparent;
+  }
   /* A dialog that arrives out of cloud (CloudSummon): a pale sky behind it, blurring in as the clouds gather. */
   dialog[data-summon]::backdrop {
     background: rgb(142 159 192 / 0.42);

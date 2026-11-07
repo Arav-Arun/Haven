@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ClientUnavailable } from "@/components/Gate";
 import { config } from "@/lib/config";
 import { makeClient, PERSONA, useDrive, type Profile } from "@/lib/drive";
+import { BackButton } from "@/components/BackButton";
 
 type Persona = Exclude<Profile, "me">;
 
@@ -106,6 +107,7 @@ export default function TryIt() {
         </Link>
       </header>
       <main className="flex flex-col gap-6 pb-16 pt-4">
+        <BackButton fallback="/" />
         <div>
           <h1 className="text-4xl font-bold tracking-[-0.04em]">Try it without a wallet</h1>
           <p className="mt-2 max-w-prose text-muted">
