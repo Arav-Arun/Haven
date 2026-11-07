@@ -17,12 +17,16 @@ import {
 } from "./addresses";
 import { randomBytes } from "./crypto";
 import {
-  deployDrive,
   deployProxy,
   dnsEncode,
+  expectProxy,
+  planDrive,
+  planProxy,
+  type PlannedProxy,
   randomLabel,
-  registerName,
+  registerTx,
   sendTx,
+  sendTxs,
   type SepoliaReader,
   type SepoliaWriter,
 } from "./ens";
@@ -90,6 +94,19 @@ export async function deployResolver(
   params: { name: string; admin: Address; texts: Record<string, string> },
   step: StepSink = ignoreSteps,
 ): Promise<Address> {
+  const { proxy } = await deployProxy(writer, resolverProxyParams(params), step);
+  return proxy;
+}
+
+/** Plans the same resolver deployment without sending it (see planProxy). */
+export function planResolver(
+  writer: SepoliaWriter,
+  params: { name: string; admin: Address; texts: Record<string, string> },
+): Promise<PlannedProxy> {
+  return planProxy(writer, resolverProxyParams(params));
+}
+
+function resolverProxyParams(params: { name: string; admin: Address; texts: Record<string, string> }) {
   const dnsName = dnsEncode(params.name);
   const calls = Object.entries(params.texts).map(([key, value]) =>
     encodeFunctionData({ abi: permissionedResolverAbi, functionName: "setText", args: [dnsName, key, value] }),
@@ -99,12 +116,7 @@ export async function deployResolver(
     functionName: "initialize",
     args: [[{ account: params.admin, roleBitmap: ALL_ROLES & ~RESOLVER_UPGRADE_ROLES }], calls],
   });
-  const { proxy } = await deployProxy(
-    writer,
-    { implementation: ensv2.PermissionedResolverImpl, init, label: "Create resolver" },
-    step,
-  );
-  return proxy;
+  return { implementation: ensv2.PermissionedResolverImpl, init, label: "Create resolver" };
 }
 
 export async function grantRootRoles(
@@ -294,30 +306,31 @@ export async function claimName(
   const label = checkUserLabel(params.label);
   const ensName = `${label}.haven.eth`;
   const owner = params.mainWallet ?? params.driveKey;
-  const resolver = await deployResolver(
-    writer,
-    { name: ensName, admin: owner, texts: { "haven.key": params.spendingPublicKey } },
-    step,
-  );
-  const { registry: driveRoot, blockNumber } = await deployDrive(
-    writer,
-    { implementation: params.implementation, driveKey: params.driveKey, mainWallet: params.mainWallet },
-    step,
-  );
-  await registerName(
-    writer,
-    {
-      parent: params.appRegistry,
-      label,
-      owner,
-      subregistry: driveRoot,
-      resolver,
-      roleBitmap: NAME_OWNER_ROLES,
-      expiry: params.expiry,
-    },
-    step,
-  );
-  return { ensName, resolver, driveRoot, driveRootBlock: blockNumber };
+  // The three transactions go out together and land in one block (one block instead of three). The register only
+  // stores the resolver and drive root addresses, and the factory's CREATE2 addresses are known before deployment.
+  const resolver = await planResolver(writer, {
+    name: ensName,
+    admin: owner,
+    texts: { "haven.key": params.spendingPublicKey },
+  });
+  const drive = await planDrive(writer, {
+    implementation: params.implementation,
+    driveKey: params.driveKey,
+    mainWallet: params.mainWallet,
+  });
+  const register = registerTx({
+    parent: params.appRegistry,
+    label,
+    owner,
+    subregistry: drive.address,
+    resolver: resolver.address,
+    roleBitmap: NAME_OWNER_ROLES,
+    expiry: params.expiry,
+  });
+  const [resolverReceipt, driveReceipt] = await sendTxs(writer, [resolver, drive, register], step);
+  expectProxy(resolverReceipt!, resolver);
+  expectProxy(driveReceipt!, drive);
+  return { ensName, resolver: resolver.address, driveRoot: drive.address, driveRootBlock: driveReceipt!.blockNumber };
 }
 
 export interface RoomParams {
@@ -337,17 +350,18 @@ export async function createRoom(
   step: StepSink = ignoreSteps,
 ): Promise<{ ensName: string; registry: Address; blockNumber: bigint }> {
   const label = params.label ?? randomLabel("r");
-  const { registry, blockNumber } = await deployDrive(
-    writer,
-    { implementation: params.implementation, driveKey: params.roomKey, mainWallet: null },
-    step,
-  );
-  await registerName(
-    writer,
-    { parent: params.roomsRegistry, label, owner: params.roomKey, subregistry: registry, expiry: params.expiry },
-    step,
-  );
-  return { ensName: `${label}.rooms.haven.eth`, registry, blockNumber };
+  // Both transactions in one block, as in claimName.
+  const drive = await planDrive(writer, { implementation: params.implementation, driveKey: params.roomKey, mainWallet: null });
+  const register = registerTx({
+    parent: params.roomsRegistry,
+    label,
+    owner: params.roomKey,
+    subregistry: drive.address,
+    expiry: params.expiry,
+  });
+  const [driveReceipt] = await sendTxs(writer, [drive, register], step);
+  expectProxy(driveReceipt!, drive);
+  return { ensName: `${label}.rooms.haven.eth`, registry: drive.address, blockNumber: driveReceipt!.blockNumber };
 }
 
 /**

@@ -1,7 +1,7 @@
 // Haven's service worker: the app shell offline, and Android's "Share to Haven".
 // It never touches cross-origin traffic (RPCs, Bee, our API), and it never sees keys or decrypted files except the
 // ones the user shares into the app, which it hands straight to the page through IndexedDB.
-const VERSION = "3";
+const VERSION = "5";
 const SHELL = `haven-shell-${VERSION}`;
 const ASSETS = `haven-assets-${VERSION}`;
 const PAGES = ["/", "/drive/", "/rooms/", "/shared/", "/groups/", "/settings/", "/onboarding/", "/try/", "/l/", "/public/"];

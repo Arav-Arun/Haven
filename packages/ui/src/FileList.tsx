@@ -62,7 +62,19 @@ export interface FileActions {
  * Files in a folder. Files you have no key for are shown, locked, with the reason. `proved` holds the Arkiv keys of
  * anonymous files, whose entries carry a zero-knowledge proof instead of the writer's signature.
  */
-export function FileRows({ files, now, proved, ...actions }: { files: FileEntry[]; now: Timestamp; proved?: ReadonlySet<string> } & FileActions) {
+export function FileRows({
+  files,
+  now,
+  proved,
+  accessUntil,
+  ...actions
+}: {
+  files: FileEntry[];
+  now: Timestamp;
+  proved?: ReadonlySet<string>;
+  /** When your access here ends or ended, if known: says why a file is locked only when it's true. */
+  accessUntil?: Timestamp | null;
+} & FileActions) {
   if (!files.length) return null;
   return (
     <ul className="surface rounded-2xl px-3">
@@ -125,7 +137,8 @@ export function FileRows({ files, now, proved, ...actions }: { files: FileEntry[
             <span className="min-w-0 flex-1">
               <span className="block truncate font-medium">Locked file</span>
               <span className="block truncate text-xs">
-                Added after your access ended, by {f.uploadedBy.label}{" "}
+                {accessUntil != null && f.uploadedAt > accessUntil ? "Added after your access ended" : "You don't hold the key it was sealed with"}, added by{" "}
+                {f.uploadedBy.label}{" "}
                 <time title={formatDate(f.uploadedAt)}>{formatAgo(f.uploadedAt, now)}</time>
               </span>
             </span>

@@ -220,6 +220,8 @@ const LOW_TGLM = parseEther("0.001");
 /** The least a key needs before the client sends a transaction with it. */
 const MIN_ETH = parseEther("0.0001");
 const MIN_TGLM = parseEther("0.0003");
+/** How long a folder's records, once read, are reused before being read again. */
+const READ_CACHE_S = 15;
 /** How many weeks of welcome notes "Shared with me" scans on a first look. */
 const WELCOME_WEEKS = 8;
 const STORE = { seed: "seed", name: "name", shares: "shares", rooms: "rooms", device: "device", tofu: "tofu", synced: "subtree-sync" } as const;
@@ -328,6 +330,8 @@ class Client implements HavenClient {
   private readonly holdings = new Map<string, Holding>();
   /** Folders made by this client recently, by registry: kept in lists until the chain's log index shows them. */
   private readonly recent = new Map<string, { list: string; folder: Folder; at: number }>();
+  /** Recent folder reads (readFolder), by folder and holder. */
+  private readonly folderReads = new Map<string, { at: number; keys: Promise<FolderKeys> }>();
   private readonly fileCache = new Map<string, { record: FileRecord & { createdAt: number }; meta: FileMeta | null }>();
   private readonly direct = new Set<string>();
   private apiInfo: ApiInfo | null = null;
@@ -347,6 +351,10 @@ class Client implements HavenClient {
       if (!v) throw new DriveError("UNKNOWN", `DriveConfig.${k} is missing`);
     }
     this.clock = new BlockClock(this.arkiv());
+    // When an action finishes (it may have written through the API too), the next read is fresh.
+    this.receipts.on((r) => {
+      if (r.done) this.folderReads.clear();
+    });
   }
 
   // ------------------------------------------------------------ transports
@@ -403,6 +411,7 @@ class Client implements HavenClient {
   }
 
   private arkivWriter(key: Hex, step?: StepSink, isolationKey?: string): ArkivWriter {
+    this.folderReads.clear(); // about to write: nothing read before this can be trusted after it
     return arkivWriter(
       {
         rpcUrl: this.cfg.arkivRpcUrl,
@@ -734,7 +743,22 @@ class Client implements HavenClient {
 
   // ------------------------------------------------------------ folder state
 
+  /**
+   * A folder's records, read once and kept for a few seconds: a folder page and the action that follows (share,
+   * upload, members) each needed them, so the same seven Arkiv queries went through the private network several times.
+   * Fewer requests is faster and leaks less. Any Arkiv write by this client, and the end of every action, clears it.
+   */
   private async readFolder(folder: Address, h: Holding, step?: StepSink): Promise<FolderKeys> {
+    const key = `${lower(folder)}:${lower(h.address)}`;
+    const hit = this.folderReads.get(key);
+    if (hit && now() - hit.at < READ_CACHE_S) return hit.keys;
+    const keys = this.readFolderFresh(folder, h, step);
+    this.folderReads.set(key, { at: now(), keys });
+    keys.catch(() => this.folderReads.delete(key));
+    return keys;
+  }
+
+  private async readFolderFresh(folder: Address, h: Holding, step?: StepSink): Promise<FolderKeys> {
     const reader = this.arkiv(step, h.address);
     const [rotations, refreshes, files, tombs, copies, zkFiles, zkJoins] = await Promise.all([
       listRotations(reader, folder),
@@ -969,6 +993,12 @@ class Client implements HavenClient {
       }),
     );
     const listed = folders.filter((f): f is Folder => f !== null && f.version > 0);
+    // Groups someone added you to arrive as shares (the same scan as "Shared with me" finds them): list them too.
+    if (parent === "groups") {
+      for (const s of await this.sharedWithMe().catch(() => [] as IncomingShare[])) {
+        if (s.folder.kind === "group" && !listed.some((f) => isAddressEqual(f.registry, s.folder.registry))) listed.push(s.folder);
+      }
+    }
     // Folders made here in the last ten minutes that the chain's log index hasn't caught up with yet.
     const list = parent === "root" || parent === "rooms" || parent === "groups" ? parent : lower(parent);
     for (const [id, r] of this.recent) {
@@ -1605,10 +1635,13 @@ class Client implements HavenClient {
       const welcome = await createWelcome({ recipientSpendingPublicKey: p.key, folder: f });
       const S = welcome.stealthAddress;
       step({ kind: "check", label: `New private address for ${people.length > 1 ? p.name : "this member"}`, detail: S, ok: true });
-      await grantRoleUntil(this.sepoliaWriter(h.key, step, h.address), f, S, opts.role, opts.until, step);
-      if (opts.role !== "viewer") {
-        await sendGlm(this.arkivWriter(h.key, step, h.address), S, MEMBER_TGLM, step, "Gas for the new member (tGLM, from this folder's key)");
-      }
+      // The Sepolia grant and the member's Arkiv gas are on different chains, so they go at the same time.
+      await Promise.all([
+        grantRoleUntil(this.sepoliaWriter(h.key, step, h.address), f, S, opts.role, opts.until, step),
+        opts.role !== "viewer"
+          ? sendGlm(this.arkivWriter(h.key, step, h.address), S, MEMBER_TGLM, step, "Gas for the new member (tGLM, from this folder's key)")
+          : Promise.resolve(),
+      ]);
       if (opts.role === "manager") {
         const w = this.sepoliaWriter(h.key, step, h.address);
         const hash = await w.wallet.sendTransaction({ account: w.wallet.account, chain: sepolia, to: S, value: MANAGER_ETH });

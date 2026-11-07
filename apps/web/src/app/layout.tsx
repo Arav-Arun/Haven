@@ -15,8 +15,8 @@ export const metadata: Metadata = {
   description: "Share files privately with any ENS name. No one can see who you shared with, and new files lock when access ends.",
   applicationName: "Haven",
   manifest: "/manifest.webmanifest",
-  // `?v=` makes browsers drop the icons they cached before the clay tile.
-  icons: { icon: [{ url: "/favicon.png?v=3", sizes: "64x64", type: "image/png" }, { url: "/icon-192.png?v=3", sizes: "192x192", type: "image/png" }], apple: "/apple-touch-icon.png?v=3" },
+  // `?v=` makes browsers drop icons they cached before the clay tile (5: after the monochrome ones).
+  icons: { icon: [{ url: "/favicon.png?v=5", sizes: "64x64", type: "image/png" }, { url: "/icon-192.png?v=5", sizes: "192x192", type: "image/png" }], apple: "/apple-touch-icon.png?v=5" },
   appleWebApp: { capable: true, title: "Haven", statusBarStyle: "default" },
   openGraph: {
     title: "Haven",

@@ -10,6 +10,7 @@ import {
   type Chain,
   concatBytes,
   decodeErrorResult,
+  decodeFunctionResult,
   encodeFunctionData,
   getAddress,
   isAddressEqual,
@@ -466,6 +467,116 @@ export async function sendTx(
   return receipt;
 }
 
+/** A transaction prepared but not sent yet. */
+export interface PlannedTx {
+  label: string;
+  to: Address;
+  data: Hex;
+}
+
+/**
+ * Sends `txs` back to back with consecutive nonces, without waiting between them, so they can all land in the same
+ * block; then waits for every receipt. Use it only when each transaction succeeds without the earlier ones' effects:
+ * each is simulated and priced against the current state before any is sent (a contract address that is known in
+ * advance and only stored, as in a register call, is fine). Nothing else may send from the same account meanwhile;
+ * the API runs its transactions one job at a time.
+ */
+export async function sendTxs(
+  writer: SepoliaWriter,
+  txs: readonly PlannedTx[],
+  step: StepSink = ignoreSteps,
+): Promise<TransactionReceipt[]> {
+  const account = writer.wallet.account;
+  const gas: bigint[] = [];
+  for (const tx of txs) {
+    try {
+      await writer.public.call({ account, to: tx.to, data: tx.data });
+      gas.push(await writer.public.estimateGas({ account, to: tx.to, data: tx.data }));
+    } catch (error) {
+      throw decodeRevert(error, tx.label);
+    }
+  }
+  const nonce = await writer.public.getTransactionCount({ address: account.address, blockTag: "pending" });
+  const hashes: Hex[] = [];
+  let sendError: DriveError | null = null;
+  for (const [i, tx] of txs.entries()) {
+    try {
+      hashes.push(
+        await writer.wallet.sendTransaction({
+          account,
+          chain: writer.wallet.chain,
+          to: tx.to,
+          data: tx.data,
+          nonce: nonce + i,
+          gas: (gas[i]! * 6n) / 5n, // the estimate plus 20%
+        }),
+      );
+    } catch (error) {
+      sendError = toDriveError(error, tx.label);
+      break;
+    }
+  }
+  // Wait for everything that went out, even after a failed send, so the receipts panel shows what happened.
+  const results = await Promise.all(
+    hashes.map((hash) =>
+      writer.public.waitForTransactionReceipt({ hash }).then(
+        (receipt) => ({ receipt, error: null }),
+        (error: unknown) => ({ receipt: null, error }),
+      ),
+    ),
+  );
+  const receipts: TransactionReceipt[] = [];
+  let failure: DriveError | null = null;
+  for (const [i, r] of results.entries()) {
+    const label = txs[i]!.label;
+    const hash = hashes[i]!;
+    const ok = r.receipt?.status === "success";
+    step({ kind: "sepolia-tx", label, hash, explorerUrl: txUrl("sepolia", hash), ok });
+    if (r.receipt) receipts.push(r.receipt);
+    failure ??= r.error ? toDriveError(r.error, label) : ok ? null : new DriveError("UNKNOWN", `${label}: transaction reverted`);
+  }
+  if (failure ?? sendError) throw (failure ?? sendError)!;
+  return receipts;
+}
+
+/** A proxy deployment, planned but not sent: `address` is where the factory will create it. */
+export interface PlannedProxy extends PlannedTx {
+  address: Address;
+}
+
+/**
+ * Plans a VerifiableFactory proxy deployment with a random salt. The factory uses CREATE2 with
+ * keccak256(sender, salt), so a simulated call from the same account returns the exact address it will get.
+ */
+export async function planProxy(
+  writer: SepoliaWriter,
+  params: { implementation: Address; init: Hex; label: string; factory?: Address },
+): Promise<PlannedProxy> {
+  const to = params.factory ?? ensv2.VerifiableFactory;
+  const data = encodeFunctionData({
+    abi: verifiableFactoryAbi,
+    functionName: "deployProxy",
+    args: [params.implementation, BigInt(toHex(randomBytes(32))), params.init],
+  });
+  let result: Hex | undefined;
+  try {
+    ({ data: result } = await writer.public.call({ account: writer.wallet.account, to, data }));
+  } catch (error) {
+    throw decodeRevert(error, params.label);
+  }
+  if (!result) throw new DriveError("UNKNOWN", `${params.label}: the factory returned no address`);
+  const address = getAddress(decodeFunctionResult({ abi: verifiableFactoryAbi, functionName: "deployProxy", data: result }));
+  return { label: params.label, to, data, address };
+}
+
+/** Checks that a sent proxy deployment created the planned address. */
+export function expectProxy(receipt: TransactionReceipt, planned: PlannedProxy): void {
+  const [deployed] = parseEventLogs({ abi: verifiableFactoryAbi, eventName: "ProxyDeployed", logs: receipt.logs });
+  if (!deployed || !isAddressEqual(deployed.args.proxyAddress, planned.address)) {
+    throw new DriveError("UNKNOWN", `${planned.label}: created at an unexpected address`);
+  }
+}
+
 /** Names the custom error a simulated call reverted with, using our ABIs. */
 function decodeRevert(error: unknown, label: string): DriveError {
   const data = revertData(error);
@@ -531,22 +642,27 @@ export async function deployDrive(
   params: DeployDriveParams,
   step: StepSink = ignoreSteps,
 ): Promise<{ registry: Address; blockNumber: bigint }> {
+  const { proxy, blockNumber } = await deployProxy(writer, driveProxyParams(params), step);
+  return { registry: proxy, blockNumber };
+}
+
+/** Plans a DriveRegistry proxy deployment (see planProxy) without sending it. */
+export function planDrive(writer: SepoliaWriter, params: DeployDriveParams): Promise<PlannedProxy> {
+  return planProxy(writer, driveProxyParams(params));
+}
+
+function driveProxyParams(params: DeployDriveParams) {
   const init = encodeFunctionData({
     abi: driveRegistryAbi,
     functionName: "initializeDrive",
     args: [params.driveKey, params.mainWallet ?? zeroAddress],
   });
-  const { proxy, blockNumber } = await deployProxy(
-    writer,
-    {
-      implementation: params.implementation,
-      init,
-      label: "Create folder registry",
-      ...(params.factory ? { factory: params.factory } : {}),
-    },
-    step,
-  );
-  return { registry: proxy, blockNumber };
+  return {
+    implementation: params.implementation,
+    init,
+    label: "Create folder registry",
+    ...(params.factory ? { factory: params.factory } : {}),
+  };
 }
 
 export interface RegisterParams {
@@ -563,6 +679,13 @@ export interface RegisterParams {
 }
 
 export async function registerName(writer: SepoliaWriter, params: RegisterParams, step: StepSink = ignoreSteps) {
+  const tx = registerTx(params);
+  return sendTx(writer, tx.label, tx.to, tx.data, step);
+}
+
+/** The register call as a planned transaction. It only stores the subregistry and resolver addresses, so they may be
+ *  contracts that are deployed earlier in the same batch (sendTxs). */
+export function registerTx(params: RegisterParams): PlannedTx {
   const data = encodeFunctionData({
     abi: driveRegistryAbi,
     functionName: "register",
@@ -575,7 +698,7 @@ export async function registerName(writer: SepoliaWriter, params: RegisterParams
       params.expiry,
     ],
   });
-  return sendTx(writer, `Register ${params.label}`, params.parent, data, step);
+  return { label: `Register ${params.label}`, to: params.parent, data };
 }
 
 export interface CreateFolderParams {
