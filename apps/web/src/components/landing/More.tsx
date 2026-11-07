@@ -1,45 +1,17 @@
 "use client";
 
-// The rest of the landing page: the four networks (and prize tracks), privacy, apps, questions, the closing call.
+// The home page sections after the story: the four networks (and prize tracks), privacy and questions.
 // Every sentence describes what the code does today.
 
-import { ArrowRight, ArrowUpRight, Check, Eye, EyeOff, Monitor, Plus, Smartphone } from "lucide-react";
+import { ArrowUpRight, Check, Eye, EyeOff, Plus } from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
 import { useState } from "react";
 import { useInView } from "./hooks";
-import { FxLabel } from "@haven/ui";
 import { FrontClouds } from "./Sky";
 import { haven } from "@haven/core";
 import { config } from "@/lib/config";
 
-export const NETWORKS = [
-  { name: "ENS", logo: "/ens.webp" },
-  { name: "Arkiv", logo: "/arkive.png" },
-  { name: "Swarm", logo: "/swarm.png" },
-  { name: "Ethereum", logo: "/eth.png" },
-  { name: "Anon-RPC", logo: "/eth.png" },
-];
 
-/** A slow, edge-faded strip of the networks Haven runs on. */
-export function BuiltOn() {
-  const row = [...NETWORKS, ...NETWORKS, ...NETWORKS];
-  return (
-    <div className="mx-auto max-w-5xl px-5 pb-6 pt-10">
-      <p className="text-center text-[15px] text-[#0d1b33]/55">Runs on open networks, not on our servers</p>
-      <div className="marquee mt-6 overflow-hidden">
-        <div className="flex w-max gap-14">
-          {[...row, ...row].map((n, i) => (
-            <span key={i} className="flex shrink-0 items-center gap-2.5 text-xl font-semibold tracking-tight text-[#0d1b33]/70">
-              <Image src={n.logo} width={28} height={28} alt="" className="rounded-md" />
-              {n.name}
-            </span>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 const TRACKS = [
   {
@@ -240,29 +212,7 @@ export function Privacy() {
   );
 }
 
-const APPS = [
-  { icon: Monitor, name: "Website", body: "Your drive, rooms and shares in any browser. Nothing to install." },
-  { icon: Smartphone, name: "Phone app", body: "Add it to your home screen. On Android, share files to Haven from any app." },
-];
 
-export function Apps() {
-  return (
-    <section className="mx-auto max-w-6xl px-5 py-24 lg:py-32">
-      <h2 className="display text-center text-5xl text-[#0d1b33] sm:text-6xl">Wherever you are.</h2>
-      <div className="mx-auto mt-12 grid max-w-4xl gap-4 md:grid-cols-2">
-        {APPS.map(({ icon: I, name, body }) => (
-          <div key={name} className="rounded-[28px] bg-white p-7 shadow-[0_18px_44px_-28px_rgb(13_27_51_/_0.4)]">
-            <span className="flex size-12 items-center justify-center rounded-2xl bg-[#1f4fd1]/10 text-[#1f4fd1]">
-              <I size={22} />
-            </span>
-            <h3 className="mt-5 text-xl font-semibold tracking-[-0.02em]">{name}</h3>
-            <p className="mt-2 text-[16px] leading-relaxed text-[#0d1b33]/65">{body}</p>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
 
 const FAQ = [
   ["Can Haven read my files?", "No. Each file is encrypted on your device with its own key before it's uploaded. Swarm stores only padded ciphertext, and our API never sees a file, a key, or who you shared with."],
@@ -306,21 +256,3 @@ export function Faq() {
   );
 }
 
-export function Closing({ href, label }: { href: string; label: string }) {
-  return (
-    <section className="px-2 pb-2 sm:px-4 sm:pb-4">
-      <div className="relative mx-auto max-w-5xl overflow-hidden rounded-[32px] bg-gradient-to-b from-[#3f78e3] via-[#5b8eec] to-[#8fb5f2] px-6 pb-40 pt-20 text-center sm:pb-48 sm:pt-24">
-        <FrontClouds />
-        <div className="relative z-30 mx-auto max-w-3xl">
-          <h2 className="display text-5xl text-white drop-shadow-[0_2px_20px_rgb(20_60_150_/_0.35)] sm:text-7xl">Hand over a file. Keep the names to yourself.</h2>
-          <Link href={href} className="btn-clay fx mt-10 inline-flex items-center gap-2.5 rounded-full px-7 py-3.5 text-[16px] font-semibold">
-            <FxLabel>
-              {label}
-              <ArrowRight size={18} />
-            </FxLabel>
-          </Link>
-        </div>
-      </div>
-    </section>
-  );
-}

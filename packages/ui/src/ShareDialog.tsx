@@ -119,6 +119,7 @@ type Lookup =
  * Haven key are refused before anything is sent.
  */
 export function ShareDialog({
+  addressUrl,
   open,
   onClose,
   folder,
@@ -131,6 +132,8 @@ export function ShareDialog({
   previewTeam,
   onShareTeam,
 }: {
+  /** Opens an address on the block explorer (the new member's random address after sharing). */
+  addressUrl?: (address: string) => string;
   open: boolean;
   onClose: () => void;
   folder: Folder;
@@ -293,7 +296,15 @@ export function ShareDialog({
             {done.until === null ? "No end date." : `Until ${formatDate(done.until)}.`}
           </p>
           <p className="text-muted">
-            On the chain they appear only as {done.address}, a new random address that can&apos;t be tied to their name.
+            On the chain they appear only as{" "}
+            {addressUrl ? (
+              <a href={addressUrl(done.address)} target="_blank" rel="noreferrer noopener" className="font-mono text-action underline underline-offset-2">
+                {done.address}
+              </a>
+            ) : (
+              done.address
+            )}
+            , a new random address that can&apos;t be tied to their name.
           </p>
           <div className="flex justify-end">
             <Button variant="primary" onClick={close}>

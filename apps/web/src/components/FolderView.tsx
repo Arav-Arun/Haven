@@ -412,6 +412,7 @@ export function FolderView({ client, folder }: { client: HavenClient; folder: Ad
       {shareOpen && (
         <ShareDialog
           open
+          addressUrl={(a) => `${config.explorerUrl}/address/${a}`}
           onClose={() => setShareOpen(false)}
           folder={f}
           groups={(groups.data ?? []).filter((g) => g.registry !== folder)}
