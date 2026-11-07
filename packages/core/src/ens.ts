@@ -122,7 +122,25 @@ export type SepoliaReader = PublicClient<Transport, Chain | undefined>;
 export interface SepoliaWriter {
   public: SepoliaReader;
   wallet: WalletClient<Transport, Chain, Account>;
+  /**
+   * Runs a send (from choosing the nonce to the last broadcast) so that no other send from the same key interleaves
+   * with it; two actions at once could otherwise pick the same nonce. The app passes one per key (serialSends).
+   * Without it, sends aren't serialised: the API runs its jobs one at a time already.
+   */
+  serialize?: <T>(send: () => Promise<T>) => Promise<T>;
 }
+
+/** A serialiser for one key's sends: each runs after the previous one has finished, whether it succeeded or not. */
+export function serialSends(): <T>(send: () => Promise<T>) => Promise<T> {
+  let tail: Promise<unknown> = Promise.resolve();
+  return <T>(send: () => Promise<T>): Promise<T> => {
+    const next = tail.then(send);
+    tail = next.catch(() => undefined);
+    return next;
+  };
+}
+
+const unserialised = <T>(send: () => Promise<T>): Promise<T> => send();
 
 // ---------------------------------------------------------------- reads
 
@@ -450,7 +468,9 @@ export async function sendTx(
   }
   let hash: Hex;
   try {
-    hash = await writer.wallet.sendTransaction({ account, chain: writer.wallet.chain, to, data });
+    hash = await (writer.serialize ?? unserialised)(() =>
+      writer.wallet.sendTransaction({ account, chain: writer.wallet.chain, to, data }),
+    );
   } catch (error) {
     throw toDriveError(error, label);
   }
@@ -496,26 +516,34 @@ export async function sendTxs(
       throw decodeRevert(error, tx.label);
     }
   }
-  const nonce = await writer.public.getTransactionCount({ address: account.address, blockTag: "pending" });
   const hashes: Hex[] = [];
   let sendError: DriveError | null = null;
-  for (const [i, tx] of txs.entries()) {
+  await (writer.serialize ?? unserialised)(async () => {
+    let nonce: number;
     try {
-      hashes.push(
-        await writer.wallet.sendTransaction({
-          account,
-          chain: writer.wallet.chain,
-          to: tx.to,
-          data: tx.data,
-          nonce: nonce + i,
-          gas: (gas[i]! * 6n) / 5n, // the estimate plus 20%
-        }),
-      );
+      nonce = await writer.public.getTransactionCount({ address: account.address, blockTag: "pending" });
     } catch (error) {
-      sendError = toDriveError(error, tx.label);
-      break;
+      sendError = toDriveError(error, txs[0]!.label);
+      return;
     }
-  }
+    for (const [i, tx] of txs.entries()) {
+      try {
+        hashes.push(
+          await writer.wallet.sendTransaction({
+            account,
+            chain: writer.wallet.chain,
+            to: tx.to,
+            data: tx.data,
+            nonce: nonce + i,
+            gas: (gas[i]! * 6n) / 5n, // the estimate plus 20%
+          }),
+        );
+      } catch (error) {
+        sendError = toDriveError(error, tx.label);
+        break;
+      }
+    }
+  });
   // Wait for everything that went out, even after a failed send, so the receipts panel shows what happened.
   const results = await Promise.all(
     hashes.map((hash) =>
@@ -718,13 +746,13 @@ export async function createFolder(
   step: StepSink = ignoreSteps,
 ): Promise<{ registry: Address; label: string; blockNumber: bigint }> {
   const label = params.label ?? randomLabel("f");
-  const { registry, blockNumber } = await deployDrive(writer, params, step);
-  await registerName(
-    writer,
-    { parent: params.parent, label, owner: params.driveKey, subregistry: registry, expiry: NO_END },
-    step,
-  );
-  return { registry, label, blockNumber };
+  // Both transactions go out together and land in one block: the register only stores the registry's address, which
+  // the factory's CREATE2 fixes before deployment (see sendTxs).
+  const drive = await planDrive(writer, params);
+  const register = registerTx({ parent: params.parent, label, owner: params.driveKey, subregistry: drive.address, expiry: NO_END });
+  const [driveReceipt] = await sendTxs(writer, [drive, register], step);
+  expectProxy(driveReceipt!, drive);
+  return { registry: drive.address, label, blockNumber: driveReceipt!.blockNumber };
 }
 
 /** Grants a role until `until` (null = no end). Also renews or shortens an existing grant. */

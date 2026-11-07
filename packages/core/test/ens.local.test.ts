@@ -29,6 +29,7 @@ import {
   roleBits,
   roleOf,
   sendTxs,
+  serialSends,
   sweep,
   wasAllowed,
   wasAllowedMany,
@@ -131,6 +132,47 @@ describe("sending a registry and its name together (claims and rooms)", () => {
       expect.objectContaining({ kind: "sepolia-tx", label: "Create folder registry", ok: true }),
       expect.objectContaining({ kind: "sepolia-tx", label: `Register ${label}`, ok: true }),
     ]);
+  });
+
+  it("createFolder puts the registry and its name in one block", async () => {
+    const { K, registry: root } = await newDrive(false);
+    const steps: ReceiptStep[] = [];
+    const folder = await timedBlocks(() =>
+      createFolder(K.writer, { parent: root, implementation: chain.implementation, driveKey: K.address, mainWallet: null, factory: chain.factory }, (s) => steps.push(s)),
+    );
+    const blocks = await Promise.all(
+      steps.map(async (s) => (s.kind === "sepolia-tx" ? (await chain.public.getTransactionReceipt({ hash: s.hash })).blockNumber : null)),
+    );
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0]).toBe(blocks[1]);
+    expect(blocks[0]).toBe(folder.blockNumber);
+    expect(await getSubregistry(chain.public, root, folder.label)).toBe(folder.registry);
+  });
+
+  it("with the app's per-key send lock, two folders made at the same moment by one key both succeed", async () => {
+    const { K, registry: root } = await newDrive(false);
+    const writer = { ...K.writer, serialize: serialSends() };
+    const params = { parent: root, implementation: chain.implementation, driveKey: K.address, mainWallet: null, factory: chain.factory };
+    const [a, b] = await timedBlocks(() => Promise.all([createFolder(writer, params), createFolder(writer, params)]));
+    expect(a.registry).not.toBe(b.registry);
+    expect(await getSubregistry(chain.public, root, a.label)).toBe(a.registry);
+    expect(await getSubregistry(chain.public, root, b.label)).toBe(b.registry);
+  });
+
+  it("the send lock runs sends strictly in order, and a failed send doesn't block the next", async () => {
+    const serialize = serialSends();
+    const order: string[] = [];
+    const slow = (name: string, ms: number, fail = false) =>
+      serialize(async () => {
+        order.push(`${name} start`);
+        await new Promise((r) => setTimeout(r, ms));
+        order.push(`${name} end`);
+        if (fail) throw new Error(name);
+        return name;
+      });
+    const results = await Promise.allSettled([slow("a", 30), slow("b", 5, true), slow("c", 1)]);
+    expect(order).toEqual(["a start", "a end", "b start", "b end", "c start", "c end"]);
+    expect(results.map((r) => r.status)).toEqual(["fulfilled", "rejected", "fulfilled"]);
   });
 
   it("sends nothing when any transaction in the batch would fail", async () => {

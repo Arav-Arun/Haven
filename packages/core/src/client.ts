@@ -120,6 +120,7 @@ import { listSubtreeHolders, overCap, planSync, type SubtreeHolder } from "./sub
 import {
   accessOf,
   createFolder as ensCreateFolder,
+  serialSends,
   createLinkName,
   driveOwner,
   findRegistry,
@@ -328,6 +329,8 @@ class Client implements HavenClient {
   private ensName: string | null = null;
   private driveRoot: Address | null = null;
   private readonly holdings = new Map<string, Holding>();
+  /** Per key: Sepolia sends run one at a time (see SepoliaWriter.serialize). */
+  private readonly sendQueues = new Map<string, ReturnType<typeof serialSends>>();
   /** Folders made by this client recently, by registry: kept in lists until the chain's log index shows them. */
   private readonly recent = new Map<string, { list: string; folder: Folder; at: number }>();
   /** Recent folder reads (readFolder), by folder and holder. */
@@ -385,11 +388,16 @@ class Client implements HavenClient {
   }
 
   private sepoliaWriter(key: Hex, step?: StepSink, isolationKey?: string): SepoliaWriter {
+    const account = privateKeyToAccount(key);
+    // One send at a time per key, across every action in this app, so two actions never pick the same nonce.
+    let serialize = this.sendQueues.get(lower(account.address));
+    if (!serialize) this.sendQueues.set(lower(account.address), (serialize = serialSends()));
     return {
       public: this.sepolia(step, isolationKey),
+      serialize,
       wallet: createWalletClient({
         chain: sepolia,
-        account: privateKeyToAccount(key),
+        account,
         transport: anonTransport({
           url: this.cfg.sepoliaRpcUrl,
           anon: this.cfg.anon,
@@ -1644,7 +1652,7 @@ class Client implements HavenClient {
       ]);
       if (opts.role === "manager") {
         const w = this.sepoliaWriter(h.key, step, h.address);
-        const hash = await w.wallet.sendTransaction({ account: w.wallet.account, chain: sepolia, to: S, value: MANAGER_ETH });
+        const hash = await w.serialize!(() => w.wallet.sendTransaction({ account: w.wallet.account, chain: sepolia, to: S, value: MANAGER_ETH }));
         await w.public.waitForTransactionReceipt({ hash });
         step({ kind: "sepolia-tx", label: "Gas for the new manager (Sepolia ETH)", hash, explorerUrl: `${EXPLORERS.sepolia}/tx/${hash}`, ok: true });
       }
