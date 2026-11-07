@@ -3,13 +3,15 @@
 // The rest of the landing page: the four networks (and prize tracks), privacy, apps, questions, the closing call.
 // Every sentence describes what the code does today.
 
-import { ArrowRight, Check, Eye, EyeOff, Monitor, Plus, Smartphone } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Check, Eye, EyeOff, Monitor, Plus, Smartphone } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { useInView } from "./hooks";
 import { FxLabel } from "@haven/ui";
 import { FrontClouds } from "./Sky";
+import { haven } from "@haven/core";
+import { config } from "@/lib/config";
 
 export const NETWORKS = [
   { name: "ENS", logo: "/ens.webp" },
@@ -47,29 +49,46 @@ const TRACKS = [
     lead: "Every folder is its own ENSv2 registry.",
     points: [
       "Your name, yourname.haven.eth, points to your drive",
-      "Data rooms are random subnames nobody can tie to you",
+      "Each folder and room is its own ENSv2 registry, made by ENS's factory",
       "Roles from Enhanced Access Control that end on their own",
       "An access history any app can ask about any moment",
+      "Everyone you share with gets a fresh stealth address, never their name",
+      "Data rooms are random subnames under rooms.haven.eth",
       "A Permissioned Resolver per name holds your public key",
-      "Share with everyone under a name, like acme.eth",
+      "Share with everyone under a name, like acme.eth, kept in sync",
     ],
     span: "lg:col-span-2 lg:row-span-2",
     dark: true,
+    cols: true,
   },
   {
     name: "Arkiv",
     prize: "Build on Arkiv",
     logo: "/arkive.png",
     lead: "The records that tie it all together.",
-    points: ["Sealed file entries, key copies and invitations", "Entries expire with the access they serve", "A public key log for every name", "Every writer checked against onchain roles"],
+    points: [
+      "Sealed file entries, key copies and invitations",
+      "Entries expire with the access they serve",
+      "A signed, hash-chained public key log for every name",
+      "Every writer checked against onchain roles",
+      "Writer groups for anonymous uploads, checked by zero-knowledge proofs",
+      "Signed website releases and independent rebuilds",
+    ],
     span: "lg:col-span-2",
+    cols: true,
   },
   {
     name: "Swarm",
     prize: "Arkiv + Swarm bonus",
     logo: "/swarm.png",
     lead: "Encrypted bytes, live updates, the site itself.",
-    points: ["Padded ciphertext, referenced from Arkiv", "Doorbells for live updates", "A verified copy of the website"],
+    points: [
+      "Only padded ciphertext, at fixed sizes",
+      "Referenced from sealed Arkiv entries",
+      "Doorbells for live updates, topics change hourly",
+      "Our own Bee node and postage batch",
+      "Every release stored on Swarm, with haven.eth pointing to it",
+    ],
     span: "",
   },
   {
@@ -77,10 +96,52 @@ const TRACKS = [
     prize: "Anon-RPC · CROPS",
     logo: "/eth.png",
     lead: "Private lookups. Keys stay yours.",
-    points: ["Lookups go through Anon-RPC, and receipts flag any that couldn't", "Every release is signed, and haven.eth points to it on Swarm", "No trackers. Open source, MIT"],
+    points: [
+      "Lookups go through Anon-RPC, one route per address and room",
+      "Fluidkey stealth addresses for every share",
+      "Receipts flag anything that had to go direct",
+      "Signed, reproducible releases. No trackers. MIT",
+    ],
     span: "",
   },
 ];
+
+/** The deployed contracts behind the ENS card, from contracts/deployments/sepolia.json, each opened on Etherscan. */
+const CONTRACTS = [
+  { label: "haven.eth", note: "Where every name is claimed", address: haven.appRegistry, code: false },
+  { label: "rooms.haven.eth", note: "Where data rooms are made", address: haven.roomsRegistry, code: false },
+  { label: "DriveRegistry", note: "Each folder's registry, source verified", address: haven.driveRegistryImpl, code: true },
+].filter((c): c is { label: string; note: string; address: `0x${string}`; code: boolean } => !!c.address);
+
+function OnChain() {
+  if (!CONTRACTS.length) return null;
+  return (
+    <div className="mt-auto pt-8">
+      <p className="text-[14px] font-medium text-white/75">Live on Sepolia. Check it yourself.</p>
+      <ul className="mt-3 grid gap-2 sm:grid-cols-3">
+        {CONTRACTS.map((c) => (
+          <li key={c.label}>
+            <a
+              href={`${config.explorerUrl}/address/${c.address}${c.code ? "#code" : ""}`}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="group flex h-full flex-col rounded-2xl bg-white/12 p-4 ring-1 ring-white/20 transition-colors hover:bg-white/20"
+            >
+              <span className="flex items-center justify-between gap-2 font-semibold">
+                {c.label}
+                <ArrowUpRight size={16} className="opacity-70 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" aria-hidden />
+              </span>
+              <span className="mt-1 text-[13px] text-white/70">{c.note}</span>
+              <span className="mt-3 font-mono text-[12px] text-white/60">
+                {c.address.slice(0, 6)}…{c.address.slice(-4)}
+              </span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 export function Tracks() {
   const { ref, inView } = useInView<HTMLDivElement>(0.15);
@@ -89,7 +150,7 @@ export function Tracks() {
       <div className="mx-auto max-w-3xl text-center">
         <h2 className="display text-5xl text-[#0d1b33] sm:text-6xl">Four open networks. One private drive.</h2>
         <p className="mt-5 text-lg leading-relaxed text-[#0d1b33]/65">
-          Each one does real work in Haven. Built at ETHGlobal Mumbai for these prize tracks.
+          Haven is private file storage and sharing for anything: encrypted on your device, shared by name through addresses nobody can trace, with access that ends on its own. Each network does real work in it.
         </p>
       </div>
       <div ref={ref} className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -110,7 +171,7 @@ export function Tracks() {
               </div>
             </div>
             <p className={`mt-6 font-semibold tracking-[-0.02em] ${t.dark ? "text-3xl leading-tight" : "text-xl"}`}>{t.lead}</p>
-            <ul className={`mt-5 flex flex-col gap-3 ${t.dark ? "sm:grid sm:grid-cols-2 sm:gap-x-6" : ""}`}>
+            <ul className={`mt-5 flex flex-col gap-3 ${t.cols ? "sm:grid sm:grid-cols-2 sm:gap-x-6" : ""}`}>
               {t.points.map((p) => (
                 <li key={p} className={`flex gap-2.5 text-[15px] leading-snug ${t.dark ? "text-white/90" : "text-[#0d1b33]/75"}`}>
                   <Check size={17} className={`mt-0.5 shrink-0 ${t.dark ? "" : "text-[#1f4fd1]"}`} />
@@ -118,6 +179,7 @@ export function Tracks() {
                 </li>
               ))}
             </ul>
+            {t.dark && <OnChain />}
           </article>
         ))}
       </div>
