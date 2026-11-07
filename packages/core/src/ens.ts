@@ -444,17 +444,50 @@ export async function listChildren(
     });
   }
   const children = [...byLabel.values()];
-  // A few at a time: one after another, a registry with many names cost one round trip per name.
-  let next = 0;
-  await Promise.all(
-    Array.from({ length: Math.min(4, children.length) }, async () => {
-      while (next < children.length) {
-        const child = children[next++]!;
-        child.registry = await getSubregistry(client, registry, child.label);
-      }
-    }),
-  );
+  const subs = await subregistries(client, registry, children.map((c) => c.label));
+  children.forEach((child, i) => (child.registry = subs[i]!));
   return children;
+}
+
+/**
+ * getSubregistry for many labels of one registry in a single eth_call through Multicall3 (one round trip through the
+ * private network instead of one per label). Falls back to one call per label where the chain has no Multicall3 (a
+ * local test chain) or the batch fails, and for any single label the batch couldn't read.
+ */
+async function subregistries(client: SepoliaReader, registry: Address, labels: string[]): Promise<(Address | null)[]> {
+  const one = (label: string) => getSubregistry(client, registry, label);
+  // The fallback: a few at a time, since a burst of parallel reads through a mixnet is what fails.
+  const fewAtATime = async () => {
+    const out: (Address | null)[] = new Array(labels.length).fill(null);
+    let next = 0;
+    await Promise.all(
+      Array.from({ length: Math.min(4, labels.length) }, async () => {
+        while (next < labels.length) {
+          const i = next++;
+          out[i] = await one(labels[i]!);
+        }
+      }),
+    );
+    return out;
+  };
+  if (labels.length === 0) return [];
+  if (labels.length === 1 || !client.chain?.contracts?.multicall3) return fewAtATime();
+  let results;
+  try {
+    results = await client.multicall({
+      contracts: labels.map((label) => ({ address: registry, abi: driveRegistryAbi, functionName: "getSubregistry" as const, args: [label] as const })),
+      allowFailure: true,
+      batchSize: 0, // one eth_call, however many labels
+    });
+  } catch {
+    return fewAtATime();
+  }
+  const out: (Address | null)[] = [];
+  for (const [i, r] of results.entries()) {
+    if (r.status === "success") out.push(isAddressEqual(r.result, zeroAddress) ? null : getAddress(r.result));
+    else out.push(await one(labels[i]!));
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------- writes

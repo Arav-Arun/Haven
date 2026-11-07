@@ -335,6 +335,8 @@ class Client implements HavenClient {
   private ensName: string | null = null;
   private driveRoot: Address | null = null;
   private readonly holdings = new Map<string, Holding>();
+  /** Folder summaries for lists (readFolderSummary): no files. Cleared whenever the full-read cache is. */
+  private readonly folderSummaries = new Map<string, { at: number; keys: Promise<FolderKeys> }>();
   /** Per key: Sepolia sends run one at a time (see SepoliaWriter.serialize). */
   private readonly sendQueues = new Map<string, ReturnType<typeof serialSends>>();
   /** Folders made by this client recently, by registry: kept in lists until the chain's log index shows them. */
@@ -362,7 +364,7 @@ class Client implements HavenClient {
     this.clock = new BlockClock(this.arkiv());
     // When an action finishes (it may have written through the API too), the next read is fresh.
     this.receipts.on((r) => {
-      if (r.done) this.folderReads.clear();
+      if (r.done) this.clearReadCaches();
     });
   }
 
@@ -424,8 +426,13 @@ class Client implements HavenClient {
     });
   }
 
+  private clearReadCaches(): void {
+    this.folderReads.clear();
+    this.folderSummaries.clear();
+  }
+
   private arkivWriter(key: Hex, step?: StepSink, isolationKey?: string): ArkivWriter {
-    this.folderReads.clear(); // about to write: nothing read before this can be trusted after it
+    this.clearReadCaches(); // about to write: nothing read before this can be trusted after it
     return arkivWriter(
       {
         rpcUrl: this.cfg.arkivRpcUrl,
@@ -793,7 +800,53 @@ class Client implements HavenClient {
       zk: { files: zkFiles.records, joins: zkJoins.records },
       malformed: rotations.malformed + refreshes.malformed + files.malformed + tombs.malformed + zkFiles.malformed + zkJoins.malformed,
     });
-    const checked = await validator.shareRecords(copies.records);
+    return this.openFolderKeys(folder, h, reading, copies.records, step);
+  }
+
+  /**
+   * What a folder list needs (its name, version, refresh state) without its files: rotations, refresh requests and my
+   * key copies, validated exactly as in a full read. A fresh full read is reused when there is one. Not stored in the
+   * full-read cache, since it has no files.
+   */
+  private async readFolderSummary(folder: Address, h: Holding): Promise<FolderKeys> {
+    const key = `${lower(folder)}:${lower(h.address)}`;
+    const full = this.folderReads.get(key);
+    if (full && now() - full.at < READ_CACHE_S) return full.keys;
+    const hit = this.folderSummaries.get(key);
+    if (hit && now() - hit.at < READ_CACHE_S) return hit.keys;
+    const keys = (async () => {
+      const reader = this.arkiv(undefined, h.address);
+      const [rotations, refreshes, copies] = await Promise.all([
+        listRotations(reader, folder),
+        listRefreshes(reader, folder),
+        listKeyCopies(reader, folder, h.address),
+      ]);
+      // The validator derives versions and refresh state from rotations and refreshes only; files don't enter into it.
+      const reading = await this.validator(undefined, h.address).folder({
+        folder,
+        rotations: rotations.records,
+        refreshes: refreshes.records,
+        files: [],
+        tombs: [],
+        zk: { files: [], joins: [] },
+        malformed: rotations.malformed + refreshes.malformed,
+      });
+      return this.openFolderKeys(folder, h, reading, copies.records);
+    })();
+    this.folderSummaries.set(key, { at: now(), keys });
+    keys.catch(() => this.folderSummaries.delete(key));
+    return keys;
+  }
+
+  /** Validates my key copies, opens them, and reads the folder's name from the newest version I can open. */
+  private async openFolderKeys(
+    folder: Address,
+    h: Holding,
+    reading: FolderKeys["reading"],
+    copyRecords: Awaited<ReturnType<typeof listKeyCopies>>["records"],
+    step?: StepSink,
+  ): Promise<FolderKeys> {
+    const checked = await this.validator(step, h.address).shareRecords(copyRecords);
     const mine = new Map<number, KeyCopy>();
     for (const c of checked.valid) {
       try {
@@ -825,8 +878,14 @@ class Client implements HavenClient {
     return { reading, copies: mine, info, displayName };
   }
 
-  private async toFolder(folder: Address, h: Holding, fk: FolderKeys, step?: StepSink): Promise<Folder> {
-    const a = await accessOf(this.sepolia(step, h.address), folder, h.address);
+  private async toFolder(
+    folder: Address,
+    h: Holding,
+    fk: FolderKeys,
+    step?: StepSink,
+    access?: Awaited<ReturnType<typeof accessOf>>,
+  ): Promise<Folder> {
+    const a = access ?? (await accessOf(this.sepolia(step, h.address), folder, h.address));
     const role = roleOf(a.roles);
     const ensName = fk.info?.e ?? h.ensName ?? "";
     if (fk.info?.e) h.ensName = fk.info.e;
@@ -975,7 +1034,7 @@ class Client implements HavenClient {
     const read = async ({ registry, holding }: { registry: Address; holding: Holding }): Promise<Folder | null> => {
       for (let attempt = 0; ; attempt++) {
         try {
-          return await this.toFolder(registry, holding, await this.readFolder(registry, holding));
+          return await this.toFolder(registry, holding, await this.readFolderSummary(registry, holding));
         } catch (e) {
           if (attempt >= 2) {
             const ensName = holding.ensName ?? "";
@@ -2378,8 +2437,11 @@ class Client implements HavenClient {
       const h = this.shareHolding(s);
       for (let attempt = 0; ; attempt++) {
         try {
-          const folder = await this.toFolder(h.folder, h, await this.readFolder(h.folder, h));
-          const access = await accessOf(this.sepolia(undefined, h.address), h.folder, h.address);
+          const [keys, access] = await Promise.all([
+            this.readFolderSummary(h.folder, h),
+            accessOf(this.sepolia(undefined, h.address), h.folder, h.address),
+          ]);
+          const folder = await this.toFolder(h.folder, h, keys, undefined, access);
           const history = access.roles ? null : await this.sepolia(undefined, h.address).readContract({
             address: h.folder,
             abi: driveRegistryAbi,
