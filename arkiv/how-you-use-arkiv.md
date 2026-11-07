@@ -8,7 +8,7 @@ Every screen is one indexed query. Nothing secret is indexed: only addresses, ra
 |---|---|
 | Folder view | `haven.file` where `folder` = the folder's registry address |
 | Opening a folder you were given | `haven.keycopy` where `folder` and `recipient` = your stealth address |
-| Shared with me | `haven.welcome` where `bucket` = this week; each note is tried on the device |
+| Shared with me | `haven.welcome` where `bucket` is one of the last 8 weeks; each note is tried on the device |
 | Members panel | `haven.roster` where `folder` |
 | A share link | `haven.link` where `link` = the link's namehash |
 | Profile page | `haven.keylog` where `ensName`, ordered by `seq` |
@@ -51,15 +51,15 @@ Every screen is one indexed query. Nothing secret is indexed: only addresses, ra
 
 | Entity | Live | Distinct `$creator`s | Expiry observed |
 |---|---|---|---|
-| `haven.keylog` | 18 | 1 (relayed) | 7,884,000 blocks (about 182 days) |
-| `haven.device` | 52 | 1 (relayed) | 3,888,000 blocks (90 days) |
-| `haven.roster` | 20 | 12 | maximum |
-| `haven.rotation` | 13 | 12 | maximum |
-| `haven.keycopy` | 15 | 12 | member's end, or maximum |
-| `haven.file` | 8 | 6 | maximum |
-| `haven.zkjoin` | 8 | 1 (relayed) | maximum |
+| `haven.keylog` | 20 | 1 (relayed) | 7,884,000 blocks (about 182 days) |
+| `haven.device` | 55 | 1 (relayed) | 3,888,000 blocks (90 days) |
+| `haven.roster` | 25 | 15 | maximum |
+| `haven.rotation` | 16 | 15 | maximum |
+| `haven.keycopy` | 19 | 15 | member's end, or maximum |
+| `haven.file` | 14 | 8 | maximum |
+| `haven.zkjoin` | 11 | 1 (relayed) | maximum |
 | `haven.release` | 12 | 1 (release key `0xBFc132fd…B50e`) | maximum |
-| `haven.welcome` | 2 | 1 | member's end |
+| `haven.welcome` | 3 | 2 | member's end |
 
 - Example entity: [`haven.file 0x9277d0e0…f121de`](https://rabdi.explorer.arkiv.network/entity/0x9277d0e012d0596341591326baaea3e2c583f43b374a3baada6553daaff121de)
   - Read-only with permissionless extension (`creationFlags.raw = 3`)

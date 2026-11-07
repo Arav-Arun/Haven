@@ -29,13 +29,13 @@ Live entities on Arkiv on 2026-11-07, from our own and testers' runs at the even
 
 | Entity | Count | Distinct writers |
 |---|---|---|
-| Key log entries (`haven.keylog`) | 18 | relayed, signed by each name |
-| Registered devices (`haven.device`) | 52 | relayed, signed by each name |
-| Folder rosters (`haven.roster`) | 20 | 12 folder keys |
-| Key schedules (`haven.rotation`) | 13 | 12 folder keys |
-| Key copies (`haven.keycopy`) | 15 | 12 |
-| Sealed file entries (`haven.file`) | 8 | 6 |
-| Anonymous-writer joins (`haven.zkjoin`) | 8 | relayed, signed by each member |
+| Key log entries (`haven.keylog`) | 20 | relayed, signed by each name |
+| Registered devices (`haven.device`) | 55 | relayed, signed by each name |
+| Folder rosters (`haven.roster`) | 25 | 15 folder keys |
+| Key schedules (`haven.rotation`) | 16 | 15 folder keys |
+| Key copies (`haven.keycopy`) | 19 | 15 |
+| Sealed file entries (`haven.file`) | 14 | 8 |
+| Anonymous-writer joins (`haven.zkjoin`) | 11 | relayed, signed by each member |
 
 The README's queries return these rows.
 
@@ -50,4 +50,4 @@ The README's queries return these rows.
 
 - Passkey sign-in, so no wallet is needed
 - Automatic key refresh when a group changes
-- Move names and roles to Ethereum mainnet, where ENSv2 is now live
+- Move names and roles to Ethereum mainnet with ENSv2

@@ -12,10 +12,12 @@ database we run.
   - With Postgres, our server would log who opened which folder, when and how often.
   - With Arkiv, clients read a public database through Anon-RPC, with a separate isolation key per room and per share.
   - There is no Haven database to breach, subpoena or switch off.
-- **Writes we can't forge or hide.**
-  - Each file entry is created and paid for by the key that wrote it (an editor's stealth address, a room key).
-  - We can't add, change or hide a file. Every client checks every entity's `$creator` against the folder's roles on
-    Sepolia.
+- **Writes we can't forge.**
+  - A signed file entry is created and paid for by the key that wrote it (an editor's stealth address, a room key).
+    Every client checks its `$creator` against the folder's roles on Sepolia, so we can't add, change or hide one.
+  - An anonymous upload (`haven.zkfile`) is relayed by our API, so its `$creator` is our relayer. It counts only with a
+    valid zero-knowledge proof that its writer is in the folder's writer group, so we still can't forge one. We could
+    refuse to relay one, and the writer can then upload signed instead.
 - **Auditable storage.**
   - The Public view lists every record stored for a folder, each linked to the Arkiv explorer.
   - With Postgres, users would have to take our word for what we keep.

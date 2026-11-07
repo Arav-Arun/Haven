@@ -23,7 +23,8 @@ SDK `@arkiv-network/sdk` 1.0.1, Rabdi testnet (chain 7794095).
 
 - **Expected:** a key scoped to reads, or to one app's schemas, that's safe to ship in a browser.
 - **Actual:** a single key, which must not go in a client bundle.
-- **Workaround:** a JSON-RPC pass-through on our API that adds the key and allows only read methods.
+- **Workaround:** a JSON-RPC pass-through on our API that adds the key and allows only the methods the app needs:
+  reads, plus relaying transactions users have already signed.
 - **Cost:** our server sits in the read path, which is what we wanted to avoid.
 - **Ask:** a scoped, rate-limited read key.
 
