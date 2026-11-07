@@ -29,7 +29,7 @@ function LeaveIcon() {
   );
 }
 
-/** The small sign-out button at the bottom right of the menu, beside the name. */
+/** The sign-out button at the bottom of the menu, beside the name. */
 function SignOutButton() {
   const signOut = useSignOut();
   const [busy, setBusy] = useState(false);
@@ -47,9 +47,10 @@ function SignOutButton() {
       disabled={busy}
       aria-label="Sign out of this device"
       title="Sign out of this device"
-      className="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-danger transition-colors hover:bg-danger-soft disabled:opacity-50"
+      className="inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-2 rounded-full px-3.5 text-sm font-semibold text-danger ring-1 ring-danger/20 transition-colors hover:bg-danger-soft disabled:cursor-wait disabled:opacity-50"
     >
       <LeaveIcon />
+      {busy ? "Signing out…" : "Sign out"}
     </button>
   );
 }

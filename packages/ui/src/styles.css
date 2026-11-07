@@ -466,3 +466,15 @@
   overflow: visible;
   max-width: min(92vw, 30rem);
 }
+
+/* Tailwind v4 gives buttons the default arrow; every clickable control here shows the hand instead. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary,
+  select:not(:disabled),
+  label:has(> input[type="checkbox"]),
+  label:has(> input[type="radio"]) {
+    cursor: pointer;
+  }
+}
