@@ -28,7 +28,7 @@ License: [MIT](LICENSE).
 
 | Where | How |
 |---|---|
-| Website | Live link added at deploy time. Sign in with a wallet, or press **Try it** with no wallet (two fresh identities in one tab) |
+| Website | [Open Haven](https://havenethglobal.xyz). Sign in with a wallet, or press **Try it** with no wallet (two fresh identities in one tab) |
 | Phone | Open the website → Settings → **Install the app**. Android also gets "Share to Haven" |
 
 Everything runs on Sepolia (ENSv2), Arkiv's Rabdi testnet and Swarm. Nothing is mocked or pre-seeded: every value on
@@ -54,8 +54,9 @@ screen is read live.
 
 1. **Sign in.** You sign one domain-bound message (SIWE). Every Haven key is derived from that signature on your
    device: drive key, room keys and stealth keys. Keys never leave the device.
-2. **Get a name.** Claim `you.haven.eth` for free (the API pays the gas and keeps no role afterwards), or bring your own
-   ENSv2 `.eth`. Your resolver publishes a `haven.key` record, which is how anyone can share with you.
+2. **Get a name.** Claim `you.haven.eth` for free (the API pays the gas and keeps no role on your new resolver or
+   drive root), or link an ENSv2 name you control. Haven publishes a signed public key log for sharing; claimed names
+   also publish a `haven.key` resolver record.
 3. **Make a folder.** Every folder is an ENS name whose subregistry is a `DriveRegistry`, our one contract. A folder is
    either in your drive (`f-….you.haven.eth`) or an unlinked room (`r-….rooms.haven.eth`).
 4. **Upload.** Files are encrypted and padded to fixed size buckets in the browser, then stored on Swarm. Arkiv gets a
@@ -65,9 +66,15 @@ screen is read live.
    - grants it a role that ends on its own (`grantRolesUntil`);
    - funds it with gas dust if it's an editor or manager (viewers send no transactions);
    - leaves a sealed welcome note on Arkiv that only the recipient can find.
-6. **Access ends.** Each folder's key changes every epoch, and keys only chain backwards. A member gets the last key
-   that ends by their end date, so new files lock for them with no transaction. Their onchain role ends, and Arkiv
-   deletes their key copy.
+6. **Access ends.** Each folder's key changes every epoch, and keys only chain backwards. Viewers and editors receive
+   an epoch key limited by their end date; their onchain role expires and their Arkiv key copy leaves the query surface.
+   Managers receive the folder secret, so rotate the keys when removing one. Anyone can keep files they already opened.
+
+For a team, open **Groups**, create a group, and add members by ENS name. The group's list includes its creator and
+members. Share a folder with the group to grant each eligible member access. When the group's owner changes its members,
+the app attempts to sync their access to the owner's shared folders in the background; check receipts for failures.
+Team rules can also be synced manually. Changes require a manager's client to run, so access is not removed until sync
+and key refresh complete.
 
 Design: [`docs/plan/HAVEN_PLAN.md`](docs/plan/HAVEN_PLAN.md). Protocol details: [`docs/protocol.md`](docs/protocol.md).
 
@@ -325,7 +332,7 @@ No funds move in the product beyond gas dust.
 - **Keys live in the browser.** XSS or a malicious browser extension would expose them. They hold only gas dust and can't
   upgrade anything.
 - **Member cap.** ENS caps each role at 15 holders per folder. `sweep` frees expired slots.
-- **Not production-ready.** ENSv2 on Sepolia is pre-launch, and `DriveRegistry` is unaudited.
+- **Not production-ready.** Haven targets Sepolia and the Arkiv testnet, and `DriveRegistry` is unaudited.
 
 ---
 ## Repository
