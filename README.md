@@ -1,19 +1,21 @@
 # Haven
 
-**Private file sharing with ENS names. Nobody else can tell who you shared with, and access ends on its own.**
+**Private file sharing with ENS names, onchain permissions, Arkiv and Swarm.**
 
 Sharing sensitive files today means a bad trade-off:
 - **Google Drive and DocSend** see every file and every viewer.
 - **Putting access onchain is worse:** anyone can read which investors got your data room.
 
-Haven lets you share a folder with any ENS name so that only you and the recipient know:
-- **Hidden members.** Each recipient gets access as a fresh random (stealth) address that can't be traced to their name.
-- **Unlinked rooms.** A data room can have a random name that isn't connected to you at all.
-- **Access that ends on its own.** When a member's time is up, every file added after that is unreadable to them. It's
-  enforced by encryption, with no transaction.
-- **Nothing in the clear.** Files are encrypted and padded in your browser, stored on **Swarm**, and indexed on **Arkiv**.
-  Roles live in **ENSv2** on Sepolia.
-- **Private by default.** Chain and database lookups go through **Anon-RPC**, so RPC providers can't see who is asking.
+Haven lets you share a folder with an ENS name that has a Haven public key:
+- **Private membership.** Each share uses a fresh stealth address instead of publishing the recipient's ENS name as a
+  room member. Managers know who they invited; timing, network traffic and other metadata can still reveal patterns.
+- **Unlinked rooms.** A room uses a random name and a separate key rather than being registered under your named drive.
+- **Time-limited access.** Onchain roles expire, and viewers and editors receive epoch keys limited by their end date.
+  Revocation and key refresh handle early removal; anyone can keep files they have already decrypted.
+- **Encrypted files.** Files are encrypted and padded in your browser, stored on **Swarm**, and indexed on **Arkiv**.
+  Sensitive metadata is sealed; addresses, timestamps, encrypted-file references and padded sizes may be public.
+- **Private-network routing.** **Anon-RPC** can route chain and database lookups through Nym, Nox or Tor. Settings and
+  receipts show the selected network and direct requests.
 
 Built at **ETHGlobal Mumbai 2026** for three tracks:
 - **ENS:** Best use of ENSv2.
@@ -32,7 +34,22 @@ License: [MIT](LICENSE).
 | Phone | Open the website → Settings → **Install the app**. Android also gets "Share to Haven" |
 
 Everything runs on Sepolia (ENSv2), Arkiv's Rabdi testnet and Swarm. Nothing is mocked or pre-seeded: every value on
-screen is read live.
+screen is read live. The startup animation plays once per page load, not on in-app navigation; click it or press Escape
+to skip it.
+
+### Features
+
+| Feature | How it works |
+|---|---|
+| Identity and onboarding | Sign in with a supported wallet or try two demo identities. Claim a sponsored `you.haven.eth` name or link an ENSv2 name you control. The app publishes a signed public-key history and checks for unexpected key changes before sharing. |
+| Folders and rooms | Organize files in named-drive folders or create a room with its own random ENS name and key. Subfolders can inherit the parent folder's members. |
+| File workflows | Upload encrypted files, preview and download them, see versions, and download a folder as a ZIP. Authorized managers can delete files. |
+| Sharing and permissions | Share with an ENS name as a viewer, editor or manager, choose an end date, and remove access early with a key refresh. File owners can create time-limited links to individual files. |
+| Groups and teams | Create a group, add ENS names and share a folder with its members. Alternatively, share with eligible direct subnames of an ENS namespace and sync membership changes. Group views include the creator and members. |
+| Anonymous uploads | When at least two eligible writers have joined, Semaphore proofs can authorize an upload without identifying which writer made it. Until then the app uses signed uploads. Availability depends on the configured proving service. |
+| Public view and receipts | Inspect onchain roles, encrypted Arkiv records, padded Swarm sizes and ignored writes. Receipts show transaction links, progress and whether requests were private or direct. |
+| Live updates | Encrypted Swarm GSOC doorbells notify members to recheck Arkiv when configured; the client polls as a fallback. |
+| Installable web app | Install Haven on a phone; Android can also send files to Haven from the system share sheet. |
 
 ---
 
@@ -52,8 +69,9 @@ screen is read live.
                                    /arkiv-rpc /upload /bytes
 ```
 
-1. **Sign in.** You sign one domain-bound message (SIWE). Every Haven key is derived from that signature on your
-   device: drive key, room keys and stealth keys. Keys never leave the device.
+1. **Sign in.** With a supported wallet, you sign a domain-bound message (SIWE); a new wallet signs the same message
+   twice to check its signatures are stable. Haven derives your private keys on the device. **Try it** uses local random
+   identities instead.
 2. **Get a name.** Claim `you.haven.eth` for free (the API pays the gas and keeps no role on your new resolver or
    drive root), or link an ENSv2 name you control. Haven publishes a signed public key log for sharing; claimed names
    also publish a `haven.key` resolver record.
@@ -94,17 +112,17 @@ layer of a file system**:
 - **Onchain access history.** `wasAllowed(account, role, t)` answers "could this address do this at time *t*?" as a
   view call. Haven's Arkiv validator relies on it, and any other app can too.
 - **Sharing to a name without revealing it.** The recipient's `haven.key` text record (on their own
-  `PermissionedResolver`) lets the sharer derive a stealth address. Their name never appears onchain next to the
-  folder.
+  `PermissionedResolver`) or signed key log lets the sharer derive a stealth address. The role grant contains that
+  address, not the recipient's ENS name.
 - **More of ENSv2, used for real features:**
   - **Namespace aliasing** mounts a shared folder into your own tree.
   - **Expiring subnames** are share links that stop working at their end date.
   - **Groups** are their own registries (`g-….you.haven.eth`).
   - **"Share with everyone at `acme.eth`"** reads a team's subnames and keeps the folder's members in sync with them.
-- **Safety.** The registry is frozen against upgrades. Dangerous powers stay with your main wallet, while the everyday
-  key in the app holds only gas dust.
-- **Gasless names without trusting us.** The API registers `you.haven.eth` and then holds no role on it. The client
-  checks this onchain (`verifyClaim`).
+- **Safety.** The registry blocks upgrades. For named drives, dangerous powers are separated from the everyday key;
+  an unlinked room uses its own key for both so that it does not expose the owner's wallet.
+- **Sponsored names.** The API registers `you.haven.eth`; the client checks that the relayer retained no role on its
+  resolver or drive root (`verifyClaim`). The API still holds registrar permissions on the parent namespace.
 - **No hardcoded values.** Addresses come from `contracts/deployments/sepolia.json`. Everything shown is read live from
   Sepolia.
 
@@ -123,36 +141,39 @@ The Arkiv judging files are in [`arkiv/`](arkiv/):
 
 What's different about this use:
 
-- **Who may write is decided by ENS.** On Arkiv, anyone can create an entity that matches a query. So every Haven
-  entity is created read-only, and the client accepts it only if its `$creator` held the right `DriveRegistry` role at
-  `$createdAt`. Entries planted by anyone else never show. The Public view counts them.
-- **Expiry means access ends.** A guest's key copy and welcome note expire when their access does. So even a new
-  device can't fetch them afterwards, and the database deletes them, not our server. Share links expire the same way.
-- **Private data in a public database.** Only addresses, random ids, version numbers and week buckets are indexed.
-  Names, file metadata, member lists and keys are sealed (AES-256-GCM). Even so, every screen is one indexed query.
+- **Who may write is checked against ENS.** Anyone can create an entity matching a query. For folder records, Haven
+  checks that the creator held the appropriate `DriveRegistry` role when the record was created; invalid writes are
+  ignored and counted in the Public view. Other record types, such as key logs, have their own signature checks.
+- **Time-scoped records.** A guest's key copy and welcome note expire with the share and stop appearing in normal Arkiv
+  queries. Share-link records expire too. Expiry cannot erase data a recipient or observer has already saved.
+- **Private data in a public database.** Indexed attributes include addresses, random IDs, versions and week buckets.
+  File names, file keys and member rosters are sealed with AES-256-GCM; public key logs and Swarm references are public.
 - **A public key directory keyed by ENS name** (`haven.keylog`). It's a signed, hash-chained history of each name's
   encryption key. Any app can look up a name's key, and tell a swapped key from a real change, with one Arkiv query.
-- **A signed release log** (`haven.release`, `haven.rebuild`). Every website build is signed on Arkiv with its file
-  hashes, and anyone who rebuilds a commit can post a matching `haven.rebuild`.
+- **A signed release log** (`haven.release`, `haven.rebuild`). The release tooling can publish signed file hashes and
+  let anyone who rebuilds a commit post a matching `haven.rebuild`; an ordinary Vercel deployment is not automatically
+  a signed Swarm release.
 - **Swarm bonus.**
-  - **Storage:** file contents live on Swarm as padded ciphertext, and Arkiv holds the sealed pointer.
-  - **Live updates:** Swarm GSOC "doorbells" tell members to re-check Arkiv.
-  - **The website itself** is also published to Swarm.
+  - **Storage:** file contents live on Swarm as padded ciphertext. Arkiv holds the public ciphertext reference and
+    sealed metadata, including the file key.
+  - **Live updates:** encrypted Swarm GSOC "doorbells" tell members to re-check Arkiv when configured. Polling is the
+    fallback; delivery with the current Bee light-node setup still needs live verification.
+  - **Website hosting:** the release tooling can publish a site build to Swarm.
 
 Thirteen entity types in total, defined in [`packages/core/src/arkiv.ts`](packages/core/src/arkiv.ts).
 
 ### Ethereum Foundation: Anon-RPC on every call, isolated per identity
 
-- **On by default everywhere:**
-  - **Coverage:** web and phone app.
-  - **Traffic:** all JSON-RPC traffic for Sepolia (ENS, roles) and Arkiv.
-  - **Networks:** Nym, Nox or Tor, chosen in Settings. Turning it off shows a red "Not private" banner.
-- **One isolation key per room and per stealth address.** Even an Anon-RPC exit can't tell that two of your rooms, or
-  two of your shares, belong to the same person.
+- **Configurable private-network routing:**
+  - **Coverage:** web and the installable phone app.
+  - **Traffic:** Sepolia and Arkiv JSON-RPC requests use the selected Anon-RPC transport when it can reach the endpoint.
+  - **Networks:** Nym, Nox, Tor or off, chosen in Settings. Settings and receipts indicate direct traffic.
+- **Isolation keys.** Room and member requests use separate isolation keys to reduce linkability across shares; this
+  does not guarantee anonymity against traffic analysis or other metadata leaks.
 - **Every call is labelled.** The receipts panel marks each request "Private" or "Direct". Settings checks whether file
   traffic can be routed by making a real request rather than assuming.
-- **A signed, reproducible frontend.** Each release's file hashes are signed on Arkiv and the build is stored on
-  Swarm, with `haven.eth`'s contenthash pointing to it, so anyone can rebuild a commit and check what is served.
+- **Reproducible release tooling.** The optional release workflow signs build hashes on Arkiv and publishes the build
+  to Swarm; it can also update `haven.eth`'s contenthash. Its output must be published separately from Vercel.
 - **No trackers.** There are no analytics and no third-party scripts. Fonts are self-hosted, and a strict
   Content-Security-Policy allows only our own scripts.
 
@@ -163,16 +184,16 @@ Thirteen entity types in total, defined in [`packages/core/src/arkiv.ts`](packag
 - **C:**
   - **What we control:** the website domain (Vercel), the API relayer (free names, rooms, gas drips, uploads, the Arkiv
     pass-through and the Swarm gateway), its Bee node, and the default RPC settings.
-  - **If any of it goes away or refuses you:** open the same build from Swarm through `haven.eth`'s contenthash, bring
-    your own `.eth` name and gas, use any Bee node, switch Anon-RPC network, or self-host the API from this repo. Your
-    data stays on Sepolia, Arkiv and Swarm.
+  - **Alternatives:** self-host the API and frontend, use your own compatible ENSv2 name, gas and Bee node, or select a
+    different Anon-RPC network. The release tooling can publish a Swarm copy through `haven.eth`; availability depends
+    on a release having been published and the required network services remaining available.
 - **O:**
   - **License:** MIT.
   - **Run it yourself:** contracts, core, API, website, phone app and Bee node config all build and run from
     this repo alone. You supply only your own testnet keys, RPC URL, Arkiv access key and Swarm postage batch.
 - **P:**
-  - **RPC providers, Arkiv and the Anon-RPC exits** see requests but not who sent them. Requests are split by room and
-    stealth address.
+  - **RPC providers, Arkiv and Anon-RPC exits** see request contents. Private routing and isolation keys reduce the
+    link between requests and the user; direct requests and network metadata may expose IP addresses or patterns.
   - **Our API** sees:
     - claim requests (a public name and key);
     - Arkiv queries;
@@ -183,9 +204,11 @@ Thirteen entity types in total, defined in [`packages/core/src/arkiv.ts`](packag
 - **S:**
   - **Keys:** derived on the device from one domain-bound signature, never sent anywhere, and stored encrypted under a
     non-extractable WebCrypto key.
-  - **Files:** every file and record is encrypted before it leaves the device.
-  - **Trust assumptions:** you trust the website code (signed releases let you check it), your wallet, and the ENSv2 contracts
-    (pre-launch). `DriveRegistry` is unaudited. Our API, the RPCs, Arkiv and Swarm only ever see ciphertext.
+  - **Files:** file contents and sensitive metadata are encrypted before upload. Arkiv also contains public fields,
+    including identifiers, ciphertext references and public-key logs.
+  - **Trust assumptions:** you trust the website code, wallet and ENSv2 contracts. Signed Swarm releases can be checked
+    when published. `DriveRegistry` is unaudited. The API, RPCs, Arkiv and Swarm see public metadata and ciphertext;
+    routed and direct traffic have different privacy properties.
 
 More detail on P is in "Who can link what" below.
 
@@ -196,7 +219,7 @@ More detail on P is in "Who can link what" below.
 Needs Node 22+, pnpm 11 and Foundry.
 
 ```bash
-git clone --recurse-submodules <this repo> && cd ETHGlobalMumbai
+git clone --recurse-submodules https://github.com/Arav-Arun/Haven.git && cd Haven
 pnpm install
 cd contracts && forge build && cd ..
 pnpm -r test                     # every package's tests
@@ -244,7 +267,7 @@ Set `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` for mobile wallet links. Without it, 
 This uploads the site to Swarm, writes `haven.release` on Arkiv and points `haven.eth` at the Swarm copy. Anyone can rebuild a commit and run
 `release rebuild <rootHash>`.
 
-**6. End to end.** With the API running and `API_URL` set, run `pnpm --filter @haven/core e2e`. Three random
+**5. End to end.** With the API running and `API_URL` set, run `pnpm --filter @haven/core e2e`. Three random
 identities run the whole story:
 - a room and an upload;
 - shares that end;
@@ -301,11 +324,11 @@ const log = await arkiv.select().from(KeyLogSchema).where(eq("ensName", str("inv
 
 | Party | Can link | Can't link |
 |---|---|---|
-| Anyone (Sepolia, Arkiv, Swarm) | A named-drive folder to its owner's name; a member's random address to the folder or room it's in; counts, end dates, timing, padded sizes | A member's address to their name or their other shares; a room to its owner |
+| Anyone (Sepolia, Arkiv, Swarm) | A named-drive folder to its owner's name; a member's random address to the folder or room it's in; counts, end dates, timing, padded sizes | No direct ENS-name label on a stealth grant; the room's random name does not itself identify its owner |
 | Owner and managers | Every member's address to their name (they shared it) | – |
 | Other members | Members who chose to be visible | Hidden members |
 | Our API | Public keys of named drives; Arkiv queries; upload and drip requests per key; weak timing hints | IPs (when routed); room → owner (proof-of-work requests, batched drips) |
-| RPC providers / Anon-RPC exits | Requests, not who sent them | – |
+| RPC providers / Anon-RPC exits | Requests and any network metadata visible to them; direct requests can include the user's IP | Plaintext file contents and sealed metadata |
 | Our Swarm gateway, if HTTPS isn't routed | Your IP ↔ which encrypted blobs you fetched | Contents, names, identities |
 | Our API and Bee node (doorbells) | Your IP ↔ which doorbell chunk addresses you listen to, and when | Which folder a topic belongs to, or anything in a ring |
 | Anyone (key log) | A name's public keys and when they changed; how many devices it lists | Device labels (sealed), which folders it's in |
@@ -316,7 +339,7 @@ const log = await arkiv.select().from(KeyLogSchema).where(eq("ensName", str("inv
 |---|---|---|
 | Claim name / create room | API registrar key (we sponsor onboarding) | Bring your own `.eth`; rooms wait |
 | Create folder, share (`grantRolesUntil` + gas for editors) | The owner, or a manager | – |
-| Access ends | Nobody | Ends automatically (epoch keys, role expiry, Arkiv expiry) |
+| Access ends | Nobody | Onchain role and Arkiv record expire; viewer/editor keys limit future epochs. Managers have the folder secret until a key refresh |
 | Early removal + key refresh | A manager | Access lasts until its end date |
 | `sweep` (frees an expired member's slot) | Anyone | The grant stays stored but inactive |
 | Key log entry | The user signs; the API relays | Nobody can share with that name until the app writes it (it retries on every open) |
@@ -332,6 +355,8 @@ No funds move in the product beyond gas dust.
 - **Keys live in the browser.** XSS or a malicious browser extension would expose them. They hold only gas dust and can't
   upgrade anything.
 - **Member cap.** ENS caps each role at 15 holders per folder. `sweep` frees expired slots.
+- **Live updates and signed releases.** GSOC delivery on the current light node needs live verification; polling is the
+  fallback. Swarm frontend releases are an explicit publishing step, separate from Vercel deployment.
 - **Not production-ready.** Haven targets Sepolia and the Arkiv testnet, and `DriveRegistry` is unaudited.
 
 ---
