@@ -35,7 +35,8 @@ function VerifyInPerson({ info }: { info: KeyInfo }) {
 function Profile({ name }: { name: string }) {
   const { identity } = useDrive();
   const now = useNow(10_000);
-  const info = useLoad((c) => c.lookupKey(name), [name]);
+  // The last result for this name shows at once while a fresh one loads (it's all public: the log and its fingerprint).
+  const info = useLoad((c) => c.lookupKey(name), [name], `key:${name}`);
   const own = identity?.ensName === name;
   if (info.loading && !info.data) return <Skeleton rows={5} />;
   if (info.error) return <ErrorNote error={info.error} />;

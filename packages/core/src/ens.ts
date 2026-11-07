@@ -404,6 +404,8 @@ export interface ListChildrenOptions {
   toBlock?: bigint;
   /** Largest block range per eth_getLogs call; halved automatically when a provider refuses a range. */
   maxRange?: bigint;
+  /** Only names whose latest registration went to this owner (checked before their registries are read). */
+  owner?: Address;
 }
 
 /**
@@ -443,7 +445,8 @@ export async function listChildren(
       blockNumber: log.blockNumber,
     });
   }
-  const children = [...byLabel.values()];
+  const owner = options.owner;
+  const children = [...byLabel.values()].filter((c) => !owner || isAddressEqual(c.owner, owner));
   const subs = await subregistries(client, registry, children.map((c) => c.label));
   children.forEach((child, i) => (child.registry = subs[i]!));
   return children;

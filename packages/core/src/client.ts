@@ -225,7 +225,9 @@ const MIN_TGLM = parseEther("0.0003");
 const READ_CACHE_S = 15;
 /** How many weeks of welcome notes "Shared with me" scans on a first look. */
 const WELCOME_WEEKS = 8;
-const STORE = { seed: "seed", name: "name", shares: "shares", rooms: "rooms", device: "device", tofu: "tofu", synced: "subtree-sync" } as const;
+const STORE = { seed: "seed", name: "name", root: "root", shares: "shares", rooms: "rooms", device: "device", tofu: "tofu", synced: "subtree-sync" } as const;
+/** How long a name's key log, once read, is reused for showing it (never for sharing or writing to it). */
+const KEY_LOG_CACHE_S = 30;
 /** A device entry is renewed when it has less than this left (it lasts 90 days). */
 const DEVICE_RENEW_SECONDS = 30 * 86_400;
 /** How often "live" folders are re-read when no Swarm subscription is open. */
@@ -305,6 +307,15 @@ interface StoredShare {
   seen: number;
 }
 
+/** A name's key log as readKeyLog returns it. */
+interface KeyLogRead {
+  name: string;
+  controller: Address | null;
+  checked: Awaited<ReturnType<typeof checkKeyLog>>;
+  havenKey: string | null;
+  current: ReturnType<typeof currentKey>;
+}
+
 interface FolderKeys {
   reading: FolderReading;
   /** Version → my key copy (an epoch key, or the folder secret for managers). */
@@ -349,6 +360,11 @@ class Client implements HavenClient {
   private childCache = new Map<string, { at: number; children: ChildName[] }>();
   private readonly keyMemory: KeyMemory;
   private readonly gsocKeys = new Map<string, GsocKey>();
+  /** Sepolia readers with no receipt to report to, one per isolation key (see sepolia()). */
+  private readonly sepoliaReaders = new Map<string, SepoliaReader>();
+  /** Key logs read recently or being read now, by name and isolation key (see readKeyLog). */
+  private readonly keyLogReads = new Map<string, { at: number; read: Promise<KeyLogRead>; done: boolean }>();
+  private readonly signedOutListeners = new Set<() => void>();
 
   constructor(private readonly cfg: DriveConfig) {
     this.keyMemory = new KeyMemory(cfg.storage);
@@ -383,9 +399,18 @@ class Client implements HavenClient {
     };
   }
 
+  /**
+   * Contract reads made at the same moment through one reader go out as a single Multicall3 eth_call: one round trip
+   * through the private network instead of one each. Readers without a receipt to report to are reused per isolation
+   * key, so reads from different parts of the app batch too. Never across isolation keys: that would link them.
+   */
   private sepolia(step?: StepSink, isolationKey?: string): SepoliaReader {
-    return createPublicClient({
+    const id = isolationKey ?? "";
+    const reused = step ? undefined : this.sepoliaReaders.get(id);
+    if (reused) return reused;
+    const reader = createPublicClient({
       chain: sepolia,
+      batch: { multicall: true },
       transport: anonTransport({
         url: this.cfg.sepoliaRpcUrl,
         anon: this.cfg.anon,
@@ -393,6 +418,8 @@ class Client implements HavenClient {
         onRoute: this.routeSink("Sepolia lookups", step),
       }),
     }) as SepoliaReader;
+    if (!step) this.sepoliaReaders.set(id, reader);
+    return reader;
   }
 
   private sepoliaWriter(key: Hex, step?: StepSink, isolationKey?: string): SepoliaWriter {
@@ -429,6 +456,7 @@ class Client implements HavenClient {
   private clearReadCaches(): void {
     this.folderReads.clear();
     this.folderSummaries.clear();
+    for (const [id, r] of this.keyLogReads) if (r.done) this.keyLogReads.delete(id);
   }
 
   private arkivWriter(key: Hex, step?: StepSink, isolationKey?: string): ArkivWriter {
@@ -552,7 +580,9 @@ class Client implements HavenClient {
   /** The name a wallet (or a passkey/"Try it" drive key) claimed, found from haven.eth's registrations. */
   private async nameOwnedBy(owner: Address): Promise<string | null> {
     const app = requireDeployed("appRegistry");
-    const mine = (await this.children(app, true)).filter((c) => isAddressEqual(c.owner, owner) && c.registry);
+    // Only this owner's names get their registry read, not every haven.eth name (the log scan itself is one pass).
+    const theirs = await listChildren(this.sepolia(), app, { fromBlock: BigInt(haven.driveRegistryImplBlock ?? 0), owner });
+    const mine = theirs.filter((c) => c.registry);
     const last = mine.sort((a, b) => Number(b.blockNumber - a.blockNumber))[0];
     return last ? `${last.label}.haven.eth` : null;
   }
@@ -577,10 +607,16 @@ class Client implements HavenClient {
     const name = await this.nameOwnedBy(keys.wallet ?? keys.driveAddress);
     if (name) {
       assertMatchesPublished(keys, await getHavenKey(this.sepolia(), name));
-      this.driveRoot = await findRegistry(this.sepolia(), name);
+      await this.setDriveRoot(await findRegistry(this.sepolia(), name));
     }
     this.ensName = name;
     await this.cfg.storage.set(STORE.name, json(name));
+  }
+
+  /** Kept on this device too, so the app can open without looking it up first. */
+  private async setDriveRoot(root: Address | null) {
+    this.driveRoot = root;
+    await this.cfg.storage.set(STORE.root, json(root));
   }
 
   async signIn(source: SignInSource): Promise<Identity> {
@@ -610,19 +646,44 @@ class Client implements HavenClient {
     const keys = deriveKeys(importSeed(seed));
     this.keys = keys;
     this.ensName = parse<string | null>(await this.cfg.storage.get(STORE.name));
-    if (this.ensName) this.driveRoot = await findRegistry(this.sepolia(), this.ensName).catch(() => null);
-    else await this.loadName(keys).catch(() => undefined);
-    if (this.ensName) {
-      // A device the user revoked from another device signs itself out here (a copy of the seed taken elsewhere is
-      // not stopped by this; see the README).
-      const device = await this.ensureDevice().catch(() => "unknown" as const);
-      if (device === "revoked") {
-        await this.signOut();
-        return null;
-      }
-      void this.ensureOwnKeyLog().catch(() => undefined);
+    if (!this.ensName) {
+      // No name on this device yet: it has to be looked up before the app knows who this is.
+      await this.loadName(keys).catch(() => undefined);
+      return this.identity();
     }
+    this.driveRoot = parse<Address | null>(await this.cfg.storage.get(STORE.root));
+    // Saved before this was kept on the device: looked up once, then stored.
+    if (!this.driveRoot) await this.setDriveRoot(await findRegistry(this.sepolia(), this.ensName).catch(() => null));
+    // The app opens with what this device knows; the checks that need the network run behind it.
+    void this.checkSession(keys);
     return this.identity();
+  }
+
+  /**
+   * After restore: refreshes the drive root, and checks this device against the public device list. A device the user
+   * revoked from another device signs itself out here, and onSignedOut listeners hear it (a copy of the seed taken
+   * elsewhere is not stopped by this; see the README). Also publishes this identity's key if its log doesn't have it.
+   */
+  private async checkSession(keys: IdentityKeys): Promise<void> {
+    const name = this.ensName;
+    if (!name) return;
+    void this.ensureOwnKeyLog().catch(() => undefined);
+    const [root, device] = await Promise.all([
+      findRegistry(this.sepolia(), name).catch(() => undefined),
+      this.ensureDevice().catch(() => "unknown" as const),
+    ]);
+    if (this.keys !== keys) return; // signed out, or someone else signed in, meanwhile
+    if (device === "revoked") {
+      await this.signOut();
+      for (const l of this.signedOutListeners) l();
+      return;
+    }
+    if (root !== undefined) await this.setDriveRoot(root).catch(() => undefined);
+  }
+
+  onSignedOut(listener: () => void): () => void {
+    this.signedOutListeners.add(listener);
+    return () => void this.signedOutListeners.delete(listener);
   }
 
   async signOut(): Promise<void> {
@@ -632,6 +693,7 @@ class Client implements HavenClient {
     this.driveRoot = null;
     this.holdings.clear();
     this.fileCache.clear();
+    this.keyLogReads.clear();
   }
 
   async exportSeed(): Promise<Uint8Array> {
@@ -668,7 +730,7 @@ class Client implements HavenClient {
       });
       step({ kind: "check", label: "The API kept no role, and haven.key is your key", detail: claimed.ensName, ok: true });
       this.ensName = claimed.ensName;
-      this.driveRoot = claimed.driveRoot;
+      await this.setDriveRoot(claimed.driveRoot);
       await this.cfg.storage.set(STORE.name, json(claimed.ensName));
       // Add-on F1: seq 0 of the name's public key log, and this device. Relayed by the API, so no gas is needed.
       try {
@@ -1474,15 +1536,37 @@ class Client implements HavenClient {
 
   async lookupRecipient(input: string): Promise<{ ensName: string; canReceive: boolean }> {
     const name = normName(input);
-    const r = await this.readKeyLog(name).catch(() => null);
+    // Only shown while typing a name; share() reads the log again, fresh, before using the key.
+    const r = await this.readKeyLog(name, undefined, undefined, KEY_LOG_CACHE_S).catch(() => null);
     const canReceive = !!r && !r.checked.problem && !!r.current && ensAgreement(r.current, r.havenKey) !== "mismatch";
     return { ensName: name, canReceive };
   }
 
   // ------------------------------------------------------------ F1: public key directory (keydir.ts)
 
+  /**
+   * A name's key log, checked. A read already in flight for the same name is shared. `maxAgeS` lets a finished read be
+   * reused for that long: only for showing a log (the profile page asks for the same one several times). Sharing and
+   * writing to a log pass nothing, so they always see it as it is now.
+   */
+  private readKeyLog(name: string, step?: StepSink, isolationKey?: string, maxAgeS = 0): Promise<KeyLogRead> {
+    const id = `${name}:${isolationKey ?? ""}`;
+    const hit = this.keyLogReads.get(id);
+    if (hit && (!hit.done || now() - hit.at < maxAgeS)) return hit.read;
+    const read = this.readKeyLogFresh(name, step, isolationKey);
+    const entry = { at: now(), read, done: false };
+    this.keyLogReads.set(id, entry);
+    read.then(
+      () => (entry.done = true),
+      () => {
+        if (this.keyLogReads.get(id) === entry) this.keyLogReads.delete(id);
+      },
+    );
+    return read;
+  }
+
   /** A name's key log, checked: controller now, valid chain, ignored (forged) entries, and the haven.key record. */
-  private async readKeyLog(name: string, step?: StepSink, isolationKey?: string) {
+  private async readKeyLogFresh(name: string, step?: StepSink, isolationKey?: string): Promise<KeyLogRead> {
     const sep = this.sepolia(step, isolationKey);
     const [controller, page, havenKey] = await Promise.all([
       nameController(sep, name).catch(() => null),
@@ -1494,7 +1578,7 @@ class Client implements HavenClient {
   }
 
   async lookupKey(name: string): Promise<KeyInfo> {
-    const r = await this.readKeyLog(normName(name));
+    const r = await this.readKeyLog(normName(name), undefined, undefined, KEY_LOG_CACHE_S);
     const times = await this.clock.timesOf(r.checked.chain.map((e) => e.createdAtBlock));
     const ensRecord = ensAgreement(r.current, r.havenKey);
     return {
@@ -1542,6 +1626,7 @@ class Client implements HavenClient {
 
   private async relayKeyLog(request: KeyLogRelayRequest, label: string, step?: StepSink): Promise<KeyLogRelayResponse> {
     const out = await this.api<KeyLogRelayResponse>("/keylog", request, step);
+    this.keyLogReads.clear(); // the log just changed: reads from before (finished or not) are out of date
     step?.({ kind: "arkiv-tx", label, hash: out.txHash, explorerUrl: `${EXPLORERS.arkiv}/tx/${out.txHash}`, ok: true });
     return out;
   }
@@ -1606,7 +1691,11 @@ class Client implements HavenClient {
     if (!this.ensName) return [];
     const { id: mine } = await this.devicePublic();
     const reader = this.arkiv();
-    const [r, entries, head] = await Promise.all([this.readKeyLog(this.ensName), listDeviceEntries(reader, this.ensName), reader.getBlockNumber()]);
+    const [r, entries, head] = await Promise.all([
+      this.readKeyLog(this.ensName, undefined, undefined, KEY_LOG_CACHE_S),
+      listDeviceEntries(reader, this.ensName),
+      reader.getBlockNumber(),
+    ]);
     const checks = await checkDevices(entries.records, r.controller, r.checked.chain, head);
     const t = now();
     return Promise.all(

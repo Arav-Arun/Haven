@@ -118,6 +118,12 @@ export interface FileProof {
 }
 
 export interface HavenClient extends DriveClient {
+  /**
+   * Hears when the client signs itself out on its own: restore() opens with what the device knows and checks it
+   * afterwards, so a device revoked elsewhere finds out after the app has opened.
+   */
+  onSignedOut(listener: () => void): () => void;
+
   /** Adds who came in through a team rule ("Via acme.eth") and who follows a parent folder. */
   listMembers(folder: Address): Promise<(Member & { rule?: string; inherited?: boolean })[]>;
   /** The permanent owner key of a group or folder registry. */

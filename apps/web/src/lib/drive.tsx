@@ -90,9 +90,16 @@ export function DriveProvider({ children }: { children: ReactNode }) {
     const off = client.onReceipt((r) =>
       setReceipts((list) => [r, ...list.filter((x) => x.id !== r.id)].sort((a, b) => b.startedAt - a.startedAt).slice(0, 50)),
     );
+    // The app opens before this device is checked; if it turns out to be revoked, the client signs out and says so here.
+    const offSignedOut = client.onSignedOut(() => {
+      if (!live) return;
+      for (const k of Object.keys(localStorage)) if (k.startsWith("haven:view:")) localStorage.removeItem(k);
+      setIdentity(null);
+    });
     return () => {
       live = false;
       off();
+      offSignedOut();
     };
   }, [client, profile]);
 
