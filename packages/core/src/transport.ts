@@ -37,6 +37,114 @@ export function isAnonymous(status: AnonStatus): boolean {
   return status.network !== "off" && status.state !== "off";
 }
 
+type RpcBody = { jsonrpc: "2.0"; id: number; method: string; params?: unknown };
+type RpcReply = { id?: number; result?: unknown; error?: { code: number; message: string } };
+
+/** One JSON-RPC call: a POST of its own. */
+async function sendOne(send: typeof fetch, url: string, body: RpcBody): Promise<unknown> {
+  let response: Response;
+  try {
+    response = await send(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  } catch (cause) {
+    throw new HttpRequestError({ url, body, cause: cause as Error, details: String(cause) });
+  }
+  if (!response.ok) {
+    throw new HttpRequestError({ url, body, status: response.status, details: await response.text().catch(() => response.statusText) });
+  }
+  const payload = (await response.json()) as RpcReply;
+  if (payload.error) throw new RpcRequestError({ body, error: payload.error, url });
+  return payload.result;
+}
+
+/** Calls that change something go alone: a batch that fails is retried call by call, which only reads may be. */
+const SENDS = new Set(["eth_sendRawTransaction", "eth_sendTransaction"]);
+/** At most this many calls per batch (the Haven API's Arkiv pass-through takes up to 50). */
+const MAX_BATCH = 20;
+/**
+ * How long a call waits for others to join its batch. viem's multicall batching hands over its eth_call a timer tick
+ * after the reads around it, so 0 would split them; a few ms is nothing next to a round trip through a mixnet.
+ */
+const BATCH_WAIT_MS = 8;
+/** Endpoints that answered a batch with something other than a list: they get one call per request from then on. */
+const unbatched = new Set<string>();
+
+/**
+ * Calls made at the same moment for one endpoint, through one route and isolation key, leave as one JSON-RPC batch:
+ * one round trip through the private network instead of one per call. A page's reads mostly start together (a folder's
+ * seven Arkiv queries, a list's block times and role checks), so this is most of the waiting on a mixnet. Calls under
+ * different isolation keys never share a batch, so batching links nothing the network couldn't already link.
+ */
+class Batcher {
+  private waiting: { body: RpcBody; resolve: (v: unknown) => void; reject: (e: unknown) => void }[] = [];
+  private scheduled = false;
+
+  constructor(
+    private readonly send: typeof fetch,
+    private readonly url: string,
+  ) {}
+
+  call(body: RpcBody): Promise<unknown> {
+    return new Promise((resolve, reject) => {
+      this.waiting.push({ body, resolve, reject });
+      if (this.scheduled) return;
+      this.scheduled = true;
+      setTimeout(() => this.flush(), BATCH_WAIT_MS);
+    });
+  }
+
+  private flush() {
+    this.scheduled = false;
+    const all = this.waiting;
+    this.waiting = [];
+    for (let i = 0; i < all.length; i += MAX_BATCH) void this.sendBatch(all.slice(i, i + MAX_BATCH));
+  }
+
+  private async sendBatch(calls: Batcher["waiting"]) {
+    const alone = (c: Batcher["waiting"][number]) => sendOne(this.send, this.url, c.body).then(c.resolve, c.reject);
+    if (calls.length === 1 || unbatched.has(this.url)) {
+      await Promise.all(calls.map(alone));
+      return;
+    }
+    // Ids are given here: calls from different clients share a batch, and their own ids may repeat.
+    const bodies = calls.map((c, i) => ({ ...c.body, id: i + 1 }));
+    let replies: RpcReply[];
+    try {
+      const response = await this.send(this.url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(bodies) });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const payload = (await response.json()) as unknown;
+      if (!Array.isArray(payload)) {
+        unbatched.add(this.url);
+        throw new Error("this endpoint doesn't take batches");
+      }
+      replies = payload as RpcReply[];
+    } catch {
+      // Reads only, so each can simply be asked again on its own.
+      await Promise.all(calls.map(alone));
+      return;
+    }
+    const byId = new Map(replies.map((r) => [r.id, r]));
+    await Promise.all(
+      calls.map(async (c, i) => {
+        const reply = byId.get(i + 1);
+        if (!reply) return alone(c); // left out of the answer: asked again on its own
+        if (reply.error) c.reject(new RpcRequestError({ body: c.body, error: reply.error, url: this.url }));
+        else c.resolve(reply.result);
+      }),
+    );
+  }
+}
+
+const batchers = new WeakMap<AnonFetch, Map<string, Batcher>>();
+
+function batcherFor(anon: AnonFetch, route: string, url: string, send: typeof fetch): Batcher {
+  let byRoute = batchers.get(anon);
+  if (!byRoute) batchers.set(anon, (byRoute = new Map()));
+  const id = `${route}\n${url}`;
+  let b = byRoute.get(id);
+  if (!b) byRoute.set(id, (b = new Batcher(send, url)));
+  return b;
+}
+
 export function anonTransport(options: AnonTransportOptions): CustomTransport {
   let nextId = 0;
   return custom(
@@ -57,28 +165,10 @@ export function anonTransport(options: AnonTransportOptions): CustomTransport {
           ...(options.isolationKey ? { isolationKey: options.isolationKey } : {}),
         });
 
-        const body = { jsonrpc: "2.0" as const, id: ++nextId, method, params };
-        let response: Response;
-        try {
-          response = await send(options.url, {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify(body),
-          });
-        } catch (cause) {
-          throw new HttpRequestError({ url: options.url, body, cause: cause as Error, details: String(cause) });
-        }
-        if (!response.ok) {
-          throw new HttpRequestError({
-            url: options.url,
-            body,
-            status: response.status,
-            details: await response.text().catch(() => response.statusText),
-          });
-        }
-        const payload = (await response.json()) as { result?: unknown; error?: { code: number; message: string } };
-        if (payload.error) throw new RpcRequestError({ body, error: payload.error, url: options.url });
-        return payload.result;
+        const body: RpcBody = { jsonrpc: "2.0", id: ++nextId, method, params };
+        if (SENDS.has(method)) return sendOne(send, options.url, body);
+        const route = !reachable ? "direct" : `anon:${options.isolationKey ?? ""}`;
+        return batcherFor(options.anon, route, options.url, send).call(body);
       },
     },
     { retryCount: 0 },

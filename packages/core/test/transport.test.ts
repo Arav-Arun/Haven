@@ -70,6 +70,69 @@ describe("anonTransport", () => {
   });
 });
 
+describe("anonTransport batching", () => {
+  /** An AnonFetch whose endpoint answers each call with its method name, singly or as a batch (or refuses batches). */
+  function batchAnon(opts: { refuseBatches?: boolean } = {}) {
+    const posts: { isolationKey: string | null; methods: string[]; batch: boolean }[] = [];
+    const make =
+      (isolationKey: string | null): typeof fetch =>
+      async (_input, init) => {
+        const body = JSON.parse(String(init?.body)) as { id: number; method: string } | { id: number; method: string }[];
+        const calls = Array.isArray(body) ? body : [body];
+        posts.push({ isolationKey, methods: calls.map((c) => c.method), batch: Array.isArray(body) });
+        if (Array.isArray(body) && opts.refuseBatches) return new Response(JSON.stringify({ jsonrpc: "2.0", id: null, error: { code: -32600, message: "no batches" } }));
+        const reply = (c: { id: number; method: string }) =>
+          c.method === "eth_fail" ? { jsonrpc: "2.0", id: c.id, error: { code: -32000, message: "boom" } } : { jsonrpc: "2.0", id: c.id, result: c.method };
+        return new Response(JSON.stringify(Array.isArray(body) ? [...calls].reverse().map(reply) : reply(calls[0]!)));
+      };
+    const anon: AnonFetch = {
+      fetch: make(null),
+      isolated: (key) => make(key),
+      supportsAnyHttps: false,
+      status: () => ({ network: "nox", state: "ready" }),
+      onStatus: () => () => {},
+      close: () => {},
+    };
+    return { anon, posts };
+  }
+  const call = (anon: AnonFetch, method: string, isolationKey?: string, url = RPC) =>
+    anonTransport({ url, anon, ...(isolationKey ? { isolationKey } : {}) })({ retryCount: 0 }).request({ method: method as never });
+
+  it("sends calls made at the same moment as one batch, and matches each answer to its call", async () => {
+    const { anon, posts } = batchAnon();
+    const results = await Promise.all([call(anon, "eth_a"), call(anon, "eth_b"), call(anon, "eth_c")]);
+    expect(results).toEqual(["eth_a", "eth_b", "eth_c"]);
+    expect(posts).toEqual([{ isolationKey: null, methods: ["eth_a", "eth_b", "eth_c"], batch: true }]);
+  });
+
+  it("never mixes isolation keys, and fails only the call that failed", async () => {
+    const { anon, posts } = batchAnon();
+    const [a, b, c] = await Promise.allSettled([call(anon, "eth_a", "0x1"), call(anon, "eth_fail", "0x1"), call(anon, "eth_c", "0x2")]);
+    expect(a).toEqual({ status: "fulfilled", value: "eth_a" });
+    expect(b.status).toBe("rejected");
+    expect(c).toEqual({ status: "fulfilled", value: "eth_c" });
+    expect(posts).toEqual([
+      { isolationKey: "0x1", methods: ["eth_a", "eth_fail"], batch: true },
+      { isolationKey: "0x2", methods: ["eth_c"], batch: false },
+    ]);
+  });
+
+  it("sends transactions on their own", async () => {
+    const { anon, posts } = batchAnon();
+    await Promise.all([call(anon, "eth_sendRawTransaction"), call(anon, "eth_a"), call(anon, "eth_b")]);
+    expect(posts).toContainEqual({ isolationKey: null, methods: ["eth_sendRawTransaction"], batch: false });
+    expect(posts).toContainEqual({ isolationKey: null, methods: ["eth_a", "eth_b"], batch: true });
+  });
+
+  it("falls back to one call per request where batches are refused", async () => {
+    const { anon, posts } = batchAnon({ refuseBatches: true });
+    // Its own URL: an endpoint that refused a batch is remembered for the rest of the run.
+    const url = "https://rpc.example/no-batches";
+    expect(await Promise.all([call(anon, "eth_a", undefined, url), call(anon, "eth_b", undefined, url)])).toEqual(["eth_a", "eth_b"]);
+    expect(posts.filter((p) => !p.batch).map((p) => p.methods[0]).sort()).toEqual(["eth_a", "eth_b"]);
+  });
+});
+
 describe("Node adapters", () => {
   it("passthroughAnon is plain fetch with the network off", () => {
     const f = (async () => ok(1)) as unknown as typeof fetch;

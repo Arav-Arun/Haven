@@ -947,19 +947,31 @@ export function listZkFiles(reader: ArkivReader, folder: Address): Promise<Page<
 
 // ---------------------------------------------------------------- time
 
-/** How many block times BlockClock.timesOf reads at once. */
-const CLOCK_READS_AT_ONCE = 4;
+/**
+ * How many block times BlockClock.timesOf reads at once. They leave together as one JSON-RPC batch (transport.ts), so
+ * this is one request, not a burst of them; it matches the transport's batch size.
+ */
+const CLOCK_READS_AT_ONCE = 20;
 
 /**
  * Arkiv's $createdAt is a BLOCK NUMBER, not a time. The validator needs the time, so this reads each block's
- * timestamp once and caches it.
+ * timestamp once and caches it. A block's time never changes, so `learned` lets the app keep them between visits
+ * (and `remember` puts them back).
  */
 export class BlockClock {
   private readonly cache = new Map<bigint, number>();
   /** Reads in flight, so two callers asking for the same block share one request. */
   private readonly pending = new Map<bigint, Promise<number>>();
 
-  constructor(private readonly reader: Pick<ArkivReader, "getBlock">) {}
+  constructor(
+    private readonly reader: Pick<ArkivReader, "getBlock">,
+    private readonly learned?: (block: bigint, time: number) => void,
+  ) {}
+
+  /** Block times known from before (e.g. kept on this device). */
+  remember(times: Iterable<[bigint, number]>): void {
+    for (const [block, time] of times) this.cache.set(block, time);
+  }
 
   async timeOf(block: bigint): Promise<number> {
     const cached = this.cache.get(block);
@@ -971,6 +983,7 @@ export class BlockClock {
         .then(({ timestamp }) => {
           const t = Number(timestamp);
           this.cache.set(block, t);
+          this.learned?.(block, t);
           return t;
         })
         .catch((error: unknown) => {
@@ -982,10 +995,7 @@ export class BlockClock {
     return read;
   }
 
-  /**
-   * A few blocks at a time: one after another, a page of records cost one private-network round trip per block. A
-   * small limit, because a burst of parallel reads through a mixnet is what fails.
-   */
+  /** Up to CLOCK_READS_AT_ONCE blocks at a time: one after another, a page of records cost a round trip per block. */
   async timesOf(blocks: Iterable<bigint>): Promise<Map<bigint, number>> {
     const list = [...new Set(blocks)];
     let next = 0;

@@ -82,10 +82,27 @@ export interface RoleCheck<R> {
   alsoRequire?: { registry: Address; account: Address; role: bigint }[];
 }
 
+/**
+ * Role checks already passed, by record and check (see checkId), with the record's creation time. A pass can't change
+ * once the time it asks about is safely in the past (a read-only record's attributes are fixed, and a registry's history
+ * is only ever appended to), so the app may keep these between visits instead of asking the chain again.
+ */
+export interface PassedChecks {
+  get(id: string): number | undefined;
+  add(id: string, createdAt: number): void;
+}
+
+/** A pass is kept only for records at least this old: until Sepolia is past their time, a grant could still land. */
+export const PASS_SETTLED_S = 10 * 60;
+
+const checkId = (c: RoleCheck<EntityInfo>) =>
+  [c.record.key, c.registry, c.role, ...(c.alsoRequire ?? []).flatMap((r) => [r.registry, r.account, r.role])].join(":").toLowerCase();
+
 export class Validator {
   constructor(
     private readonly history: AccessHistory,
     private readonly clock: Clock,
+    private readonly passed?: PassedChecks,
   ) {}
 
   /**
@@ -93,7 +110,20 @@ export class Validator {
    * creation time (and every `alsoRequire` must hold at that time too).
    */
   async checkRoles<R extends EntityInfo>(checks: RoleCheck<R>[]): Promise<Checked<R>> {
-    const out: Checked<R> = { valid: [], hidden: [] };
+    // Checks this device has seen pass before need no chain reads at all.
+    const all = checks;
+    const known: (R & { createdAt: number })[] = [];
+    if (this.passed) {
+      const rest: RoleCheck<R>[] = [];
+      for (const check of checks) {
+        const at = check.record.readonly ? this.passed.get(checkId(check)) : undefined;
+        if (at === undefined) rest.push(check);
+        else known.push({ ...check.record, createdAt: at });
+      }
+      checks = rest;
+    }
+    const out: Checked<R> = { valid: [...known], hidden: [] };
+    if (!checks.length) return out;
     const times = await this.clock.timesOf(checks.map((c) => c.record.createdAtBlock));
 
     // One wasAllowedMany per (registry, role): every question is "did `account` hold `role` at `t`?".
@@ -129,12 +159,20 @@ export class Validator {
       );
       list.forEach((q, i) => (q.answer = answers[i] === true));
     }
+    const settled = Math.floor(Date.now() / 1000) - PASS_SETTLED_S;
     for (const { check, parts } of asked) {
       if (parts.every((q) => q.answer)) {
-        out.valid.push({ ...check.record, createdAt: times.get(check.record.createdAtBlock)! });
+        const createdAt = times.get(check.record.createdAtBlock)!;
+        out.valid.push({ ...check.record, createdAt });
+        if (createdAt <= settled) this.passed?.add(checkId(check), createdAt);
       } else {
         out.hidden.push({ record: check.record, reason: "no-role" });
       }
+    }
+    if (known.length) {
+      // In the order the records came in, as without the saved passes.
+      const order = new Map(all.map((c, i) => [c.record.key, i]));
+      out.valid.sort((a, b) => order.get(a.key)! - order.get(b.key)!);
     }
     return out;
   }

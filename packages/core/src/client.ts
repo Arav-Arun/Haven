@@ -187,7 +187,7 @@ import {
 import { createWelcome, openWelcome } from "./stealth";
 import { downloadEncrypted, downloadFolderBlobs, normalizeRef, uploadEncrypted, type SwarmConfig } from "./swarm";
 import { anonCanReach, anonTransport, isAnonymous, type RouteStep } from "./transport";
-import { registryHistory, scheduleOf, Validator, type FolderReading } from "./validator";
+import { registryHistory, scheduleOf, Validator, type FolderReading, type PassedChecks } from "./validator";
 import {
   currentWriterGroup,
   loadZkArtifacts,
@@ -225,7 +225,20 @@ const MIN_TGLM = parseEther("0.0003");
 const READ_CACHE_S = 15;
 /** How many weeks of welcome notes "Shared with me" scans on a first look. */
 const WELCOME_WEEKS = 8;
-const STORE = { seed: "seed", name: "name", root: "root", shares: "shares", rooms: "rooms", device: "device", tofu: "tofu", synced: "subtree-sync" } as const;
+const STORE = {
+  seed: "seed",
+  name: "name",
+  root: "root",
+  shares: "shares",
+  rooms: "rooms",
+  device: "device",
+  tofu: "tofu",
+  synced: "subtree-sync",
+  clock: "block-times",
+  passed: "passed-checks",
+} as const;
+/** At most this many block times and passed checks are kept on the device (the newest). */
+const SAVED_MAX = 3000;
 /** How long a name's key log, once read, is reused for showing it (never for sharing or writing to it). */
 const KEY_LOG_CACHE_S = 30;
 /** A device entry is renewed when it has less than this left (it lasts 90 days). */
@@ -365,6 +378,20 @@ class Client implements HavenClient {
   /** Key logs read recently or being read now, by name and isolation key (see readKeyLog). */
   private readonly keyLogReads = new Map<string, { at: number; read: Promise<KeyLogRead>; done: boolean }>();
   private readonly signedOutListeners = new Set<() => void>();
+  /**
+   * What never changes once known, kept on this device so the next visit skips asking for it again: Arkiv block
+   * times, and role checks records have passed (validator.ts, PassedChecks). Both are deleted on sign-out.
+   */
+  private readonly blockTimes = new Map<string, number>();
+  private readonly passes = new Map<string, number>();
+  private readonly passedChecks: PassedChecks = {
+    get: (id) => this.passes.get(id),
+    add: (id, createdAt) => {
+      this.passes.set(id, createdAt);
+      this.saveSoon();
+    },
+  };
+  private saveTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private readonly cfg: DriveConfig) {
     this.keyMemory = new KeyMemory(cfg.storage);
@@ -377,11 +404,44 @@ class Client implements HavenClient {
     })) {
       if (!v) throw new DriveError("UNKNOWN", `DriveConfig.${k} is missing`);
     }
-    this.clock = new BlockClock(this.arkiv());
+    this.clock = new BlockClock(this.arkiv(), (block, time) => {
+      this.blockTimes.set(block.toString(), time);
+      this.saveSoon();
+    });
+    this.savedLoaded = this.loadSaved();
     // When an action finishes (it may have written through the API too), the next read is fresh.
     this.receipts.on((r) => {
       if (r.done) this.clearReadCaches();
     });
+  }
+
+  /** Done once what the last visit kept (block times, passed checks) is back in memory. restore() waits for it. */
+  private readonly savedLoaded: Promise<void>;
+
+  private async loadSaved(): Promise<void> {
+    try {
+      const times = parse<[string, number][]>(await this.cfg.storage.get(STORE.clock)) ?? [];
+      for (const [block, time] of times) if (!this.blockTimes.has(block)) this.blockTimes.set(block, time);
+      this.clock.remember(times.map(([block, time]) => [BigInt(block), time]));
+      const passes = parse<[string, number][]>(await this.cfg.storage.get(STORE.passed)) ?? [];
+      for (const [id, at] of passes) if (!this.passes.has(id)) this.passes.set(id, at);
+    } catch {
+      // unreadable: everything is simply asked for again
+    }
+  }
+
+  /** Writes the block times and passed checks a few seconds after the last new one, keeping the newest SAVED_MAX. */
+  private saveSoon(): void {
+    if (this.saveTimer) return;
+    this.saveTimer = setTimeout(() => {
+      this.saveTimer = null;
+      const newest = (m: Map<string, number>) => [...m].slice(-SAVED_MAX);
+      void Promise.all([
+        this.cfg.storage.set(STORE.clock, json(newest(this.blockTimes))),
+        this.cfg.storage.set(STORE.passed, json(newest(this.passes))),
+      ]).catch(() => undefined);
+    }, 3000);
+    (this.saveTimer as { unref?: () => void }).unref?.(); // in Node scripts, never what keeps the process alive
   }
 
   // ------------------------------------------------------------ transports
@@ -477,7 +537,7 @@ class Client implements HavenClient {
   }
 
   private validator(step?: StepSink, isolationKey?: string) {
-    return new Validator(registryHistory(this.sepolia(step, isolationKey)), this.clock);
+    return new Validator(registryHistory(this.sepolia(step, isolationKey)), this.clock, this.passedChecks);
   }
 
   private swarm(): SwarmConfig {
@@ -645,6 +705,7 @@ class Client implements HavenClient {
   }
 
   async restore(): Promise<Identity | null> {
+    await this.savedLoaded;
     const seed = await this.cfg.storage.get(STORE.seed);
     if (!seed) return null;
     const keys = deriveKeys(importSeed(seed));
@@ -698,6 +759,11 @@ class Client implements HavenClient {
     this.holdings.clear();
     this.fileCache.clear();
     this.keyLogReads.clear();
+    // Their stored copies went with the STORE keys above; nothing is written back.
+    if (this.saveTimer) clearTimeout(this.saveTimer);
+    this.saveTimer = null;
+    this.blockTimes.clear();
+    this.passes.clear();
   }
 
   async exportSeed(): Promise<Uint8Array> {
@@ -1234,12 +1300,12 @@ class Client implements HavenClient {
 
   // ------------------------------------------------------------ files
 
-  private async uploaderLabel(folder: Address, h: Holding, creator: Address, roster: Roster | null): Promise<string> {
+  private async uploaderLabel(h: Holding, creator: Address, roster: Roster | null, owner: () => Promise<Address>): Promise<string> {
     if (isAddressEqual(creator, h.address)) return "you";
     const m = roster && [...roster.managers, ...roster.members].find((r) => isAddressEqual(r.address, creator));
     if (m?.label) return m.label;
     try {
-      if (isAddressEqual(await driveOwner(this.sepolia(undefined, h.address), folder), creator)) {
+      if (isAddressEqual(await owner(), creator)) {
         const owner = h.ensName ? ownerNameOf(h.ensName) : null;
         return owner ?? "the owner";
       }
@@ -1255,6 +1321,9 @@ class Client implements HavenClient {
     for (const f of fk.reading.files) byFile.set(f.fileId, [...(byFile.get(f.fileId) ?? []), f]);
     const out: FileEntry[] = [];
     const labels = new Map<string, string>();
+    // The folder's owner, read once for the whole list (it used to be read again for every uploader not in the roster).
+    let ownerRead: Promise<Address> | null = null;
+    const owner = () => (ownerRead ??= driveOwner(this.sepolia(undefined, h.address), folder));
     const me = zkIdentity(h.key, folder);
     for (const [, revisions] of byFile) {
       revisions.forEach((record, i) => (record as { revision?: number }).revision = i + 1);
@@ -1274,7 +1343,7 @@ class Client implements HavenClient {
         // An anonymous entry's creator is our relayer: the proof says only "one of N writers", and only its writer can
         // tell it's theirs.
         const anonymousLabel = zk ? (madeBy(me, { scope: zk.scope.toString(), nullifier: zk.nullifier.toString() }) ? "you (anonymously)" : `anonymous writer (one of ${zk.writers})`) : null;
-        if (!anonymousLabel && !labels.has(c)) labels.set(c, await this.uploaderLabel(folder, h, record.creator, roster));
+        if (!anonymousLabel && !labels.has(c)) labels.set(c, await this.uploaderLabel(h, record.creator, roster, owner));
         out.push({
           fileId: record.fileId,
           folder,
@@ -1952,12 +2021,11 @@ class Client implements HavenClient {
     if (!event || event.type !== "event") throw new Error("AccessGranted missing from the ABI");
     const logs = await client.getLogs({ address: folder, event, fromBlock: BigInt(haven.driveRegistryImplBlock ?? 0) });
     const accounts = [...new Set(parseEventLogs({ abi: driveRegistryAbi, eventName: "AccessGranted", logs }).map((l) => getAddress(l.args.account)))];
-    const out: { address: Address; roles: bigint; until: Timestamp | null }[] = [];
-    for (const address of accounts) {
-      const a = await accessOf(client, folder, address);
-      if (a.roles !== 0n) out.push({ address, roles: a.roles, until: a.until });
-    }
-    return out;
+    // All at once: they go out as one multicall (one round trip) instead of one call per member.
+    const access = await Promise.all(accounts.map((address) => accessOf(client, folder, address)));
+    return accounts
+      .map((address, i) => ({ address, roles: access[i]!.roles, until: access[i]!.until }))
+      .filter((m) => m.roles !== 0n);
   }
 
   /** A new version for everyone left in the roster: what removal and an open refresh request both need. */
@@ -2766,7 +2834,7 @@ class Client implements HavenClient {
     const h = this.holdings.get(lower(f)) ?? (this.keys ? await this.holding(f).catch(() => null) : null);
     const iso = h?.address;
     const reader = this.arkiv(undefined, iso);
-    const [members, rotations, rosters, files, tombs, refreshes, copies, welcomes] = await Promise.all([
+    const [members, rotations, rosters, files, tombs, refreshes, copies, welcomes, block] = await Promise.all([
       this.holders(f, iso),
       listRotations(reader, f),
       listRosters(reader, f),
@@ -2775,6 +2843,7 @@ class Client implements HavenClient {
       listRefreshes(reader, f),
       listFolderKeyCopies(reader, f),
       listFolderWelcomes(reader, f),
+      reader.getBlockNumber(),
     ]);
     const validator = this.validator(undefined, iso);
     const reading = await validator.folder({
@@ -2786,7 +2855,6 @@ class Client implements HavenClient {
       malformed: rotations.malformed + files.malformed + tombs.malformed + refreshes.malformed,
     });
     const shareChecked = await validator.shareRecords([...rosters.records, ...copies.records, ...welcomes.records]);
-    const block = await reader.getBlockNumber();
     const toTime = (b: bigint) => now() + Number(b - block) * 2;
     const bytesOf = (r: Record<string, unknown>) =>
       Object.values(r).reduce<number>((n, v) => n + (v instanceof Uint8Array ? v.length : 0), 0);
@@ -2813,15 +2881,26 @@ class Client implements HavenClient {
     const routed = anon.supportsAnyHttps && isAnonymous(anon.status()) && anonCanReach(this.cfg.beeUrl);
     if (!routed && reading.files.length) this.direct.add("Swarm (file sizes)");
     const doFetch = routed ? (iso ? anon.isolated(iso) : anon.fetch) : globalThis.fetch.bind(globalThis);
-    for (const file of reading.files) {
-      try {
-        const res = await doFetch(`${this.cfg.beeUrl.replace(/\/+$/, "")}/bytes/${file.swarmRef.slice(2)}`, { method: "HEAD" });
-        const length = Number(res.headers.get("content-length"));
-        if (res.ok && length > 0) swarm.push({ ref: file.swarmRef, paddedBytes: length });
-      } catch {
-        // not reachable: leave it out rather than guess
-      }
-    }
+    // A few at a time (these are plain HTTP, so they can't share a batch): one after another, a folder of N files cost
+    // N round trips.
+    const sizes: ({ ref: Hex; paddedBytes: number } | null)[] = new Array(reading.files.length).fill(null);
+    let nextFile = 0;
+    await Promise.all(
+      Array.from({ length: Math.min(4, reading.files.length) }, async () => {
+        while (nextFile < reading.files.length) {
+          const i = nextFile++;
+          const file = reading.files[i]!;
+          try {
+            const res = await doFetch(`${this.cfg.beeUrl.replace(/\/+$/, "")}/bytes/${file.swarmRef.slice(2)}`, { method: "HEAD" });
+            const length = Number(res.headers.get("content-length"));
+            if (res.ok && length > 0) sizes[i] = { ref: file.swarmRef, paddedBytes: length };
+          } catch {
+            // not reachable: leave it out rather than guess
+          }
+        }
+      }),
+    );
+    for (const s of sizes) if (s) swarm.push(s);
 
     const ensName = h?.ensName ?? "";
     const kind = ensName ? kindOf(ensName) : "drive";
