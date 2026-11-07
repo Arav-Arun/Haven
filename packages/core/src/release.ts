@@ -6,8 +6,8 @@
 //     .css file of the static build; rootHash = sha256(canonical JSON of the manifest);
 //   - the manifest and the whole site on Swarm (haven.eth's contenthash points at the site);
 //   - a haven.release entity on Arkiv, signed (EIP-712) by the release key R.
-// The extension re-downloads every file a Haven tab loaded, hashes it, and releases keys to the page only when every
-// hash is in a published, non-revoked manifest.
+// A verifier re-downloads every file a Haven page loaded, hashes it, and trusts the page only when every hash is in a
+// published, non-revoked manifest.
 
 import type { Address, Hex } from "@haven/types";
 import { bytesToHex, isAddressEqual, recoverTypedDataAddress } from "viem";

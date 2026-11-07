@@ -57,14 +57,13 @@ reference for the code as built.
   F1 log. New holders become ordinary stealth shares (the roster remembers name and controller); a name that is gone,
   excluded or transferred is revoked, then one key refresh. Over 14 people is refused.
 
-## Add-on F3: verified frontend (`release.ts`, `scripts/release.ts`, the extension)
+## Add-on F3: verified frontend (`release.ts`, `scripts/release.ts`)
 - `manifest = {version, gitCommit, publicEnv, files: {path: sha256}}` over the export's `.html/.js/.css`;
   `rootHash = sha256(canonical JSON)`. Build id = git commit.
 - `release publish`: the site (tar) and the manifest to Swarm, `haven.release` signed by R, `haven.eth`
   contenthash → the site.
-- The extension re-downloads every file a Haven tab loaded, hashes it, and matches a non-revoked release signed
-  by R. Only then does it answer the page's `keys-request` (on a MessageChannel port). With "Keep keys in the extension"
-  the site keeps the seed in memory only.
+- `release rebuild <rootHash>`: anyone who rebuilds the commit and gets the same manifest posts a `haven.rebuild`
+  entry, so a release's hashes can be checked against independent rebuilds.
 
 ## Add-on F4: doorbells (`doorbell.ts`)
 - Topic `HKDF(E_v[epoch], "doorbell/<folder>")`; GSOC key mined towards our Bee overlay; payload `{type, arkivKey}`

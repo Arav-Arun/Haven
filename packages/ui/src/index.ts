@@ -1,4 +1,4 @@
-// @haven/ui: the screens' building blocks, shared by the website (and PWA) and the extension.
+// @haven/ui: the screens' building blocks, shared by the website and the installable phone app.
 // Components take data in the frozen @haven/types shapes and callbacks; they never fetch on their own.
 export * from "./AppShell";
 export * from "./Clouds";

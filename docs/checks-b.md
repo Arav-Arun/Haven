@@ -21,7 +21,7 @@ Done. `pnpm --filter @haven/platform test`: 10 tests pass.
 - Failure is reported, never silently replaced by plain fetch.
 - Missing bootstrap RPC or Tor gateways fail loudly instead of using built-in defaults.
 - `supportsAnyHttps` is measured with a real request through the worker (`probeUrl`), not assumed.
-- Storage: IndexedDB values are encrypted at rest under a non-extractable key; extension storage uses chrome.storage.
+- Storage: IndexedDB values are encrypted at rest under a non-extractable key.
 
 ## B3 · Parts that need no core
 
@@ -91,36 +91,6 @@ Built; the "Done when" needs a real Android phone and iPhone (human).
   iframe. To check: `pnpm --filter @haven/web build`, serve `apps/web/out`, open it in Chrome, then DevTools →
   Application → Service workers / Manifest.
 
-## B7 · Extension
-
-Built (`apps/extension`, WXT 0.21.5, MV3). `pnpm --filter @haven/extension zip` makes the Chrome zip (147 KB).
-The "Done when" (fresh Chrome profile: pair, badge for a new share, save an image) needs `createDriveClient` and a
-human in Chrome.
-- **Private network:** `@anon-rpc/browser-extension-harness` 0.4.0 with its offscreen document and sandboxed page,
-  copied from `node_modules` on every build (the README warns a stale copy fails silently). Sandbox CSP as the README
-  specifies.
-- **Permissions:** `storage`, `contextMenus`, `alarms`, `notifications`, `offscreen`. Host permissions only for our
-  configured RPC, API, Bee and Arkiv pass-through, plus where the Nox worker's code is fetched from, read from its
-  specifier contract on Sepolia (`workerResolvers()`): `raw.githubusercontent.com`, `cdn.jsdelivr.net`, `unpkg.com`.
-  The harness checks those bytes against the contract's `workerHash` (`0xd9fa04b0…`). Saving from another site asks
-  for that one site at the moment you use it (`optional_host_permissions`).
-- **Pairing:** website Settings → "Connect extension" → after the user confirms, the seed goes by `window.postMessage`
-  (this origin only) to the extension's content script, which runs only on the configured `WXT_APP_ORIGIN`, then to
-  the background worker, which calls `signIn({ kind: "seed" })`. Changed from the plan's `externally_connectable`:
-  that needs the extension's ID baked into the website, which differs between an unpacked build and the Chrome Web
-  Store; the content script gives the same "our origin only" guarantee without it. Keys live in
-  `chrome.storage.session` unless the user ticks "Keep it signed in".
-- **Popup:** network badge, "Shared with me" tickets (open in the website), files saved from the web waiting for a
-  folder, and upload into a chosen folder.
-- **Right-click "Save to Haven"** on images, links and the page: fetched without cookies, parked in the shared
-  inbox (`@haven/platform` `inbox.ts`, also used by the phone's share target), encrypted when the user picks a
-  folder.
-- **Background:** a `chrome.alarms` check every 15 minutes: `sharedWithMe({ since })` → badge and notification; then
-  `maintain()` → a notification of what it did.
-- Side panel and Firefox: not built (Should and Stretch).
-- Not checked yet, needs Chrome: whether the popup and the background can each start a worker (an extension may
-  have only one offscreen document), and whether `permissions.request` from the context-menu click shows its prompt.
-
 ## Plan A steps A5 and A6, done on plan-b
 
 At the owner's request, after merging `plan-a` (A1–A4), Plan A's API and client were written here.
@@ -132,7 +102,7 @@ At the owner's request, after merging `plan-a` (A1–A4), Plan A's API and clien
   uploads, bad references), config, CORS.
 - `scripts/bootstrap.ts` (implementation, `haven.eth`, `rooms.haven.eth`, relayer registrar) and
   `scripts/e2e.ts` (the demo story with three random identities; writes `docs/evidence.md`).
-- Both apps now use the real client. The website and extension build with it.
+- Both apps now use the real client. The website builds with it.
 - **Not run live yet:** needs funded keys, the Arkiv access key, a Bee node or batch, and the deployed API. The order:
   `bootstrap` → start the API → `e2e`. Until then nothing has been checked against Sepolia, Arkiv or Swarm.
 
@@ -141,21 +111,10 @@ At the owner's request, after merging `plan-a` (A1–A4), Plan A's API and clien
 - **Reproducible build (check):** `generateBuildId` = git commit, `SOURCE_DATE_EPOCH` = the commit's time. Two clean
   builds (`rm -rf out .next && pnpm build`) of the same tree: every `.html`, `.js` and `.css` identical (`shasum`
   diff: 0 lines; 123 files). `pnpm --filter @haven/core release manifest` prints the root hash.
-- **Extension:** the content script lists the page, every script and stylesheet (performance entries plus the DOM);
-  the background re-downloads and hashes them, and accepts only a release signed by `WXT_RELEASE_SIGNER` and not
-  revoked, whose manifest from Swarm hashes to its `rootHash`. Badge per tab (✓, !, ?), a red full-page overlay on a
-  mismatch with "Open the verified copy" (`https://<cid>.bzz.link/`, CIDv1 of the site's Swarm reference), and the popup
-  shows the active tab's result. Keys go to the page only after a fresh check passes, on a MessageChannel port.
-- **(check) MV3 can't read response bodies,** hence the re-download. This catches files swapped for everyone; it can
-  miss a host that serves bad code to one targeted visitor only (README, Add-ons, Limits). Not built: Firefox's
-  `filterResponseData`.
-- **Website:** Settings → "Keep my keys in the extension" (the seed then stays in memory only and comes from the
-  extension at each load); without the extension it says to install it to verify the page first.
 - **Add-on UI:** profile page `/u/?n=<name>` (fingerprint, "Verify in person", key history, forged entries, own
   devices); share dialog (fingerprint, a warning with "The words match: trust the new key", a Team tab with "N members
   found (M have no Haven key)"); members panel ("Via acme.eth", Exclude, last synced, Sync now, Stop sharing);
   Settings (your key, devices, link another ENS name with the wallet's `signTypedData`); folder view "Live" or
-  "Checking every 30 s"; extension background keeps subscriptions (re-made each minute if the worker was stopped) and
-  notifies.
+  "Checking every 30 s".
 - **Not checked in a browser yet:** none of the add-on screens has been exercised against live data (no deployment
-  yet); the extension's verification needs a published release. Web and extension builds pass.
+  yet). The web build passes.

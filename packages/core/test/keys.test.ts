@@ -178,7 +178,7 @@ describe("derived keys", () => {
     expect(ownSealKey(keys.driveKey, f1)).toEqual(ownSealKey(keys.driveKey, f1.toUpperCase().replace("0X", "0x") as Hex));
   });
 
-  it("an exported seed restores exactly the same identity (extension pairing)", () => {
+  it("an exported seed restores exactly the same identity", () => {
     for (const material of sources) {
       const restored = deriveKeys(importSeed(exportSeed(material)));
       const original = deriveKeys(material);

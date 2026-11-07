@@ -352,7 +352,7 @@ Found while preparing A5. All of it was checked onchain, read-only.
 
 Code: `apps/api/` (Hono). Two versions were written in parallel: one on `plan-a` and one on `plan-b`, the second as
 part of A6. The merge keeps the `plan-b` version, `createApi` in `src/app.ts`, because `createDriveClient`, the web
-app, the extension and the add-ons (`/keylog`, `/doorbell`, `/arkiv-rpc`, `/bytes/:ref`, `/config`) are built on it.
+app and the add-ons (`/keylog`, `/doorbell`, `/arkiv-rpc`, `/bytes/:ref`, `/config`) are built on it.
 Both versions call the same core flows: `claimName`, `createRoom`, `verifyUpload` and `wasAllowed`. The request formats
 are in `packages/core/src/api.ts`. The `plan-a` version is gone, along with its `apiAuth.ts`, `server.ts`, `drips.ts`,
 `limits.ts` and their tests; it is still in the history (commit `eb526ed`). Runbook: `apps/api/README.md`.

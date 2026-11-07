@@ -42,7 +42,7 @@ for ENS" as a headline.
 |---|---|---|---|
 | ENS | **ENS-1** ($7k; 1st $3k) | `DriveRegistry`, an ENSv2 registry with: access that expires; an onchain access history (`wasAllowed(account, role, time)`); rights flowing down the folder tree; groups; frozen against upgrades; dangerous powers kept on the main wallet. Plus stealth members, unlinked rooms, mounting (namespace aliasing) and expiring links (subnames) | Sepolia, ENSv2 central, **no hard-coded values**, live demo link, open-source repo |
 | Arkiv | **ARKIV-2** ($4k; 1st $3k) **+ ARKIV-5** Swarm bonus ($500); one pick | The drive's data (files, welcomes, key copies, rosters, key rotations, links) lives in Arkiv. Users see expiry. ENS's onchain access history decides whose writes count. Encrypted files on Swarm | `/arkiv/schema.md`, `friction.md`, `reach.md`, `why-arkiv.md`, `how-you-use-arkiv.md`, `swarm.md`; README lists writer wallets, one runnable query, AI usage; open-source licence |
-| Ethereum Foundation | **EF-1** Anon-RPC ($5k; 1st $2.5k). Also tick **EF-3** (CROPS); EF places us in at most one | All JSON-RPC traffic (ENS on Sepolia, Arkiv) from web, phone and extension goes through Anon-RPC by default, with one isolation key per stealth address. Anything not routed is listed in the README and shown in the app | README `CROPS` section, FOSS licence, video of 3 min or less showing the moment privacy matters, no trackers |
+| Ethereum Foundation | **EF-1** Anon-RPC ($5k; 1st $2.5k). Also tick **EF-3** (CROPS); EF places us in at most one | All JSON-RPC traffic (ENS on Sepolia, Arkiv) from web and phone goes through Anon-RPC by default, with one isolation key per stealth address. Anything not routed is listed in the README and shown in the app | README `CROPS` section, FOSS licence, video of 3 min or less showing the moment privacy matters, no trackers |
 
 The **Finalist** award is separate: $1k per person plus $500 travel for a team of 3–5.
 If we win first place in all three picks, the most we'd make is about $9k.
@@ -51,41 +51,37 @@ If we win first place in all three picks, the most we'd make is about $9k.
 
 ## 3. Features
 
-Columns: **Web** = website; **Phone** = the same site installed as a PWA; **Ext** = browser extension.
+Columns: **Web** = website; **Phone** = the same site installed as a PWA.
 **Must** = the demo needs it. **Should** = build if on schedule. **Stretch** = only if ahead.
 
-| # | Feature | What the user sees | Web | Phone | Ext | Priority |
-|---|---|---|---|---|---|---|
-| 1 | Safe sign-in | Sign one domain-bound message (twice on the first device, to check the wallet signs the same way each time). Wallets that can't are refused and pointed to passkey | ✓ | ✓ | pairs with web | Must |
-| 2 | Free name | Claim `you.haven.eth` with no gas, or bring your own ENSv2 `.eth` | ✓ | ✓ | – | Must |
-| 3 | Two kinds of folder | **In my drive** (listed under your name) or **Unlinked room** (random name, not connected to you; recommended for data rooms) | ✓ | ✓ | view | Must |
-| 4 | Upload | Drag and drop; many files; up to 25 MB each; encrypted and padded in the browser | ✓ | ✓ camera/files | popup drop, right-click | Must |
-| 5 | Preview and download | Images, PDF, video and text, decrypted locally; "download whole folder" | ✓ | ✓ | side panel | Must |
-| 6 | Private share | Type an ENS name; pick Viewer / Editor / Manager and "access until"; editors and managers are funded by the sharer automatically | ✓ | ✓ | – | Must |
-| 7 | Shared with me | Finds private shares by checking welcome notes locally | ✓ | ✓ | badge + notification | Must |
-| 8 | Access that ends on time | Countdown on each member. At the end, new files are unreadable to them (encryption), the onchain role ends, and their key copy expires. No transaction | ✓ | ✓ | ✓ | Must |
-| 9 | Same rights down the tree | Access to a folder covers its subfolders unless the subfolder was created as "separate access" | ✓ | ✓ | ✓ | Must |
-| 10 | Remove someone | Revoke now; the folder and its subfolders get new keys in the same action | ✓ | ✓ | – | Must |
-| 11 | Public view | Shows what outsiders see (Etherscan, Arkiv explorer) next to what you see, plus a plain sentence of what that metadata reveals | ✓ | compact | – | Must |
-| 12 | Receipts panel | Each action: tx hashes, which permission check ran, Swarm reference, and which network route each call took (Anon-RPC or direct) | ✓ | compact | – | Must |
-| 13 | Private network by default | Anon-RPC on; picker for Nym / Nox / Tor; red "Not private" banner if off | ✓ | ✓ | ✓ | Must |
-| 14 | New-device recovery | Sign in on a new device and everything comes back, including unlinked rooms | ✓ | ✓ | ✓ | Must |
-| 15 | Extension basics | Popup (recent files, shared with me, upload), right-click "Save to Haven", badge for new shares, background check that tops up members' gas for owners | – | – | ✓ | Must |
-| 16 | Installable phone app | Home-screen icon, full screen, app shell works offline | – | ✓ | – | Must |
-| 17 | Groups | Share once with a group; add people in one place; removing someone triggers a key refresh in every folder shared with the group | ✓ | ✓ | – | Should |
-| 18 | Expiring links | Link for one file, for people with no wallet; the key sits in the `#fragment`, never sent to a server | ✓ | ✓ | copy link | Should |
-| 19 | Member list for members only | Members see each other unless marked "hide from other members" | ✓ | ✓ | – | Should |
-| 20 | Versions | Upload a new version; see history | ✓ | ✓ | – | Should |
-| 21 | Mount a folder | Add someone's folder into your own ENS tree (namespace aliasing). Public, so the UI warns; not allowed for unlinked rooms | ✓ | – | – | Should |
-| 22 | Android share target | "Share to Haven" from any app's share sheet | – | ✓ Android | – | Should |
-| 23 | Side panel and Save page | Full drive in Chrome's side panel; save the current page privately | – | – | ✓ | Should |
-| 24 | Passkey sign-in | No wallet needed; keys from a passkey (WebAuthn PRF). Phishing-resistant by design | ✓ | ✓ | pairs | Should |
-| 25 | Search | Local search over decrypted names | ✓ | ✓ | ✓ | Should |
-| 26 | App copy on Swarm | Same app served from Swarm via the ENS name; works if Vercel is down | ✓ | – | – | Should |
-| 27 | Unlinkable room tokens | Blind-signed tokens so even our API can't link a room to the account that made it | ✓ | ✓ | – | Should |
-| 28 | Gmail button | "Insert Haven link" in Gmail compose | – | – | ✓ | Stretch |
-| 29 | Firefox build | Signed XPI | – | – | ✓ | Stretch |
-| 30 | Files as ENS names | Every file resolves as an ENS name with no token, answered from Arkiv (CCIP-Read) | ✓ | – | – | Stretch |
+| # | Feature | What the user sees | Web | Phone | Priority |
+|---|---|---|---|---|---|
+| 1 | Safe sign-in | Sign one domain-bound message (twice on the first device, to check the wallet signs the same way each time). Wallets that can't are refused and pointed to passkey | ✓ | ✓ | Must |
+| 2 | Free name | Claim `you.haven.eth` with no gas, or bring your own ENSv2 `.eth` | ✓ | ✓ | Must |
+| 3 | Two kinds of folder | **In my drive** (listed under your name) or **Unlinked room** (random name, not connected to you; recommended for data rooms) | ✓ | ✓ | Must |
+| 4 | Upload | Drag and drop; many files; up to 25 MB each; encrypted and padded in the browser | ✓ | ✓ camera/files | Must |
+| 5 | Preview and download | Images, PDF, video and text, decrypted locally; "download whole folder" | ✓ | ✓ | Must |
+| 6 | Private share | Type an ENS name; pick Viewer / Editor / Manager and "access until"; editors and managers are funded by the sharer automatically | ✓ | ✓ | Must |
+| 7 | Shared with me | Finds private shares by checking welcome notes locally | ✓ | ✓ | Must |
+| 8 | Access that ends on time | Countdown on each member. At the end, new files are unreadable to them (encryption), the onchain role ends, and their key copy expires. No transaction | ✓ | ✓ | Must |
+| 9 | Same rights down the tree | Access to a folder covers its subfolders unless the subfolder was created as "separate access" | ✓ | ✓ | Must |
+| 10 | Remove someone | Revoke now; the folder and its subfolders get new keys in the same action | ✓ | ✓ | Must |
+| 11 | Public view | Shows what outsiders see (Etherscan, Arkiv explorer) next to what you see, plus a plain sentence of what that metadata reveals | ✓ | compact | Must |
+| 12 | Receipts panel | Each action: tx hashes, which permission check ran, Swarm reference, and which network route each call took (Anon-RPC or direct) | ✓ | compact | Must |
+| 13 | Private network by default | Anon-RPC on; picker for Nym / Nox / Tor; red "Not private" banner if off | ✓ | ✓ | Must |
+| 14 | New-device recovery | Sign in on a new device and everything comes back, including unlinked rooms | ✓ | ✓ | Must |
+| 15 | Installable phone app | Home-screen icon, full screen, app shell works offline | – | ✓ | Must |
+| 16 | Groups | Share once with a group; add people in one place; removing someone triggers a key refresh in every folder shared with the group | ✓ | ✓ | Should |
+| 17 | Expiring links | Link for one file, for people with no wallet; the key sits in the `#fragment`, never sent to a server | ✓ | ✓ | Should |
+| 18 | Member list for members only | Members see each other unless marked "hide from other members" | ✓ | ✓ | Should |
+| 19 | Versions | Upload a new version; see history | ✓ | ✓ | Should |
+| 20 | Mount a folder | Add someone's folder into your own ENS tree (namespace aliasing). Public, so the UI warns; not allowed for unlinked rooms | ✓ | – | Should |
+| 21 | Android share target | "Share to Haven" from any app's share sheet | – | ✓ Android | Should |
+| 22 | Passkey sign-in | No wallet needed; keys from a passkey (WebAuthn PRF). Phishing-resistant by design | ✓ | ✓ | Should |
+| 23 | Search | Local search over decrypted names | ✓ | ✓ | Should |
+| 24 | App copy on Swarm | Same app served from Swarm via the ENS name; works if Vercel is down | ✓ | – | Should |
+| 25 | Unlinkable room tokens | Blind-signed tokens so even our API can't link a room to the account that made it | ✓ | ✓ | Should |
+| 26 | Files as ENS names | Every file resolves as an ENS name with no token, answered from Arkiv (CCIP-Read) | ✓ | – | Stretch |
 
 **Dropped from version 1:** opt-in "seen" receipts. They would need viewers to write, and viewers must never need gas
 (section 8).
@@ -95,7 +91,7 @@ Columns: **Web** = website; **Phone** = the same site installed as a PWA; **Ext*
 ## 4. Architecture
 
 ```
-  Website · Phone (PWA) · Extension          one shared core package:
+  Website · Phone (PWA)                      one shared core package:
                                              keys · epochs · stealth · ENS · Arkiv · Swarm · validation
                 │
                 │  JSON-RPC (Sepolia, Arkiv) goes through the Anon-RPC worker's fetch;
@@ -158,8 +154,7 @@ Issued At: 2026-11-06T00:00:00.000Z
   - The user's own key copies are sealed with `HKDF(K or K_room, folder)`.
 - **Hot keys hold little:** K and room keys sign inside the app with no pop-ups, but hold only gas dust and **can't
   upgrade anything** (section 6).
-- **Storage:** IndexedDB, wrapped by a non-extractable WebCrypto key. The extension uses `chrome.storage.session` by
-  default. Strict CSP, no third-party scripts, pinned dependencies.
+- **Storage:** IndexedDB, wrapped by a non-extractable WebCrypto key. Strict CSP, no third-party scripts, pinned dependencies.
 
 ---
 
@@ -294,7 +289,7 @@ Keep these only in `packages/core/src/addresses.ts`. Re-check before deploying.
 5. **Groups (Should).** A folder shared with a group gives the group's managers `E_v[j_group]`. The group manager's app
    re-seals `E_v[min(j_group, j_member)]` for each group member, which key regression allows. Removing someone from a
    group early opens a **refresh request** in each shared folder. Rule 1 blocks editors there until a folder manager
-   refreshes. A folder manager's app (web or extension background check) refreshes as soon as it sees the request.
+   refreshes. A folder manager's app refreshes as soon as it sees the request.
 6. **Links** carry a per-file bundle sealed with the link secret in the URL fragment. They don't use epochs.
 
 ### Padding and invariant
@@ -327,7 +322,7 @@ Keep these only in `packages/core/src/addresses.ts`. Re-check before deploying.
 | Who | Needs gas? | Funded by | What the funding reveals |
 |---|---|---|---|
 | Viewer (stealth S) | **Never.** Reading is free view calls | – | Nothing |
-| Editor (stealth S) | Arkiv tGLM to write file entries | **The sharer's key, in the same action as the grant.** Topped up by an owner or manager app (web, or the extension's background check) | That this folder's owner funded this member address, which the onchain grant already shows. Not who the member is |
+| Editor (stealth S) | Arkiv tGLM to write file entries | **The sharer's key, in the same action as the grant.** Topped up by an owner or manager app | That this folder's owner funded this member address, which the onchain grant already shows. Not who the member is |
 | Manager (stealth S) | Arkiv tGLM and Sepolia ETH | Same as editor | Same |
 | Drive key K | Sepolia and Arkiv | API drip | Nothing new: K is already public as the owner of a named drive |
 | Room key `K_room` | Sepolia and Arkiv | API drip, **sent in batches every 10 minutes**, never from K | API-side timing at most; see section 9 and blind tokens (feature 27) |
@@ -382,8 +377,8 @@ Keep these only in `packages/core/src/addresses.ts`. Re-check before deploying.
   scan small on phones.
 - **Runnable README query:** `select().from(Files).where(eq("folder", "0x…")).fetch()`.
 - **Access key:** Arkiv's guidance is to keep it on a backend, never in a browser bundle. So it lives only on our API,
-  which exposes `POST /arkiv-rpc`, a JSON-RPC pass-through that adds the key server-side. Browsers, phones and the
-  extension point their Arkiv client at that URL, through Anon-RPC like any other RPC. The pass-through forwards only
+  which exposes `POST /arkiv-rpc`, a JSON-RPC pass-through that adds the key server-side. Browsers and phones point
+  their Arkiv client at that URL, through Anon-RPC like any other RPC. The pass-through forwards only
   the read methods the app uses plus `eth_sendRawTransaction` (writes are signed in the browser), and logs nothing.
 
 ---
@@ -409,8 +404,7 @@ Keep these only in `packages/core/src/addresses.ts`. Re-check before deploying.
 
 ## 12. Anon-RPC (fixes "may not carry most of the traffic")
 
-- **Packages:** `@anon-rpc/browser-harness` 0.4.0 (web and phone) and `@anon-rpc/browser-extension-harness` 0.4.0
-  (extension).
+- **Packages:** `@anon-rpc/browser-harness` 0.4.0 (web and phone).
 - **Workers** (from `adopters.json5`): Nym `0x3aCD9742C68F6d993066Ae25533e09b9e1f60eD0` (mainnet), Nox
   `0x35133267A8F7EC35046a83DCA0f4Ca8A6e1b7A9A` (Sepolia), tor-js `0x700dA3193D35fA54Cd3fBf29B66f2a2A0385659e` (mainnet;
   demo gateway "may disappear").
@@ -447,14 +441,12 @@ Keep these only in `packages/core/src/addresses.ts`. Re-check before deploying.
 5. **Share:** derive S → grant (with an end date) → fund S if editor or manager → welcome note, key copy, roster →
    cascade key copies into inheriting subfolders.
 6. **Shared with me:** fetch new welcome notes by `bucket` → try each locally → read key copies and files with
-   isolation key S. The extension does this every 15 minutes.
+   isolation key S.
 7. **End date:** nothing to do. Epoch keys, `_getRoles` and Arkiv expiry all end on their own.
 8. **Remove early:** revoke → refresh the folder and its inheriting subfolders → delete their key copies.
 9. **Groups / links / mount (Should):** as in sections 6, 7 and 9.
 10. **New device:** sign in → check keys against `haven.key` → drive tree from ENS → rooms by checking n → entries from
     Arkiv → files from Swarm.
-11. **Extension pairing:** the site sends the seed to the extension through `externally_connectable` (our origins
-    only), after the user confirms.
 
 ---
 
@@ -471,14 +463,6 @@ Keep these only in `packages/core/src/addresses.ts`. Re-check before deploying.
   "Add to Home Screen" hint.
 - No push notifications: a push server would learn which device waits for which shares.
 - Shows "Connecting privately…" while the Nym worker (about 18 MB) starts.
-
-**Extension (`apps/extension`):**
-- WXT 0.21 + React, MV3.
-- Permissions: `storage`, `contextMenus`, `alarms`, `notifications`, `offscreen`, `sidePanel`.
-- Popup, right-click save, side panel (Should).
-- 15-minute background check: new shares → badge; for owners, members' gas top-ups and open refresh requests.
-- Released as a GitHub zip and an unlisted Chrome Web Store submission on day 1; a human pays the one-time developer
-  fee.
 
 **"Try it" for judges:** two fresh identities from random seeds (no wallet: Founder and Investor), with a switcher.
 They get real names and rooms on testnet; the judge uploads their own files. Nothing is pre-seeded.
@@ -556,7 +540,7 @@ No funds move in the product beyond gas dust.
 4. **1:00 Public view:** random addresses with end dates; ciphertext on Arkiv; the plain sentence "Anyone can see…
    They can't see who owns it…". Then show that `acme.haven.eth` has no link to the room.
 5. **1:20 Investor on a phone:** "Shared with you: Series A"; the deck opens.
-6. **1:45 Lawyer in Chrome:** right-click a term sheet → "Save to Haven" → it appears in the room.
+6. **1:45 Editor uploads:** Priya, as editor, adds a term sheet from her own laptop → it appears in the room.
 7. **2:05 End date passes:**
    - the investor still has the deck they opened (we say so);
    - the founder uploads "Final terms", and on the investor's phone it shows as **locked**;
@@ -599,7 +583,6 @@ No funds move in the product beyond gas dust.
   - Vercel;
   - the Swarm copy;
   - the installable PWA;
-  - the extension zip (plus store links if approved);
   - "Try it" with no wallet.
 
 ---

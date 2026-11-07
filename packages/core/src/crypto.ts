@@ -1,5 +1,5 @@
 // Low-level crypto shared by keys, epochs, padding and stealth.
-// - HKDF-SHA256 and SHA-256: @noble/hashes (synchronous, audited, same in Node, browser and extension).
+// - HKDF-SHA256 and SHA-256: @noble/hashes (synchronous, audited, same in Node and the browser).
 // - AES-256-GCM and randomness: WebCrypto (globalThis.crypto), available in all three.
 
 import { secp256k1 } from "@noble/curves/secp256k1";

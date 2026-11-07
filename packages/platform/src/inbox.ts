@@ -1,6 +1,5 @@
 /**
- * Files waiting on this device for the user to pick a folder: shared into the phone app from another app, or saved
- * from a web page with the extension's right-click menu. They stay in this origin's IndexedDB until they are
+ * Files waiting on this device for the user to pick a folder, shared into the phone app from another app. They stay in this origin's IndexedDB until they are
  * encrypted and uploaded, then they're removed. The website's service worker (public/sw.js) writes the same store.
  */
 export interface InboxFile {

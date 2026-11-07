@@ -253,7 +253,7 @@ export async function keyMaterialFrom(
   }
 }
 
-// ---------------------------------------------------------------- seed export (extension pairing)
+// ---------------------------------------------------------------- seed export
 
 const SEED_FORMAT_VERSION = 1;
 const KIND_CODES = { wallet: 0, passkey: 1, random: 2 } as const;

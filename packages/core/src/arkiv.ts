@@ -128,7 +128,7 @@ export const ReleaseSchema = defineSchema("haven.release", {
   sig: bytes(),
 });
 
-/** A release R has withdrawn: the extension treats it as bad. */
+/** A release R has withdrawn: verifiers treat it as bad. */
 export const UnreleaseSchema = defineSchema("haven.unrelease", {
   rootHash: str().indexed(),
   sig: bytes(),

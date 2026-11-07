@@ -265,8 +265,7 @@ function deviceLabel(): string {
   if (!ua) return "Command line";
   const browser = ua.includes("edg/") ? "Edge" : ua.includes("firefox") ? "Firefox" : ua.includes("chrome") ? "Chrome" : ua.includes("safari") ? "Safari" : "Browser";
   const os = ua.includes("android") ? "Android" : ua.includes("iphone") || ua.includes("ipad") ? "iOS" : ua.includes("mac os") ? "macOS" : ua.includes("windows") ? "Windows" : ua.includes("linux") ? "Linux" : "";
-  const ext = typeof (globalThis as { chrome?: { runtime?: { id?: string } } }).chrome?.runtime?.id === "string" && !globalThis.document ? " (extension)" : "";
-  return `${browser}${os ? ` on ${os}` : ""}${ext}`;
+  return `${browser}${os ? ` on ${os}` : ""}`;
 }
 const lower = (a: string) => a.toLowerCase();
 const json = (v: unknown) => utf8(JSON.stringify(v));
@@ -2733,8 +2732,7 @@ class Client implements HavenClient {
         if (m.role === "viewer" || (m.until !== null && m.until <= now())) continue;
         if ((await reader.getBalance({ address: m.address })) < LOW_TGLM) low.push(m);
       }
-      // Add-on F2: subtree rules turn into shares and removals here (on open in the web app, every 15 minutes in the
-      // extension).
+      // Add-on F2: subtree rules turn into shares and removals here (every time the app opens).
       if (current.roster.subtrees?.length) {
         try {
           await this.syncFolder(folder.registry, null);

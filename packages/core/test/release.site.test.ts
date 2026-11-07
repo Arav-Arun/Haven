@@ -1,6 +1,6 @@
 // Add-on F3 against the real static export (apps/web/out), not hand-made fixtures: serve it over HTTP, collect what each
-// page loads the way the extension's content script does (the page plus every script and stylesheet it references),
-// re-download and hash them the way apps/extension/src/lib/verify.ts does, and compare with a manifest of the build.
+// page loads (the page plus every script and stylesheet it references), re-download and hash them as a verifier
+// would, and compare with a manifest of the build.
 // Then change one byte of a real chunk and expect a mismatch naming it.
 // Skipped when there is no build: run `next build` in apps/web first.
 
@@ -62,7 +62,7 @@ async function pageLoads(page: string): Promise<string[]> {
   return [`${origin}/${page}`, ...refs.map((r) => new URL(r, `${origin}/${page}`).href)];
 }
 
-/** The extension's view (verify.ts): manifest path → sha256 of a fresh download, null for another origin. */
+/** A verifier's view: manifest path → sha256 of a fresh download, null for another origin. */
 async function hashAll(urls: string[]): Promise<Map<string, string | null>> {
   const loaded = new Map<string, string | null>();
   for (const url of urls) {
@@ -83,7 +83,7 @@ describe.skipIf(!built)("a real static build", () => {
     );
   });
 
-  it("the manifest round-trips through its root hash, as the extension reads it from Swarm", () => {
+  it("the manifest round-trips through its root hash, as a verifier reads it from Swarm", () => {
     expect(manifestMatches(utf8(canonicalJson(manifest)), rootHashOf(manifest))).toEqual(manifest);
   });
 

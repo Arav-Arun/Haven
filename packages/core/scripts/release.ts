@@ -2,7 +2,7 @@
 //
 //   pnpm --filter @haven/core release manifest            root hash of apps/web/out (run after `pnpm --filter @haven/web build`)
 //   pnpm --filter @haven/core release publish <version>   site + manifest to Swarm, haven.release on Arkiv, haven.eth contenthash
-//   pnpm --filter @haven/core release revoke <rootHash>   haven.unrelease (the extension then treats that build as bad)
+//   pnpm --filter @haven/core release revoke <rootHash>   haven.unrelease (verifiers then treat that build as bad)
 //   pnpm --filter @haven/core release rebuild <rootHash>  rebuild yourself first; posts haven.rebuild {matched} from your own key
 //
 // Env (repo-root .env, then apps/api/.env): SEPOLIA_RPC_URL, DEPLOYER_PRIVATE_KEY (owns haven.eth), RELEASE_PRIVATE_KEY
