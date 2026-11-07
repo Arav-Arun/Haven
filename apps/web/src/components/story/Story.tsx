@@ -921,13 +921,23 @@ export function Story() {
   );
 }
 
-/** The site's floating nav pill, here from the start. */
+/** On the sky at the top of the page; a floating white pill once you scroll past the first screen. */
 function StoryNav({ cta }: { cta: { href: string; label: string } }) {
+  const [floating, setFloating] = useState(false);
+  useEffect(() => {
+    const on = () => setFloating(window.scrollY > 120);
+    on();
+    window.addEventListener("scroll", on, { passive: true });
+    return () => window.removeEventListener("scroll", on);
+  }, []);
   return (
     <div className="pointer-events-none fixed inset-x-0 top-0 z-50 px-3 pt-3 sm:px-6 sm:pt-5">
-      <header data-floating="true" className="nav-bar pointer-events-auto mx-auto flex max-w-5xl items-center justify-between gap-4 rounded-full px-4 py-2.5 sm:px-5">
+      <header
+        data-floating={floating}
+        className={`nav-bar pointer-events-auto mx-auto flex items-center justify-between gap-4 rounded-full px-4 py-2.5 sm:px-5 ${floating ? "max-w-5xl" : "max-w-[calc(100%-1rem)]"}`}
+      >
         <Link href="/" aria-label="Haven home">
-          <HavenLogo tone="dark" size={32} line />
+          <HavenLogo tone={floating ? "dark" : "light"} size={32} line />
         </Link>
         <nav aria-label="Pages" className="hidden md:block">
           <ul className="flex items-center gap-1">
@@ -940,14 +950,17 @@ function StoryNav({ cta }: { cta: { href: string; label: string } }) {
               ] as const
             ).map(([label, href]) => (
               <li key={href}>
-                <Link href={href} className="fx inline-flex rounded-full px-3.5 py-2 text-[15px] text-[#0d1b33]/70 [--fx-fill:#1f4fd1]">
+                <Link
+                  href={href}
+                  className={`fx inline-flex rounded-full px-3.5 py-2 text-[15px] ${floating ? "text-[#0d1b33]/70 [--fx-fill:#1f4fd1]" : "text-white/85 [--fx-fill:#fff] [--fx-text:#1f4fd1]"}`}
+                >
                   <FxLabel>{label}</FxLabel>
                 </Link>
               </li>
             ))}
           </ul>
         </nav>
-        <Link href={cta.href} className="btn-action fx rounded-full px-5 py-2.5 text-[15px] font-semibold">
+        <Link href={cta.href} className={`fx rounded-full px-5 py-2.5 text-[15px] font-semibold ${floating ? "btn-action" : "btn-clay"}`}>
           <FxLabel>{cta.label}</FxLabel>
         </Link>
       </header>
