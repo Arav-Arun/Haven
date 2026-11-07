@@ -1,21 +1,37 @@
 # Why Arkiv
 
-**What users would lose with Postgres:**
-- **Expiry they can trust.** A guest's key copy and welcome note disappear at the end of their access because the
-  database itself removes them, not because our server promised to.
-- **No one to ask.** With Postgres, our server would see every query: who opens which folder, when, how often. Here,
-  reads go through Anon-RPC to a public database, isolated per room and per stealth address. There's no Haven
-  database to subpoena, breach or switch off.
-- **Writes owned by their writers.** Each file entry is created and paid for by the key that wrote it (an editor's
-  stealth address, a room key). Our server can't add, change or hide a file; the client checks every entity against
-  onchain roles itself.
-- **Anyone can audit it.** The Public view shows exactly what's stored, with explorer links. With Postgres you'd have to
-  trust our word about what we keep.
+Haven shares sensitive files without a central list of who got what. Arkiv is where that state lives instead of a
+database we run.
 
-**What we keep off Arkiv, and why:**
-- **File contents** go to Swarm: Arkiv entities hold up to 128 KiB, and files are up to 25 MB. Arkiv keeps the sealed
-  pointer.
-- **Roles and their history** live in ENSv2 on Sepolia (`DriveRegistry`), because names, resolvers and the 15-holder
-  role cap are ENS's, and other apps can ask "was this address allowed at time t?" without reading Arkiv.
-- **Keys and the seed** never leave the device.
-- **The Arkiv access key** stays on our API (`/arkiv-rpc` adds it), per Arkiv's guidance not to ship it in a browser.
+## What users would lose with Postgres
+
+- **Expiry enforced by the database, not by us.**
+  - A guest's key copy and welcome note are written with an expiry equal to the end of their access.
+  - Arkiv drops them at that block. With Postgres, users would have to trust our cleanup job.
+- **No server watching reads.**
+  - With Postgres, our server would log who opened which folder, when and how often.
+  - With Arkiv, clients read a public database through Anon-RPC, with a separate isolation key per room and per share.
+  - There is no Haven database to breach, subpoena or switch off.
+- **Writes we can't forge or hide.**
+  - Each file entry is created and paid for by the key that wrote it (an editor's stealth address, a room key).
+  - We can't add, change or hide a file. Every client checks every entity's `$creator` against the folder's roles on
+    Sepolia.
+- **Auditable storage.**
+  - The Public view lists every record stored for a folder, each linked to the Arkiv explorer.
+  - With Postgres, users would have to take our word for what we keep.
+
+## What we keep off Arkiv
+
+| Data | Where | Why |
+|---|---|---|
+| File contents | Swarm | Entities hold up to 128 KiB; files go up to 25 MB. Arkiv holds the pointer and sealed metadata |
+| Roles and role history | ENSv2 on Sepolia (`DriveRegistry`) | Permissions belong to the folder's ENS name; any app can call `wasAllowed(account, role, t)` |
+| Private keys | The user's device | Derived in the browser from one wallet signature, never sent anywhere |
+| Arkiv access key | Our API (`/arkiv-rpc`) | Arkiv's guidance is not to ship it in a browser bundle |
+
+## Verify it
+
+- Arkiv's public endpoint returns our entities with no access key. The README has a curl command and an SDK script.
+- Example file entry:
+  [`0x9277d0e0…f121de`](https://rabdi.explorer.arkiv.network/entity/0x9277d0e012d0596341591326baaea3e2c583f43b374a3baada6553daaff121de)
+  shows its creator, expiry and sealed `meta`.

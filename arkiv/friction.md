@@ -1,33 +1,58 @@
 # Friction with Arkiv
 
-Expected vs actual, with what we did about it. SDK `@arkiv-network/sdk` 1.0.1, Rabdi testnet (chain 7794095).
+SDK `@arkiv-network/sdk` 1.0.1, Rabdi testnet (chain 7794095).
 
-1. **`$createdAt` is a block number, not a time.**
-   Expected: a timestamp we could compare with onchain role history. Actual: a block number. Repro: create an entity,
-   select `$createdAt`, compare with the creating transaction's receipt (`blockNumber` matches). We added `BlockClock`,
-   which reads each block's timestamp once and caches it. A `$createdAtTime` system field would save every app a lookup
-   per entity.
+## 1. `$createdAt` is a block number, not a time
 
-2. **Anyone can write an entity that matches your query.**
-   The docs say so, which is good. But there's no built-in way to restrict a query to entities whose creator satisfies
-   a rule. Every app with shared data has to write its own validator. We check each `$creator` against our onchain
-   access history. A `where($creator in [...])` filter would cover the simple cases.
+- **Expected:** a timestamp we could compare with onchain role history.
+- **Actual:** a block number.
+- **Repro:** create an entity, select `$createdAt`, and compare it with the creating transaction's receipt. It equals
+  `blockNumber`.
+- **Workaround:** `BlockClock` reads each block's timestamp once and caches it.
+- **Ask:** a `$createdAtTime` system field, so apps don't need a lookup per entity.
 
-3. **The access key can't go in a browser bundle, but there's no read-only key.**
-   Expected: a key scoped to reads (or to one app's schemas) that could ship to clients. Actual: one key, so we run a
-   JSON-RPC pass-through on our API that adds it, with a method allowlist. That puts our server in the read path, which
-   is what we wanted to avoid. A scoped, rate-limited read key would remove it.
+## 2. Anyone can write an entity that matches your query
 
-4. **Expiry is set in blocks, and `ExpirationTime.atDate` needs care near "now".**
-   An end date only a minute or two away (our demo's access windows) can land below the minimum; we pass
-   `{ atLeast: ExpirationTime.fromMinutes(2) }`. Expected: a clear error for a too-short expiry rather than having to
-   know the floor.
+- **Expected:** a way to limit a query to entities whose creator meets a rule.
+- **Actual:** the docs are clear that anyone can write a matching entity, but there's no filter on creator, so every
+  app with shared data writes its own validator.
+- **Workaround:** we check each `$creator` against `DriveRegistry.wasAllowedMany` on Sepolia at `$createdAt`.
+- **Ask:** a `where($creator in [...])` filter for the simple cases.
 
-5. **Paging and malformed rows.**
-   Entities that don't fit a schema are skipped and counted in `skipped`, so a page can hold fewer rows than the limit
-   without being the last one. We page by offset and count `entities + skipped`. Worth a line in the paging docs.
+## 3. No read-only access key
 
-6. **tGLM for writers.**
-   Each writer key (our editors' stealth addresses, room keys) needs tGLM. We fund them from the sharer's key in the same
-   action as the grant, so funding never links a member to their own wallet. A sponsored-write option would make this
-   much simpler for apps that care about unlinkability.
+- **Expected:** a key scoped to reads, or to one app's schemas, that's safe to ship in a browser.
+- **Actual:** a single key, which must not go in a client bundle.
+- **Workaround:** a JSON-RPC pass-through on our API that adds the key and allows only read methods.
+- **Cost:** our server sits in the read path, which is what we wanted to avoid.
+- **Ask:** a scoped, rate-limited read key.
+
+## 4. Expiry near "now" needs care
+
+- **Expected:** a clear error when an expiry is too short.
+- **Actual:** an end date a minute or two away (short test shares) can fall below the minimum expiry. Expiry is set in
+  blocks, and `ExpirationTime.atDate` doesn't flag it.
+- **Workaround:** we pass `{ atLeast: ExpirationTime.fromMinutes(2) }`.
+- **Ask:** document the minimum, and reject with a named error.
+
+## 5. Paging with malformed rows
+
+- **Expected:** a page with fewer rows than the limit is the last page.
+- **Actual:** entities that don't fit the schema are skipped and counted in `skipped`, so a short page may not be the
+  last one.
+- **Workaround:** page by offset, and treat `entities.length + skipped` as the page size.
+- **Ask:** one line about this in the paging docs.
+
+## 6. Node page limit is 100, but the SDK accepts more
+
+- **Expected:** the SDK to cap or warn at the node's maximum.
+- **Actual:** `.limit(200)` fails at runtime: "limit 200 exceeds the node maximum of 100".
+- **Repro:** `select().from(schema).limit(200).fetch()` against Rabdi.
+- **Ask:** expose the maximum as a constant, or clamp it in the SDK.
+
+## 7. Every writer key needs tGLM
+
+- **Context:** our writers are one-off keys (editors' stealth addresses, room keys), each needing tGLM to write.
+- **Workaround:** the sharer funds them in the same action as the role grant, so the funding never links a member to
+  their own wallet.
+- **Ask:** sponsored writes, for apps that care about unlinkable writers.

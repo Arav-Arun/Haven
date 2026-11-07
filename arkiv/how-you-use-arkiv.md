@@ -1,31 +1,67 @@
 # How we use Arkiv
 
-**Filters.** Every screen is an indexed query: a folder's files (`eq("folder", …)`), my key copies
-(`folder` + `recipient`), this week's welcome notes (`bucket`), a link (`link`). Nothing is filtered on the device that
-Arkiv could filter, and nothing secret is indexed: the indexed columns are addresses, random ids, numbers and a namehash.
+## Filters
 
-**Edit rights.** We don't rely on Arkiv's ownership for who may write: anyone can create an entity that matches a query.
-Instead every entity is created read-only, and the client checks its `$creator` against the folder's onchain roles at
-`$createdAt` (`DriveRegistry.wasAllowed`). Users see this: planted entries never show, and the Public view counts them
-("3 records were written here by addresses without access. Haven ignores them"). Entities that managers keep alive
-are created with permissionless extension, so a manager can renew an editor's entry without being able to change it.
+Every screen is one indexed query. Nothing secret is indexed: only addresses, random IDs, numbers and a namehash.
 
-**Expiry.** It changes what users see:
-- A guest's **key copy expires at the end of their access**, so a new device can't even fetch it afterwards.
-- **Welcome notes expire** with the share, which keeps "Shared with me" fast on phones (the scan only reads live notes).
-- **Links stop working** at their end: the `haven.link` entity is gone.
-- Refresh requests expire after 30 days.
-- Everything else lives as long as Arkiv allows (about 182 days) and managers' apps renew it.
+| Screen | Query |
+|---|---|
+| Folder view | `haven.file` where `folder` = the folder's registry address |
+| Opening a folder you were given | `haven.keycopy` where `folder` and `recipient` = your stealth address |
+| Shared with me | `haven.welcome` where `bucket` = this week; each note is tried on the device |
+| Members panel | `haven.roster` where `folder` |
+| A share link | `haven.link` where `link` = the link's namehash |
+| Profile page | `haven.keylog` where `ensName`, ordered by `seq` |
 
-**Each feature, as the user sees it:** "Shared with me" is a welcome-note scan; the folder view is a validated file
-query; the members panel reads the sealed roster; the Public view lists every entity with its explorer link, owner,
-size and expiry; the receipts panel links each Arkiv transaction.
+## Who can edit each entity
 
-**Public data (add-ons).** Arkiv also holds data meant for everyone:
-- **A key directory keyed by ENS name** (`haven.keylog`): any app looks up a name's current key, and its whole history,
-  with one query, and can tell a swapped key from a real change. Sharing in Haven refuses a key that doesn't match
-  its log, and warns when a key changed since the last share. Forged entries (written about a name by anyone but its
-  controller) show on the profile page as ignored.
-- **Devices** (`haven.device`) expire after 90 days unless used, so a lost laptop drops off on its own.
-- **Website releases** (`haven.release`): the extension reads them to decide whether the page in front of it may get
-  the user's keys. Independent rebuilders post `haven.rebuild` from their own wallets; the extension counts them.
+- **Anyone can write an entity that matches our queries,** so Arkiv ownership alone doesn't decide what's valid.
+- **Every entity is created read-only.** Its attributes are exactly what its creator wrote.
+- **Validity goes by `$creator`, checked against Sepolia.** The client calls `DriveRegistry.wasAllowedMany` to see
+  whether the creator held the right role at `$createdAt`.
+- **Users see the result.** Planted entries never show up, and the Public view counts them: "3 records were written
+  here by addresses without access. Haven ignores them."
+- **Renewal without edit rights.** Entities that managers keep alive use permissionless extension, so a manager can
+  extend an editor's entry but can't change it.
+- **Public records go by signature, not creator.** Key logs, devices and anonymous-writer joins carry an EIP-712
+  signature, so our API can relay them and users need no tGLM.
+
+## When each entity expires
+
+| Entity | Expires | What the user sees |
+|---|---|---|
+| `haven.keycopy` | The member's end date | A new device can't fetch the key after access ends |
+| `haven.welcome` | The member's end date | "Shared with me" scans only live notes, which keeps it fast on phones |
+| `haven.link` | The link's end date | The link stops opening |
+| `haven.device` | 90 days, renewed while used | A lost laptop drops off the account on its own |
+| `haven.refresh` | 30 days | An unanswered key-refresh request clears itself |
+| Everything else | Arkiv's maximum (about 182 days) | Managers' clients renew folder records |
+
+## Arkiv features and where they show up
+
+- **Indexed queries:** the folder view, "Shared with me", the members panel and the profile page.
+- **`$creator` and `$createdAt`:** ignored writes in the Public view.
+- **Expiry:** access that ends, links that stop, devices that drop off.
+- **Permissionless extension:** folders that stay readable while managers renew them.
+- **Explorer links:** every record in the Public view and every Arkiv transaction in the receipts panel.
+- **Release log (`haven.release`):** the release tooling signs each build's file hashes with the release key and
+  writes them to Arkiv. No screen in the web app reads them; they're a public record to check a build against.
+
+## Live numbers (2026-11-07)
+
+| Entity | Live | Distinct `$creator`s | Expiry observed |
+|---|---|---|---|
+| `haven.keylog` | 18 | 1 (relayed) | 7,884,000 blocks (about 182 days) |
+| `haven.device` | 52 | 1 (relayed) | 3,888,000 blocks (90 days) |
+| `haven.roster` | 20 | 12 | maximum |
+| `haven.rotation` | 13 | 12 | maximum |
+| `haven.keycopy` | 15 | 12 | member's end, or maximum |
+| `haven.file` | 8 | 6 | maximum |
+| `haven.zkjoin` | 8 | 1 (relayed) | maximum |
+| `haven.release` | 12 | 1 (release key `0xBFc132fd…B50e`) | maximum |
+| `haven.welcome` | 2 | 1 | member's end |
+
+- Example entity: [`haven.file 0x9277d0e0…f121de`](https://rabdi.explorer.arkiv.network/entity/0x9277d0e012d0596341591326baaea3e2c583f43b374a3baada6553daaff121de)
+  - Read-only with permissionless extension (`creationFlags.raw = 3`)
+  - `folder` and `swarmRef` in the clear, `meta` sealed
+- The README's curl command and SDK script return it.

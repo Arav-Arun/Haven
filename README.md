@@ -160,7 +160,7 @@ What's different about this use:
     fallback; delivery with the current Bee light-node setup still needs live verification.
   - **Website hosting:** the release tooling can publish a site build to Swarm.
 
-Thirteen entity types in total, defined in [`packages/core/src/arkiv.ts`](packages/core/src/arkiv.ts).
+Fifteen entity types in total, defined in [`packages/core/src/arkiv.ts`](packages/core/src/arkiv.ts).
 
 ### Ethereum Foundation: Anon-RPC on every call, isolated per identity
 
@@ -279,30 +279,53 @@ Every transaction link is appended to `docs/evidence.md`.
 
 ### One runnable Arkiv query
 
-Every file entry of a folder, as anyone can read it:
+These run against Arkiv's public Rabdi endpoint with no access key and no Haven code (it is rate limited, so pass your
+own key from https://hub.arkiv.network/access-keys if you hit the limit).
+
+**One file entry, with curl.** A live `haven.file` entity: you'll see its creator, its expiry block, the `folder` and
+`swarmRef` attributes in the clear, and `meta` as sealed bytes.
+
+```bash
+curl -s https://rpc.rabdi.db-chain.testnet.arkiv.network -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"arkiv_getEntity","params":["0x9277d0e012d0596341591326baaea3e2c583f43b374a3baada6553daaff121de"]}'
+```
+
+Explorer: [the same entity](https://rabdi.explorer.arkiv.network/entity/0x9277d0e012d0596341591326baaea3e2c583f43b374a3baada6553daaff121de).
+Its folder is the Sepolia registry
+[`0x5Ac1BF80…5490`](https://sepolia.etherscan.io/address/0x5Ac1BF80cFC369EdAE45f4a5c4Ca6F095E365490), and its
+`swarmRef` opens as [4 MB of padded ciphertext](https://api.gateway.ethswarm.org/bytes/dec00d5f4228bae57f34c30f2f6c3bc385ebc9f5bbb8ee21f547c8032df0ad6b).
+
+**Every file entry of a folder, with the SDK** (`npm i @arkiv-network/sdk viem`, then run with `npx tsx`):
 
 ```ts
 import { createPublicClient } from "@arkiv-network/sdk";
 import { rabdi } from "@arkiv-network/sdk/chains";
 import { eq } from "@arkiv-network/sdk/query";
-import { addr } from "@arkiv-network/sdk/schema";
-import { FileSchema } from "@haven/core";
+import { addr, bytes, defineSchema, str, u64 } from "@arkiv-network/sdk/schema";
 import { http } from "viem";
 
-const arkiv = createPublicClient({ chain: rabdi({ accessKey }), transport: http(`https://rpc.rabdi.db-chain.testnet.arkiv.network/${accessKey}`) });
-const files = await arkiv.select().from(FileSchema).where(eq("folder", addr("0x<folder registry>"))).fetch();
-// each row: folder, fileId, version, epoch, swarmRef, and meta (sealed: name, type, size and file key)
+// The same definition as FileSchema in packages/core/src/arkiv.ts
+const FileSchema = defineSchema("haven.file", {
+  folder: addr().indexed(), fileId: str().indexed(), version: u64().indexed(), epoch: u64().indexed(),
+  swarmRef: str(), meta: bytes(),
+});
+
+const arkiv = createPublicClient({ chain: rabdi({ accessKey: "" }), transport: http() });
+const page = await arkiv.select().from(FileSchema)
+  .where(eq("folder", addr("0x5Ac1BF80cFC369EdAE45f4a5c4Ca6F095E365490"))).fetch();
+console.log(page.entities.map((e) => ({ key: e.$key, creator: e.$creator, expiresAt: e.$expiresAt, swarmRef: e.swarmRef })));
+// meta is sealed (name, type, size and file key); only members holding that epoch's key can open it
 ```
 
-The public key log of a name, as any app can read it. To filter out forged entries, check each `sig` against the name's
-controller, as `checkKeyLog` in `@haven/core` does:
+**The public key log of a name**, as any app can read it. To filter out forged entries, check each `sig` against the
+name's controller, as `checkKeyLog` in `@haven/core` does:
 
 ```ts
 import { asc, eq } from "@arkiv-network/sdk/query";
 import { str } from "@arkiv-network/sdk/schema";
 import { KeyLogSchema } from "@haven/core";
 
-const log = await arkiv.select().from(KeyLogSchema).where(eq("ensName", str("investor.haven.eth"))).orderBy(asc("seq")).fetch();
+const log = await arkiv.select().from(KeyLogSchema).where(eq("ensName", str("founder-3k1f1.haven.eth"))).orderBy(asc("seq")).fetch();
 // each row: ensName, seq, kind, spendingPublicKey, devicePublicKey, prevEntryKey, sig (EIP-712)
 ```
 
@@ -310,12 +333,12 @@ const log = await arkiv.select().from(KeyLogSchema).where(eq("ensName", str("inv
 
 | Who | Writes | Address |
 |---|---|---|
-| Relayer (API) | Sepolia: names, room registries, gas drips. Arkiv: tGLM drips, and the `haven.keylog` / `haven.device` entries users signed | From `RELAYER_PRIVATE_KEY`; shown at `GET /config` |
-| Deployer | Sepolia: the implementation, `haven.eth`, `rooms.haven.eth` | From `DEPLOYER_PRIVATE_KEY` |
+| Relayer (API) | Sepolia: names, room registries, gas drips. Arkiv: tGLM drips, and the `haven.keylog`, `haven.device` and `haven.zkjoin` entries users signed | [`0xc09b72D5DceF2eE9716b91CEfb14Bd06D2856969`](https://rabdi.explorer.arkiv.network/address/0xc09b72D5DceF2eE9716b91CEfb14Bd06D2856969) (also at [`GET /config`](https://havenethglobal-api.fly.dev/config)) |
+| Deployer | Sepolia: the implementation, `haven.eth`, `rooms.haven.eth` | [`0x03E0eab0E4AeA87F9bff8CA2923ab748D820Da9c`](https://sepolia.etherscan.io/address/0x03E0eab0E4AeA87F9bff8CA2923ab748D820Da9c) |
+| Release key R | Arkiv: `haven.release`, `haven.unrelease` | [`0xBFc132fda5A9119dCE4C9b5bb5470255A586B50e`](https://rabdi.explorer.arkiv.network/address/0xBFc132fda5A9119dCE4C9b5bb5470255A586B50e) |
 | Each user's drive key K | Their own folders' entities | Derived on the device |
 | Each room's key K_room | That room's entities | Derived on the device; not linked to K |
 | Each member's stealth address | Their file entries | Derived per share |
-| Release key R | Arkiv: `haven.release`, `haven.unrelease` | From `RELEASE_PRIVATE_KEY` |
 | Any rebuilder | Arkiv: `haven.rebuild` | Their own key |
 
 ---

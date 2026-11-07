@@ -1,23 +1,53 @@
 # Reach
 
-**Who it's for.** Anyone who shares sensitive files with people outside their organisation and doesn't want the
-platform, or the public, to learn who got them:
-- founders sending a data room to investors (the demo);
-- lawyers and their clients exchanging drafts;
-- journalists receiving documents from sources;
-- DAOs sharing grant applications or security reports with reviewers.
+## Who it's for
 
-**Would they use it?** The two things they get here and nowhere else: members no one else can identify, and access that
-ends on its own, with new files locking automatically. The cost is learning one new step: an ENS name, which Haven
-gives for free (`you.haven.eth`) with no gas.
+People who share sensitive files with outsiders and don't want the platform, or the public, to learn who got them:
 
-**Can they try it today?** Yes, on testnets: the website (with "Try it", no wallet needed), the installable phone app
-and the Chrome extension. Sign-in is one wallet signature; there's no app to install and no gas to buy.
+- Founders sending a data room to investors
+- Lawyers exchanging drafts with clients
+- Journalists receiving documents from sources
+- DAOs sharing grant applications or security reports with reviewers
 
-**Useful beyond Haven.** The public key directory (`haven.keylog`) is a standalone piece: any chat, email or
-file app that wants to encrypt to an ENS name can read a name's key and its signed history with one Arkiv query, no
-API key from us and no Haven code (README, "One runnable Arkiv query"). The release log does the same for "is this
-the published build of this website".
+## Why they would use it
 
-**Will we keep building?** Yes. Next: passkey sign-in (no wallet at all), groups with automatic key refresh, a Firefox
-build, and moving to mainnet once ENSv2 launches there.
+- **Members nobody else can identify.** Each share goes to a fresh stealth address, not the recipient's ENS name.
+- **Access that ends on its own.** Roles expire on Sepolia, key copies expire on Arkiv, and files added later stay
+  locked for the expired member.
+- **One new step.** An ENS name, which Haven gives away free (`you.haven.eth`) with no gas.
+
+## Try it today (testnets)
+
+- Website: [havenethglobal.xyz](https://havenethglobal.xyz), signing in with a wallet
+- No wallet: [havenethglobal.xyz/try](https://havenethglobal.xyz/try/) creates two fresh identities in one tab
+- Phone: Settings → Install the app. Android also gets "Share to Haven" in the system share sheet
+- Cost to the user: one signature. Names are sponsored, and viewers send no transactions
+
+## Use so far
+
+Live entities on Arkiv on 2026-11-07, from our own and testers' runs at the event. Expired entities no longer appear.
+
+| Entity | Count | Distinct writers |
+|---|---|---|
+| Key log entries (`haven.keylog`) | 18 | relayed, signed by each name |
+| Registered devices (`haven.device`) | 52 | relayed, signed by each name |
+| Folder rosters (`haven.roster`) | 20 | 12 folder keys |
+| Key schedules (`haven.rotation`) | 13 | 12 folder keys |
+| Key copies (`haven.keycopy`) | 15 | 12 |
+| Sealed file entries (`haven.file`) | 8 | 6 |
+| Anonymous-writer joins (`haven.zkjoin`) | 8 | relayed, signed by each member |
+
+The README's queries return these rows.
+
+## Useful beyond Haven
+
+- **ENS key directory (`haven.keylog`).** Any chat, mail or file app that wants to encrypt to an ENS name can read
+  that name's key and its signed history with one Arkiv query. No API key from us and no Haven code.
+- **Release log (`haven.release`).** A public, signed record of each website build's file hashes, which anyone can
+  check a build against.
+
+## After Mumbai
+
+- Passkey sign-in, so no wallet is needed
+- Automatic key refresh when a group changes
+- Move names and roles to Ethereum mainnet, where ENSv2 is now live
