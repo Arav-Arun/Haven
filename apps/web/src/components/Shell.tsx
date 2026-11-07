@@ -54,12 +54,14 @@ function SignOutButton() {
   );
 }
 
-/** Back, at the top of every app page. A folder (?f=) draws its own, which goes to its parent folder. */
+/** Back, at the top of every app page. A folder in the drive (/drive?f=) draws its own, which goes to its parent. */
 function ShellBack() {
   const path = usePathname();
-  const inFolder = useSearchParams().has("f");
-  if (inFolder) return null;
-  return <BackButton fallback={path.startsWith("/drive") ? "/" : "/drive"} className="mb-4" />;
+  const folder = useSearchParams().get("f");
+  if (folder && path.startsWith("/drive")) return null;
+  // Opened on its own: a folder's public view goes back to that folder, the drive to home, anything else to the drive.
+  const fallback = folder ? `/drive?f=${folder}` : path.startsWith("/drive") ? "/" : "/drive";
+  return <BackButton fallback={fallback} className="mb-4" />;
 }
 
 /** Shown on every screen while a "Try it" persona is active, so no one mistakes whose keys are in use. */
