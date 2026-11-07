@@ -237,6 +237,12 @@ const OPS_PER_TX = 16;
 
 const now = () => Math.floor(Date.now() / 1000);
 const normName = (name: string) => normalize(name.trim().toLowerCase());
+/** The gas a key needs before sharing with `people` people as `role`: its own fees, plus ETH for each new manager. */
+const shareGas = (role: Role, people: number) => ({
+  sepolia: true,
+  arkiv: true,
+  minEth: MIN_ETH + (role === "manager" ? BigInt(people) * MANAGER_ETH : 0n),
+});
 
 /** "Chrome on macOS": a rough, local-only label for this device (sealed before it's stored). */
 function deviceLabel(): string {
@@ -1038,7 +1044,8 @@ class Client implements HavenClient {
     const room = parentHolding?.source === "room" ? parentHolding : null;
     return this.receipts.run(prefix === "g" ? `New group "${displayName}"` : `New folder "${displayName}"`, async (step) => {
       const k: Holding = { folder: parentRegistry, key: keys.driveKey, address: keys.driveAddress, seal: new Uint8Array(32), source: "own" };
-      await this.ensureGas(room ? { ...room, folder: parentRegistry } : { ...k, folder: this.driveRoot! }, { sepolia: true, arkiv: true }, step);
+      const payer = room ? { ...room, folder: parentRegistry } : { ...k, folder: this.driveRoot! };
+      await this.ensureGas(payer, { sepolia: true, arkiv: true }, step);
       const label = randomLabel(prefix);
       const { registry } = await ensCreateFolder(
         this.sepoliaWriter(room?.key ?? keys.driveKey, step),
@@ -1068,6 +1075,8 @@ class Client implements HavenClient {
       );
       this.childCache.delete(lower(parentRegistry));
       if (inherit) await this.syncInherited(parentRegistry, registry, step);
+      // Gas for the first share from this folder, asked for now rather than when that share starts.
+      this.topUpLater(payer);
       return this.freshFolder(registry, ensName, displayName, parent === "root" ? null : parentRegistry, inherit);
     });
   }
@@ -1599,25 +1608,36 @@ class Client implements HavenClient {
     if (opts.until !== null && opts.until <= now()) throw new DriveError("EXPIRED", "That end date has passed.");
     if (isAddress(recipient)) return this.shareWithGroup(f, getAddress(recipient), opts);
     const name = normName(recipient);
-    return this.receipts.run(`Share with ${name}`, async (step) => {
+    const after: { h?: Holding; group?: boolean } = {};
+    const member = await this.receipts.run(`Share with ${name}`, async (step) => {
       const h = await this.holding(f);
+      after.h = h;
+      // Gas is checked (and, if short, asked for) while the folder and the recipient's key are read, not after.
+      const gas = this.ensureGas(h, shareGas(opts.role, 1), step);
+      gas.catch(() => undefined); // awaited in addMembers; this only keeps an early failure from being reported as unhandled
       const fk = await this.readFolder(f, h, step);
       const current = await this.latestRoster(f, fk, h);
       if (!current) throw new DriveError("NOT_AUTHORIZED", "Only managers can share this folder.");
+      after.group = kindOf(fk.info?.e ?? h.ensName ?? "") === "group";
       const P = await this.requireTrustedKey(name, step, h.address);
-      const { added, rosterKey } = await this.addMembers(f, h, fk, current, [{ name, key: P }], opts, step);
+      const { added, rosterKey } = await this.addMembers(f, h, fk, current, [{ name, key: P }], opts, step, undefined, gas);
       await this.keyMemory.remember(name, P, now());
       if (rosterKey) await this.ring(h, fk, { type: "member", arkivKey: rosterKey }, step);
       await this.propagate(f, step);
       const m = added[0]!;
-      return { address: m.address, label: name, role: opts.role, until: opts.until, via: "direct", hiddenFromMembers: opts.hideFromMembers, needsGas: false };
+      return { address: m.address, label: name, role: opts.role, until: opts.until, via: "direct", hiddenFromMembers: opts.hideFromMembers, needsGas: false } satisfies Member;
     });
+    if (after.h) this.topUpLater(after.h);
+    // Someone joined a group: the folders shared with that group give them access now, not at the next manual sync.
+    if (after.group) this.syncGroupFollowers(f);
+    return member;
   }
 
   /**
    * Adds people to a folder: per person a fresh stealth address, the onchain grant, gas for writers, then welcome notes,
    * key copies and the new roster on Arkiv (at most OPS_PER_TX creates per transaction; the roster goes last).
-   * `rosterEdit` changes the roster that gets written (e.g. adds a subtree rule).
+   * `rosterEdit` changes the roster that gets written (e.g. adds a subtree rule). `gas`: a gas check the caller already
+   * started (with `shareGas`), so it ran while the folder was being read.
    */
   private async addMembers(
     f: Address,
@@ -1628,6 +1648,7 @@ class Client implements HavenClient {
     opts: ShareOptions,
     step: StepSink,
     rosterEdit?: (r: Roster) => Roster,
+    gas?: Promise<void>,
   ): Promise<{ added: RosterMember[]; rosterKey: Hex | null }> {
     if (fk.reading.refreshOpen) throw new DriveError("REFRESH_PENDING");
     if (opts.until !== null && opts.until <= now()) throw new DriveError("EXPIRED", "That end date has passed.");
@@ -1637,8 +1658,9 @@ class Client implements HavenClient {
     const head = chainHead(fsCopy.key);
     const ops: CreateOp[] = [];
     const added: RosterMember[] = [];
-    const newManagers = opts.role === "manager" ? BigInt(people.length) : 0n;
-    if (people.length) await this.ensureGas(h, { sepolia: true, arkiv: true, minEth: MIN_ETH + newManagers * MANAGER_ETH }, step);
+    if (people.length) await (gas ?? this.ensureGas(h, shareGas(opts.role, people.length), step));
+    // A new manager's ETH is waited for at the end, together with the Arkiv writes, instead of before the next step.
+    const managerGas: Promise<void>[] = [];
     for (const p of people) {
       const welcome = await createWelcome({ recipientSpendingPublicKey: p.key, folder: f });
       const S = welcome.stealthAddress;
@@ -1653,8 +1675,11 @@ class Client implements HavenClient {
       if (opts.role === "manager") {
         const w = this.sepoliaWriter(h.key, step, h.address);
         const hash = await w.serialize!(() => w.wallet.sendTransaction({ account: w.wallet.account, chain: sepolia, to: S, value: MANAGER_ETH }));
-        await w.public.waitForTransactionReceipt({ hash });
-        step({ kind: "sepolia-tx", label: "Gas for the new manager (Sepolia ETH)", hash, explorerUrl: `${EXPLORERS.sepolia}/tx/${hash}`, ok: true });
+        const landed = w.public.waitForTransactionReceipt({ hash }).then(() => {
+          step({ kind: "sepolia-tx", label: "Gas for the new manager (Sepolia ETH)", hash, explorerUrl: `${EXPLORERS.sepolia}/tx/${hash}`, ok: true });
+        });
+        landed.catch(() => undefined); // awaited below; this only keeps an early failure from being reported as unhandled
+        managerGas.push(landed);
       }
       added.push({
         address: S,
@@ -1692,18 +1717,21 @@ class Client implements HavenClient {
     if (rosterEdit) roster = rosterEdit(roster);
     ops.push(rosterOp({ folder: f, version: v, ...(await sealRoster(rosterKey(fsCopy.key), f, v, roster)) }));
     let last: Hex[] = [];
-    for (let i = 0; i < ops.length; i += OPS_PER_TX) {
-      const chunk = ops.slice(i, i + OPS_PER_TX);
-      const final = i + OPS_PER_TX >= ops.length;
-      last = (
-        await writeEntities(
-          this.arkivWriter(h.key, step, h.address),
-          chunk,
-          people.length === 0 ? "Roster" : final ? "Welcome notes, key copies and roster" : "Welcome notes and key copies",
-          step,
-        )
-      ).keys;
-    }
+    const write = async () => {
+      for (let i = 0; i < ops.length; i += OPS_PER_TX) {
+        const chunk = ops.slice(i, i + OPS_PER_TX);
+        const final = i + OPS_PER_TX >= ops.length;
+        last = (
+          await writeEntities(
+            this.arkivWriter(h.key, step, h.address),
+            chunk,
+            people.length === 0 ? "Roster" : final ? "Welcome notes, key copies and roster" : "Welcome notes and key copies",
+            step,
+          )
+        ).keys;
+      }
+    };
+    await Promise.all([write(), ...managerGas]);
     return { added, rosterKey: last[last.length - 1] ?? null };
   }
 
@@ -1804,17 +1832,21 @@ class Client implements HavenClient {
 
   async removeMember(folder: Address, member: Address): Promise<void> {
     const f = getAddress(folder);
+    const after: { group?: boolean } = {};
     await this.receipts.run("Remove a member", async (step) => {
       const h = await this.holding(f);
       const fk = await this.readFolder(f, h, step);
       const current = await this.latestRoster(f, fk, h);
       if (!current) throw new DriveError("NOT_AUTHORIZED", "Only managers can remove people.");
+      after.group = kindOf(fk.info?.e ?? h.ensName ?? "") === "group";
       const m = [...current.roster.managers, ...current.roster.members].find((x) => isAddressEqual(x.address, member));
       if (m?.rule === INHERITED) throw new DriveError("NOT_AUTHORIZED", "This person's access comes from the parent folder. Change it there.");
       if (m?.rule?.startsWith(GROUP_RULE)) throw new DriveError("NOT_AUTHORIZED", "This person's access comes from a group. Remove them from the group.");
       await this.removeMembers(f, h, fk, current, [getAddress(member)], step);
       await this.propagate(f, step);
     });
+    // Someone left a group: the folders shared with that group take their access away now.
+    if (after.group) this.syncGroupFollowers(f);
   }
 
   // ------------------------------------------------------------ inherited access (subfolders that follow their parent)
@@ -1881,7 +1913,9 @@ class Client implements HavenClient {
     const keys = this.requireKeys();
     let children: ChildName[];
     try {
-      children = await this.children(f, true);
+      // The cached list (up to 30 s old) is enough: a subfolder made here clears it, and a full log scan on every
+      // share or removal was a large part of the wait.
+      children = await this.children(f);
     } catch {
       return;
     }
@@ -2012,6 +2046,7 @@ class Client implements HavenClient {
         (r) => ({ ...r, subtrees: [...(r.subtrees ?? []), rule] }),
       );
       for (const x of plan.add) await this.keyMemory.remember(x.name, x.key!, now());
+      this.topUpLater(h);
       await this.markSynced(f, [parent]);
       const what = parent.startsWith(GROUP_RULE) ? "the group" : parent;
       step({ kind: "check", label: "What the chain sees", detail: `${added.length} random addresses; nothing links them to ${what}`, ok: true });
@@ -2309,10 +2344,14 @@ class Client implements HavenClient {
     const from = weekBucket(opts?.since ?? t - WELCOME_WEEKS * 7 * 86_400);
     const buckets = Array.from({ length: Math.min(weekBucket(t) - from + 1, 26) }, (_, i) => weekBucket(t) - i);
     const welcomes = await listWelcomes(this.arkiv(), buckets);
-    const valid = (await this.validator().shareRecords(welcomes.records)).valid;
     const stored = await this.storedShares();
     const known = new Set(stored.map((s) => lower(s.folder)));
-    for (const w of valid) {
+    // Opening a note is local work; checking who wrote it costs network reads. So every note is tried first, and only
+    // the ones that open (ours) are checked. The same check runs on the same notes before anything is kept, but it no
+    // longer grows with every share anyone has made.
+    const mine = new Map<string, NonNullable<Awaited<ReturnType<typeof openWelcome>>>>();
+    const candidates: typeof welcomes.records = [];
+    for (const w of welcomes.records) {
       if (known.has(lower(w.folder))) continue;
       const opened = await openWelcome({
         spendingPrivateKey: keys.spendingPrivateKey,
@@ -2320,6 +2359,13 @@ class Client implements HavenClient {
         note: { ephemeralPublicKey: w.ephemeralPub, sealedMemberKey: w.sealedMemberKey },
       });
       if (!opened) continue;
+      mine.set(lower(w.key), opened);
+      candidates.push(w);
+    }
+    const valid = candidates.length ? (await this.validator().shareRecords(candidates)).valid : [];
+    for (const w of valid) {
+      const opened = mine.get(lower(w.key));
+      if (!opened || known.has(lower(w.folder))) continue;
       stored.push({ folder: w.folder, sk: opened.stealthPrivateKey, mk: toHex(opened.memberKey), seen: w.createdAt });
       known.add(lower(w.folder));
     }
@@ -2388,14 +2434,56 @@ class Client implements HavenClient {
     return shares.filter((s): s is IncomingShare => s !== null).sort((a, b) => b.firstSeenAt - a.firstSeenAt);
   }
 
-  async maintain(): Promise<Receipt[]> {
-    const done: Receipt[] = [];
+  /** Folders and rooms the user owns, with their subfolders, breadth first (at most 200). */
+  private async ownedFolders(): Promise<Folder[]> {
     const managed = [...(await this.listFolders("root").catch(() => [])), ...(await this.listFolders("rooms").catch(() => []))];
-    // Subfolders too (their own team and group rules), breadth first, at most 200 folders per run.
     for (let i = 0; i < managed.length && managed.length < 200; i++) {
       const kids = await this.listFolders(managed[i]!.registry).catch(() => [] as Folder[]);
       for (const k of kids) if (k.myAccess?.role === "owner" && !managed.some((m) => isAddressEqual(m.registry, k.registry))) managed.push(k);
     }
+    return managed;
+  }
+
+  /**
+   * After a group's members change: every folder the user shared with that group syncs its rule, so whoever joined
+   * gets access and whoever left loses it. Runs in the background; each sync that changes something has its own receipt.
+   */
+  private syncGroupFollowers(group: Address) {
+    const rule = lower(`${GROUP_RULE}${group}`);
+    void (async () => {
+      for (const folder of await this.ownedFolders()) {
+        try {
+          const h = await this.holding(folder.registry);
+          const current = await this.latestRoster(folder.registry, await this.readFolder(folder.registry, h), h);
+          if (!current?.roster.subtrees?.some((r) => lower(r.parent) === rule)) continue;
+          await this.syncFolder(folder.registry, null);
+        } catch (e) {
+          this.receipts.start(`Team sync: ${folder.displayName}`).finish(toDriveError(e));
+        }
+      }
+    })().catch(() => undefined);
+  }
+
+  /**
+   * After an action spends a key's gas: if what's left wouldn't cover sharing with a new manager, asks the API for more
+   * now, without waiting, so the next share doesn't wait for it. Only the owner keys of drives and rooms get drips.
+   */
+  private topUpLater(h: Holding) {
+    if (h.source === "share") return;
+    void (async () => {
+      const [eth, glm] = await Promise.all([
+        this.sepolia(undefined, h.address).getBalance({ address: h.address }),
+        this.arkiv(undefined, h.address).getBalance({ address: h.address }),
+      ]);
+      if (eth >= MIN_ETH + MANAGER_ETH && glm >= MIN_TGLM + MEMBER_TGLM) return;
+      await this.api<DripResponse>("/drip", { address: h.address, registry: h.folder });
+    })().catch(() => undefined);
+  }
+
+  async maintain(): Promise<Receipt[]> {
+    const done: Receipt[] = [];
+    // Subfolders too (their own team and group rules).
+    const managed = await this.ownedFolders();
     for (const folder of managed) {
       if (folder.inherit && folder.parent) {
         try {

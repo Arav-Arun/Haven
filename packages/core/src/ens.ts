@@ -444,7 +444,16 @@ export async function listChildren(
     });
   }
   const children = [...byLabel.values()];
-  for (const child of children) child.registry = await getSubregistry(client, registry, child.label);
+  // A few at a time: one after another, a registry with many names cost one round trip per name.
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(4, children.length) }, async () => {
+      while (next < children.length) {
+        const child = children[next++]!;
+        child.registry = await getSubregistry(client, registry, child.label);
+      }
+    }),
+  );
   return children;
 }
 

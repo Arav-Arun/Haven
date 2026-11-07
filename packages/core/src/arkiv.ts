@@ -937,31 +937,53 @@ export function listZkFiles(reader: ArkivReader, folder: Address): Promise<Page<
 
 // ---------------------------------------------------------------- time
 
+/** How many block times BlockClock.timesOf reads at once. */
+const CLOCK_READS_AT_ONCE = 4;
+
 /**
  * Arkiv's $createdAt is a BLOCK NUMBER, not a time. The validator needs the time, so this reads each block's
  * timestamp once and caches it.
  */
 export class BlockClock {
   private readonly cache = new Map<bigint, number>();
+  /** Reads in flight, so two callers asking for the same block share one request. */
+  private readonly pending = new Map<bigint, Promise<number>>();
 
   constructor(private readonly reader: Pick<ArkivReader, "getBlock">) {}
 
   async timeOf(block: bigint): Promise<number> {
     const cached = this.cache.get(block);
     if (cached !== undefined) return cached;
-    try {
-      const { timestamp } = await this.reader.getBlock({ blockNumber: block });
-      const t = Number(timestamp);
-      this.cache.set(block, t);
-      return t;
-    } catch (error) {
-      throw toDriveError(error, `time of Arkiv block ${block}`);
+    let read = this.pending.get(block);
+    if (!read) {
+      read = this.reader
+        .getBlock({ blockNumber: block })
+        .then(({ timestamp }) => {
+          const t = Number(timestamp);
+          this.cache.set(block, t);
+          return t;
+        })
+        .catch((error: unknown) => {
+          throw toDriveError(error, `time of Arkiv block ${block}`);
+        })
+        .finally(() => this.pending.delete(block));
+      this.pending.set(block, read);
     }
+    return read;
   }
 
+  /**
+   * A few blocks at a time: one after another, a page of records cost one private-network round trip per block. A
+   * small limit, because a burst of parallel reads through a mixnet is what fails.
+   */
   async timesOf(blocks: Iterable<bigint>): Promise<Map<bigint, number>> {
-    const out = new Map<bigint, number>();
-    for (const block of new Set(blocks)) out.set(block, await this.timeOf(block));
-    return out;
+    const list = [...new Set(blocks)];
+    let next = 0;
+    await Promise.all(
+      Array.from({ length: Math.min(CLOCK_READS_AT_ONCE, list.length) }, async () => {
+        while (next < list.length) await this.timeOf(list[next++]!);
+      }),
+    );
+    return new Map(list.map((block) => [block, this.cache.get(block)!]));
   }
 }
