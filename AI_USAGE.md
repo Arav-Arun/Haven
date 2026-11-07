@@ -1,25 +1,71 @@
 # How AI was used
 
-Haven was built by two people, each working with a Claude coding agent (Claude Code) on their own laptop, on
-separate branches merged later.
+We used Claude (Anthropic), mostly through **Claude Code**, its command-line coding agent, as a pair programmer
+while we built Haven. Each of us ran it on our own laptop, on our own branch, and we merged the branches as we went.
 
-**Planning (both).** The design in `docs/plan/` was written with Claude from the prize briefs and the partners' docs.
-An outside review found eight flaws (editor key leaks, stealth funding that linked members, rooms linked to owners,
-traffic not routed privately, and more). Claude rewrote the plan to fix each one; section 22 maps every finding to its
-fix. The humans chose the idea, the three partners, the name and every trade-off.
+## What was ours
 
-**Person A (Aarav Bhatia): contracts and core.** Claude wrote `DriveRegistry.sol` and its Foundry tests (unit, fuzz,
-invariant, fork tests against live Sepolia ENSv2), and the core building blocks (keys, epochs, stealth shares, Arkiv
-schemas, the validator, Swarm uploads, naming), following the plan step by step. The feasibility checks (for example,
-that ENSv2's role hooks can't be overridden) were run, and their results recorded in `docs/checks-a.md`.
+- **The idea:** private file sharing with ENS names, where nobody else learns who got access and access ends by itself.
+- **The stack:** ENSv2, Arkiv, Swarm and Anon-RPC.
+- **The architecture and every design trade-off.**
+- **Every scope decision** during the hackathon.
 
-**Person B (Arav Arun): apps, then the client and API.** Claude wrote the platform package (Anon-RPC wiring for web
-and encrypted storage), the UI package, and the website and phone app. After merging A's
-branch, at Arav's request, Claude also wrote the API (`apps/api`), `createDriveClient` and the bootstrap and
-end-to-end scripts. Results are recorded in `docs/checks-b.md`.
+## Where Claude helped
 
-**Rules the agents followed** (`CLAUDE.md`): no mocks, seeded data or fake values (every value shown is read live);
-no third-party scripts or analytics; keys never committed; addresses only from the ENS docs, never guessed.
+**Planning.** Claude helped turn our design into a step-by-step build plan (`docs/plan/`), with a "done when" check
+for each step. When a review of the plan found flaws, we decided how to fix each one, and Claude updated the plan to
+match. The flaws included editor keys that could leak, stealth funding that linked members, and rooms that could be
+tied to their owners.
 
-**What humans did:** accounts, faucets and funding, keys, deploys, testing on real phones and in Chrome, the demo
-video, and every decision about scope.
+**Contract.** Claude wrote `DriveRegistry.sol` with us, along with its Foundry tests: unit, fuzz, invariant, and fork
+tests against the live Sepolia ENSv2 contracts. It ran the feasibility checks against the live deployment and recorded
+the results in `docs/checks-a.md`. For example, it confirmed that ENSv2's role hooks can't be overridden, and found that
+the live ENSv2 is newer than the source we had pinned.
+
+**Core library** (`packages/core`):
+- key derivation from one sign-in signature;
+- epoch keys;
+- stealth shares;
+- the Arkiv schemas and the validator that checks every record against ENS roles;
+- Swarm uploads;
+- ENS naming;
+- the client the apps use.
+
+**API and apps:**
+- the Hono API on Fly.io (names, rooms, gas, uploads, and the Arkiv and Sepolia pass-throughs);
+- the Anon-RPC wiring;
+- the encrypted browser storage;
+- the UI components;
+- the Next.js website and installable phone app;
+- the bootstrap and end-to-end scripts.
+
+**Debugging and performance on the live network.** Claude measured where the time went on Sepolia and implemented the
+fixes:
+- a sign-up's three transactions and a new folder's two now land in one block;
+- one Sepolia send at a time per key, so two actions never pick the same nonce;
+- folder lists load child names in a single call, and use folder summaries that skip files;
+- drips go out in one block;
+- receipts are checked more often.
+
+Each fix was checked on a fork of live Sepolia before we merged it. Claude also tracked down a few surprises in the
+live network, such as Sepolia's higher gas prices for deploying code and creating new accounts.
+
+**Docs.** Claude drafted parts of the README (including the CROPS section), the Arkiv judging files, the architecture
+diagram and a brief for our pitch deck. We edited and corrected them.
+
+## Rules the agents worked under
+
+These are in `CLAUDE.md`:
+- **No mocks, seeded data or fake values:** every value on screen is read live from Sepolia, Arkiv or Swarm.
+- **No third-party scripts, trackers or analytics.**
+- **No keys or secrets committed.**
+- **Contract addresses only from the official ENS docs,** never guessed.
+- **Each person edits only the parts of the repo they own.**
+
+## What we did ourselves
+
+- **Review:** we read every change before merging, resolved the merges, and tested everything again ourselves.
+- **Accounts and money:** testnet accounts, faucets and funding, keys and secrets.
+- **Deploys:** the contracts on Sepolia, the API and Bee node on Fly.io, and the website.
+- **Real-world testing:** real phones, and wallets in Chrome and Brave.
+- **The demo:** every scope decision, the pitch and the demo video.
