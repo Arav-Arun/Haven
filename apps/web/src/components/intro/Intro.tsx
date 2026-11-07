@@ -145,20 +145,36 @@ export function Intro() {
     };
   }, [run, leave, finishOut]);
 
-  // A page-load animation only: moving between pages inside the app never replays it. Escape skips it.
+  // Start on the click, before the next page loads; back and forward start as the history entry changes.
   useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (linkTarget(e)) start(true);
+    };
+    // Back/forward between #sections of the same page isn't a page change.
+    const onPop = () => pathOf(location.pathname) !== pathOf(shownPath.current) && start(true);
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && leave();
+    document.addEventListener("click", onClick, true);
+    window.addEventListener("popstate", onPop);
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [leave]);
+    return () => {
+      document.removeEventListener("click", onClick, true);
+      window.removeEventListener("popstate", onPop);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [start, leave]);
 
-  // The page changed while the first cover was still up (a quick click): let it go.
+  // The page changed: it has arrived. A change nothing announced (the app moving you after creating a room) gets a
+  // cover of its own.
   useEffect(() => {
     if (shownPath.current === pathname) return;
     shownPath.current = pathname;
+    if (phaseRef.current === "gone") {
+      start(false);
+      return;
+    }
     waiting.current = false;
-    if (phaseRef.current !== "gone") finishOut();
-  }, [pathname, finishOut]);
+    if (revealed.current) finishOut();
+  }, [pathname, start, finishOut]);
 
   useEffect(() => {
     if (phase !== "leave") return;

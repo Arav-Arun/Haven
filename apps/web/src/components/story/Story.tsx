@@ -328,7 +328,7 @@ export function Story() {
       FILES.forEach(([, bytes], i) => {
         const ts = 11.65 + i * 0.35;
         const k = eo(seg(t, ts - 0.1, ts + 0.25));
-        set(`sealName${i}`, { opacity: (1 - k).toFixed(3), transform: `translateY(${(-10 * k).toFixed(1)}px)` });
+        set(`sealName${i}`, { opacity: (1 - k).toFixed(3), transform: `translateY(${(-10 * k).toFixed(1)}px)`, filter: `blur(${(3 * k).toFixed(1)}px)` });
         set(`sealCipher${i}`, { opacity: k.toFixed(3), transform: `translateY(${(10 * (1 - k)).toFixed(1)}px)` });
         op(`sealLock${i}`, k);
         set(`sealPad${i}`, { transform: `scaleX(${k.toFixed(3)})` });
@@ -406,7 +406,7 @@ export function Story() {
         const k = eo(seg(t, 20.9 + i * 0.08, 21.35 + i * 0.08));
         set(`pRow${i}`, { opacity: k.toFixed(3), transform: `translateY(${lerp(16, 0, k).toFixed(1)}px)` });
         const fz = eio(seg(t, 22.0 + i * 0.04, 22.35 + i * 0.04));
-        set(`pName${i}`, { opacity: (1 - 0.9 * fz).toFixed(3) });
+        set(`pName${i}`, { opacity: (1 - 0.9 * fz).toFixed(3), filter: `blur(${(6 * fz).toFixed(1)}px)` });
         set(`pFrost${i}`, { opacity: fz.toFixed(3), transform: `scaleX(${lerp(0.55, 1, fz).toFixed(3)})` });
         op(`pDot${i}`, eo(seg(t, 22.3, 22.5)));
       });
@@ -478,7 +478,7 @@ export function Story() {
 
     // Wheel and trackpad scrolling is smoothed by Lenis. Touch keeps the phone's own scrolling, so the loop below
     // eases toward it instead.
-    const lenis = reduce ? null : new Lenis({ autoRaf: false, lerp: 0.12 });
+    const lenis = reduce ? null : new Lenis({ autoRaf: false, lerp: 0.09 });
     let touch = false;
     const onTouch = () => (touch = true);
     const onWheel = () => (touch = false);
