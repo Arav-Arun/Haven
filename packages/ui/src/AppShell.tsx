@@ -48,6 +48,7 @@ export function AppShell({
   Link,
   status,
   account,
+  signOut,
   actions,
   children,
 }: {
@@ -55,6 +56,8 @@ export function AppShell({
   Link: LinkLike;
   status: ReactNode;
   account?: ReactNode;
+  /** A sign-out control, at the bottom right of the menu's footer, after the name and the network badge. */
+  signOut?: ReactNode;
   actions?: ReactNode;
   children: ReactNode;
 }) {
@@ -74,10 +77,11 @@ export function AppShell({
             items={nav}
             Link={Link}
             footer={
-              (account || status) && (
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white bg-white/70 px-4 py-3 text-sm">
-                  {account}
+              (account || status || signOut) && (
+                <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-white bg-white/70 px-4 py-3 text-sm">
+                  <span className="min-w-0 flex-1">{account}</span>
                   {status}
+                  {signOut}
                 </div>
               )
             }

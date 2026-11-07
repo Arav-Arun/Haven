@@ -71,14 +71,14 @@ export function Dialog({
   title,
   children,
   wide = false,
-  summon = false,
+  summon = true,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
   wide?: boolean;
-  /** Arrive out of cloud (CloudSummon) instead of just appearing. */
+  /** Arrive out of cloud (CloudSummon), as every dialog does unless this is false. */
   summon?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);

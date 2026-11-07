@@ -5,11 +5,11 @@ import Link from "next/link";
 import { NETWORKS } from "@haven/platform";
 import type { AnonStatus, PrivateNetwork, Receipt } from "@haven/types";
 import { Button, ErrorNote, shortAddress } from "@haven/ui";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { chooseNetwork, getAnon, selectedNetwork, unavailableReason } from "@/lib/anon";
 import { config } from "@/lib/config";
 import { useDrive } from "@/lib/drive";
+import { useSignOut } from "@/lib/signout";
 import { useInstall } from "@/lib/pwa";
 import { Devices, LinkName, MyKey } from "@/components/KeyDirectory";
 import { useNow } from "@haven/ui";
@@ -43,8 +43,8 @@ function Install() {
 
 /** Who is signed in, the housekeeping run, and sign-out. */
 function Account() {
-  const router = useRouter();
-  const { client, identity, setIdentity, profile } = useDrive();
+  const { client, identity, profile } = useDrive();
+  const signOut = useSignOut();
   const [ran, setRan] = useState<Receipt[] | null>(null);
   const [pending, setPending] = useState<"maintain" | "signout" | null>(null);
   const [error, setError] = useState<unknown>(null);
@@ -55,13 +55,7 @@ function Account() {
     setError(null);
     try {
       if (what === "maintain") setRan(await client.maintain());
-      else {
-        await client.signOut();
-        // The quick-start lists of this tab belong to the account that just left.
-        for (const k of Object.keys(localStorage)) if (k.startsWith("haven:view:")) localStorage.removeItem(k);
-        setIdentity(null);
-        router.push("/");
-      }
+      else await signOut();
     } catch (e) {
       setError(e);
     } finally {

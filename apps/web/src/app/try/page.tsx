@@ -112,7 +112,6 @@ export default function TryIt() {
             Two people, both played by you in this tab. Each gets a fresh key made on this device and a real name on the Sepolia
             test network. Nothing is set up in advance: you make the room, add your own files, and share them.
           </p>
-          {config.demoMode && <p className="mt-2 text-sm text-warn">Test network, 1-minute access windows.</p>}
         </div>
 
         {!mounted ? null : !founder || !investor ? (

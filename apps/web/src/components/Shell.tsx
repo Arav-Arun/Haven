@@ -5,8 +5,8 @@ import { DoorClosed, HardDrive, Inbox, ReceiptText, Settings, UsersRound } from 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
-import { config } from "@/lib/config";
 import { PERSONA, useDrive } from "@/lib/drive";
+import { useSignOut } from "@/lib/signout";
 import { NetworkBadge } from "./NetworkBadge";
 
 const NAV: Omit<NavItem, "active">[] = [
@@ -16,6 +16,42 @@ const NAV: Omit<NavItem, "active">[] = [
   { href: "/groups", label: "Groups", icon: <UsersRound size={20} aria-hidden />, primary: true },
   { href: "/settings", label: "Settings", icon: <Settings size={20} aria-hidden />, primary: true },
 ];
+
+/** Leaving: a door with an arrow into its frame, in red line art. */
+function LeaveIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M4 3.5l6 2v14l-6 2z" />
+      <path d="M13 5.5h4v13h-4" />
+      <path d="M22 12h-6.5M18.5 9l-3 3 3 3" />
+    </svg>
+  );
+}
+
+/** The small sign-out button at the bottom right of the menu, beside the name. */
+function SignOutButton() {
+  const signOut = useSignOut();
+  const [busy, setBusy] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        setBusy(true);
+        try {
+          await signOut();
+        } finally {
+          setBusy(false);
+        }
+      }}
+      disabled={busy}
+      aria-label="Sign out of this device"
+      title="Sign out of this device"
+      className="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-danger transition-colors hover:bg-danger-soft disabled:opacity-50"
+    >
+      <LeaveIcon />
+    </button>
+  );
+}
 
 /** Shown on every screen while a "Try it" persona is active, so no one mistakes whose keys are in use. */
 function PersonaBar() {
@@ -57,6 +93,7 @@ export function Shell({ children }: { children: ReactNode }) {
       Link={Link}
       status={null}
       account={who}
+      signOut={identity && <SignOutButton />}
       actions={
         <button
           onClick={() => setOpen(true)}
@@ -71,9 +108,6 @@ export function Shell({ children }: { children: ReactNode }) {
         </button>
       }
     >
-      {config.demoMode && (
-        <p className="mb-4 rounded-2xl border border-white/80 bg-white/60 px-4 py-2.5 text-sm text-muted backdrop-blur">Test network, 1-minute access windows.</p>
-      )}
       <PersonaBar />
       {children}
       <ReceiptsDrawer
