@@ -39,18 +39,35 @@ export interface CreateAnonFetchOptions {
 }
 
 /** A JSON-RPC provider over plain fetch. Used only to read the specifier contract. */
+/** EIP-1193 over plain fetch. `url` may list several endpoints, comma-separated: a rationed or failing one is skipped. */
 export function jsonRpcProvider(url: string) {
   let id = 0;
+  const urls = url
+    .split(",")
+    .map((u) => u.trim())
+    .filter(Boolean);
   return {
     async request({ method, params }: { method: string; params?: unknown[] }): Promise<unknown> {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ jsonrpc: "2.0", id: ++id, method, params: params ?? [] }),
-      });
-      const body = (await res.json()) as { result?: unknown; error?: { message?: string } };
-      if (body.error) throw new Error(body.error.message ?? "RPC error");
-      return body.result;
+      let last: unknown = null;
+      for (const u of urls) {
+        try {
+          const res = await fetch(u, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ jsonrpc: "2.0", id: ++id, method, params: params ?? [] }),
+          });
+          const body = (await res.json().catch(() => ({ error: { message: `HTTP ${res.status}` } }))) as { result?: unknown; error?: { message?: string } };
+          if (body.error) {
+            last = new Error(body.error.message ?? "RPC error");
+            if (!res.ok || /rate limit|limit exceeded|usage limit|too many|HTTP 5/i.test(body.error.message ?? "")) continue;
+            throw last;
+          }
+          return body.result;
+        } catch (e) {
+          last = e;
+        }
+      }
+      throw last ?? new Error("no RPC endpoint configured");
     },
   };
 }

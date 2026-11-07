@@ -116,6 +116,8 @@ import { sepolia } from "viem/chains";
 
 export interface ApiEnv {
   SEPOLIA_RPC_URL: string;
+  /** Optional: providers for eth_getLogs (comma-separated), when SEPOLIA_RPC_URL caps their block range. */
+  SEPOLIA_LOGS_RPC_URL: string;
   RELAYER_PRIVATE_KEY: Hex;
   ARKIV_RPC_URL: string;
   ARKIV_ACCESS_KEY: string;
@@ -140,6 +142,7 @@ export function readEnv(source: Record<string, string | undefined>): ApiEnv {
   if (!/^0x[0-9a-fA-F]{64}$/.test(key)) throw new Error("RELAYER_PRIVATE_KEY must be 0x + 64 hex");
   return {
     SEPOLIA_RPC_URL: need("SEPOLIA_RPC_URL"),
+    SEPOLIA_LOGS_RPC_URL: source.SEPOLIA_LOGS_RPC_URL ?? "",
     RELAYER_PRIVATE_KEY: key as Hex,
     ARKIV_RPC_URL: need("ARKIV_RPC_URL"),
     ARKIV_ACCESS_KEY: need("ARKIV_ACCESS_KEY"),
@@ -156,6 +159,31 @@ export function readEnv(source: Record<string, string | undefined>): ApiEnv {
 }
 
 /** The JSON-RPC methods the client's Arkiv reads and writes use. Anything else is refused. */
+/**
+ * What browsers may ask Sepolia through /sepolia-rpc: reads, gas estimates and sending already-signed transactions.
+ * The API's own provider answers, so a busy free public RPC can't stall everyone.
+ */
+export const SEPOLIA_METHODS = new Set([
+  "eth_chainId",
+  "net_version",
+  "eth_blockNumber",
+  "eth_getBlockByNumber",
+  "eth_getBlockByHash",
+  "eth_call",
+  "eth_getLogs",
+  "eth_getBalance",
+  "eth_getCode",
+  "eth_getStorageAt",
+  "eth_getTransactionCount",
+  "eth_getTransactionByHash",
+  "eth_getTransactionReceipt",
+  "eth_estimateGas",
+  "eth_gasPrice",
+  "eth_maxPriorityFeePerGas",
+  "eth_feeHistory",
+  "eth_sendRawTransaction",
+]);
+
 export const ARKIV_METHODS = new Set([
   "arkiv_query",
   "arkiv_getEntity",
@@ -187,6 +215,8 @@ const LIMITS = {
   uploadBytesPerKeyPerDay: 512 * 1024 * 1024,
   // Every page reads Arkiv a few dozen times through this pass-through; shared by all users.
   arkivCallsPerMinute: 3000,
+  // Browsers' Sepolia reads through /sepolia-rpc, shared by all users (the provider's own limits sit above this).
+  sepoliaCallsPerMinute: 3000,
   keylogPerNamePerDay: 30,
   keylogPerDay: 3000,
   ringsPerAddressPerHour: 240,
@@ -530,6 +560,34 @@ export function createApi(env: ApiEnv) {
       }
       pending.set(address, address);
       return c.json({ sendsAt: nextBatch });
+    } catch (e) {
+      return fail(c, e);
+    }
+  });
+
+  app.post("/sepolia-rpc", async (c) => {
+    try {
+      const body = (await c.req.json()) as { method?: string } | { method?: string }[];
+      const calls = Array.isArray(body) ? body : [body];
+      if (!counters.hit("sepolia", calls.length, LIMITS.sepoliaCallsPerMinute, 60)) throw new DriveError("RATE_LIMITED");
+      if (calls.length === 0 || calls.length > 50 || calls.some((x) => !x?.method || !SEPOLIA_METHODS.has(x.method))) {
+        throw new DriveError("NOT_AUTHORIZED", "method not allowed");
+      }
+      // Log searches go to providers without a tight block-range cap (SEPOLIA_LOGS_RPC_URL), everything else to ours.
+      const targets = calls.some((x) => x.method === "eth_getLogs") && env.SEPOLIA_LOGS_RPC_URL ? env.SEPOLIA_LOGS_RPC_URL.split(",") : [env.SEPOLIA_RPC_URL];
+      let reply: Response | null = null;
+      for (const target of targets.map((t) => t.trim()).filter(Boolean)) {
+        try {
+          const upstream = await fetch(target, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+          const text = await upstream.text();
+          reply = new Response(text, { status: upstream.status, headers: { "content-type": "application/json" } });
+          if (upstream.ok && !/rate limit|limit exceeded|usage limit|too many requests/i.test(text)) break;
+        } catch {
+          // unreachable: try the next one
+        }
+      }
+      if (!reply) throw new DriveError("NETWORK", "no Sepolia provider answered");
+      return reply;
     } catch (e) {
       return fail(c, e);
     }

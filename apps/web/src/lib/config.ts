@@ -42,7 +42,11 @@ export const config = {
   appOrigin: raw.NEXT_PUBLIC_APP_ORIGIN ?? "",
   apiUrl: raw.NEXT_PUBLIC_API_URL ?? "",
   beeUrl: raw.NEXT_PUBLIC_BEE_URL ?? "",
-  sepoliaRpcUrl: raw.NEXT_PUBLIC_SEPOLIA_RPC_URL ?? "",
+  // Our API's Sepolia pass-through first (its own provider, so a busy free RPC can't stall the app), then the
+  // configured public RPC. Comma-separated: the transports move to the next one only when one is rationed or down.
+  sepoliaRpcUrl: [raw.NEXT_PUBLIC_API_URL ? `${raw.NEXT_PUBLIC_API_URL.replace(/\/$/, "")}/sepolia-rpc` : "", raw.NEXT_PUBLIC_SEPOLIA_RPC_URL ?? ""]
+    .filter(Boolean)
+    .join(","),
   mainnetRpcUrl: raw.NEXT_PUBLIC_MAINNET_RPC_URL ?? "",
   torGateways: (raw.NEXT_PUBLIC_TOR_GATEWAYS ?? "").split(",").map((s) => s.trim()).filter(Boolean),
   arkivRpcUrl: raw.NEXT_PUBLIC_ARKIV_RPC_URL ?? "",

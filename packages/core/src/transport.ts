@@ -145,30 +145,63 @@ function batcherFor(anon: AnonFetch, route: string, url: string, send: typeof fe
   return b;
 }
 
+/** A provider saying it's overloaded or rationing us: worth trying the next endpoint. */
+const RATIONED = /rate limit|limit exceeded|usage limit|too many requests|over quota|capacity/i;
+
+/** Whether a failed call should move on to the next endpoint (rationed, failing or unreachable), not be returned. */
+function tryNext(error: unknown): boolean {
+  if (error instanceof HttpRequestError) return error.status === undefined || error.status === 429 || error.status >= 500 || RATIONED.test(error.details ?? "");
+  const message = error instanceof Error ? error.message : String(error);
+  return RATIONED.test(message);
+}
+
+/**
+ * `url` may list several endpoints, comma-separated, best first. A call moves to the next one only when an endpoint
+ * is rate-limiting, failing (5xx) or unreachable; a real answer, an error included, is returned as it is. The last
+ * endpoint that worked is tried first next time.
+ */
 export function anonTransport(options: AnonTransportOptions): CustomTransport {
   let nextId = 0;
+  const urls = options.url
+    .split(",")
+    .map((u) => u.trim())
+    .filter(Boolean);
+  let preferred = 0;
   return custom(
     {
       async request({ method, params }: { method: string; params?: unknown }) {
-        const reachable = anonCanReach(options.url);
-        const send = !reachable
-          ? globalThis.fetch.bind(globalThis)
-          : options.isolationKey
-            ? options.anon.isolated(options.isolationKey)
-            : options.anon.fetch;
-        const status = options.anon.status();
-        options.onRoute?.({
-          kind: "route",
-          label: method,
-          route: reachable && isAnonymous(status) ? "anon" : "direct",
-          network: status.network,
-          ...(options.isolationKey ? { isolationKey: options.isolationKey } : {}),
-        });
+        let last: unknown = new Error("no RPC endpoint configured");
+        for (let k = 0; k < urls.length; k++) {
+          const i = (preferred + k) % urls.length;
+          const url = urls[i]!;
+          const reachable = anonCanReach(url);
+          const send = !reachable
+            ? globalThis.fetch.bind(globalThis)
+            : options.isolationKey
+              ? options.anon.isolated(options.isolationKey)
+              : options.anon.fetch;
+          const status = options.anon.status();
+          options.onRoute?.({
+            kind: "route",
+            label: method,
+            route: reachable && isAnonymous(status) ? "anon" : "direct",
+            network: status.network,
+            ...(options.isolationKey ? { isolationKey: options.isolationKey } : {}),
+          });
 
-        const body: RpcBody = { jsonrpc: "2.0", id: ++nextId, method, params };
-        if (SENDS.has(method)) return sendOne(send, options.url, body);
-        const route = !reachable ? "direct" : `anon:${options.isolationKey ?? ""}`;
-        return batcherFor(options.anon, route, options.url, send).call(body);
+          const body: RpcBody = { jsonrpc: "2.0", id: ++nextId, method, params };
+          try {
+            const result = SENDS.has(method)
+              ? await sendOne(send, url, body)
+              : await batcherFor(options.anon, !reachable ? "direct" : `anon:${options.isolationKey ?? ""}`, url, send).call(body);
+            preferred = i;
+            return result;
+          } catch (error) {
+            last = error;
+            if (k === urls.length - 1 || !tryNext(error)) throw error;
+          }
+        }
+        throw last;
       },
     },
     { retryCount: 0 },

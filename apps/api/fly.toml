@@ -12,6 +12,8 @@ swap_size_mb = 1024
   # Keep the JavaScript heap small, so garbage is collected before the machine runs short.
   NODE_OPTIONS = "--max-old-space-size=160"
   ARKIV_RPC_URL = "https://rpc.rabdi.db-chain.testnet.arkiv.network"
+  # Log searches for browsers (/sepolia-rpc): providers without a tight eth_getLogs block-range cap, best first.
+  SEPOLIA_LOGS_RPC_URL = "https://sepolia.gateway.tenderly.co,https://ethereum-sepolia-rpc.publicnode.com"
   ROOM_POW_DIFFICULTY = "20"
   DRIP_SEPOLIA_WEI = "1000000000000000"
   DRIP_ARKIV_WEI = "20000000000000000"

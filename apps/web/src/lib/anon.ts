@@ -52,16 +52,37 @@ export function getAnon(): AnonFetch {
 /** An EIP-1193 request function that sends JSON-RPC through Anon-RPC (for viem's `custom` transport). */
 export function anonJsonRpc(url: string, isolationKey?: string) {
   let id = 0;
+  // Several endpoints, comma-separated, best first: a rationed or failing one is skipped (see config.sepoliaRpcUrl).
+  const urls = url
+    .split(",")
+    .map((u) => u.trim())
+    .filter(Boolean);
   return async ({ method, params }: { method: string; params?: unknown }) => {
     const anon = getAnon();
     const doFetch = isolationKey ? anon.isolated(isolationKey) : anon.fetch;
-    const res = await doFetch(url, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ jsonrpc: "2.0", id: ++id, method, params: params ?? [] }),
-    });
-    const body = (await res.json()) as { result?: unknown; error?: { code?: number; message?: string; data?: unknown } };
-    if (body.error) throw Object.assign(new Error(body.error.message ?? "RPC error"), body.error);
-    return body.result;
+    let last: unknown = new Error("no RPC endpoint configured");
+    for (const u of urls) {
+      try {
+        const res = await doFetch(u, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ jsonrpc: "2.0", id: ++id, method, params: params ?? [] }),
+        });
+        const body = (await res.json().catch(() => ({ error: { message: `HTTP ${res.status}` } }))) as {
+          result?: unknown;
+          error?: { code?: number; message?: string; data?: unknown };
+        };
+        if (body.error) {
+          last = Object.assign(new Error(body.error.message ?? "RPC error"), body.error);
+          if (!res.ok || /rate limit|limit exceeded|usage limit|too many|HTTP 5/i.test(body.error.message ?? "")) continue;
+          throw last;
+        }
+        return body.result;
+      } catch (e) {
+        last = e;
+        if (!(e instanceof TypeError) && !/rate limit|limit exceeded|usage limit|too many|HTTP 5/i.test(e instanceof Error ? e.message : "")) throw e;
+      }
+    }
+    throw last;
   };
 }
