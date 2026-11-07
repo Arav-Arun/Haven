@@ -55,7 +55,7 @@ export function Shell({ children }: { children: ReactNode }) {
     <AppShell
       nav={NAV.map((n) => ({ ...n, active: path === n.href || path.startsWith(`${n.href}/`) }))}
       Link={Link}
-      status={<NetworkBadge compact />}
+      status={null}
       account={who}
       actions={
         <button
