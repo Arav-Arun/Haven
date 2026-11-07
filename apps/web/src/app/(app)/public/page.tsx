@@ -27,6 +27,7 @@ function View({ folder }: { folder: Address }) {
         <PublicViewPanel
           view={view.data}
           mine={mine.data}
+          mineLoading={Boolean(identity) && mine.loading}
           now={now}
           addressUrl={(a) => `${config.explorerUrl}/address/${a}`}
         />

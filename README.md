@@ -1,55 +1,78 @@
-# Haven
+<h1 align="center">Haven</h1>
 
-**Private file sharing with ENS names, onchain permissions, Arkiv and Swarm.**
+<p align="center"><b>Share any file by ENS name. Nobody learns who.</b></p>
 
-Sharing sensitive files today means a bad trade-off:
-- **Google Drive and DocSend** see every file and every viewer.
-- **Putting access onchain is worse:** anyone can read which investors got your data room.
+<p align="center">
+Private file storage and sharing: files are encrypted on your device, shared with an ENS name through a fresh stealth
+address, and access ends on the date you pick. Built on ENSv2, Arkiv, Swarm and Anon-RPC.
+</p>
 
-Haven lets you share a folder with an ENS name that has a Haven public key:
-- **Private membership.** Each share uses a fresh stealth address instead of publishing the recipient's ENS name as a
-  room member. Managers know who they invited; timing, network traffic and other metadata can still reveal patterns.
-- **Unlinked rooms.** A room uses a random name and a separate key rather than being registered under your named drive.
-- **Time-limited access.** Onchain roles expire, and viewers and editors receive epoch keys limited by their end date.
-  Revocation and key refresh handle early removal; anyone can keep files they have already decrypted.
-- **Encrypted files.** Files are encrypted and padded in your browser, stored on **Swarm**, and indexed on **Arkiv**.
-  Sensitive metadata is sealed; addresses, timestamps, encrypted-file references and padded sizes may be public.
-- **Private-network routing.** **Anon-RPC** can route chain and database lookups through Nym, Nox or Tor. Settings and
-  receipts show the selected network and direct requests.
+<p align="center">
+<a href="https://havenethglobal.xyz"><b>Open Haven</b></a> ·
+<a href="docs/DEMO.md">Demo guide</a> ·
+<a href="docs/protocol.md">Protocol</a> ·
+<a href="LICENSE">MIT</a>
+</p>
 
-Built at **ETHGlobal Mumbai 2026** for three tracks:
-- **ENS:** Best use of ENSv2.
-- **Arkiv:** Build on Arkiv, plus the Swarm bonus.
-- **Ethereum Foundation:** Anon-RPC, and CROPS.
+---
 
-License: [MIT](LICENSE).
+## About
+
+- **Share by name:** type an ENS name, pick a role (viewer, editor, manager) and an end date. That's the whole flow.
+- **Access that ends on its own:** roles are granted with `grantRolesUntil` on an ENSv2 registry, so they expire onchain
+  without anyone sending a transaction.
+- **Private membership:** every share goes to a new Fluidkey stealth address, so the chain never lists who you shared with.
+- **Unlinked rooms:** a room gets a random name under `rooms.haven.eth` and its own key, so it can't be tied to your drive.
+- **Encrypted, padded files:** files are encrypted in the browser, padded to fixed sizes and stored on Swarm. Arkiv holds
+  only sealed entries pointing at them.
+- **Private lookups:** chain and database reads go through Anon-RPC, with a separate route for each room and address.
+- **Receipts for everything:** each action lists its transactions with Etherscan and Arkiv explorer links, and flags any
+  request that had to go direct.
+- **Public view:** see exactly what anyone can read about a folder, next to what you see with your keys.
+- **Teams and groups:** share a folder with a group of ENS names, or with every subname under a name like `acme.eth`.
+- **Anonymous uploads:** once two writers have joined, Semaphore proofs let a member upload without revealing which one.
+- **Works on phones:** installable web app; on Android, "Share to Haven" from any app.
+- **Try it without a wallet:** two fresh identities in one tab, each with a real name on Sepolia.
+
+> [!NOTE]
+> Haven runs on test networks: **Sepolia** (ENSv2), **Arkiv's Rabdi testnet** and **Swarm**. Gas for names, rooms and
+> shares is covered by the Haven API. Nothing is mocked or pre-seeded: every value on screen is read live, and every
+> transaction links to its explorer.
+
+Built at **ETHGlobal Mumbai 2026** for: **ENS** (Best use of ENSv2) · **Arkiv** (Build on Arkiv, plus the Swarm bonus) ·
+**Ethereum Foundation** (Anon-RPC, CROPS).
+
+---
+
+## Screenshots
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/home.webp" width="100%" alt="Haven home page" /><br><sub>Home</sub></td>
+    <td width="50%"><img src="docs/screenshots/tracks.webp" width="100%" alt="How Haven uses each network" /><br><sub>One drive, four networks</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/signin.webp" width="100%" alt="Sign-in steps" /><br><sub>Sign in with a wallet, or try it without one</sub></td>
+    <td><img src="docs/screenshots/share.webp" width="100%" alt="Share dialog" /><br><sub>Share by ENS name, with a key check and an end date</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/ticket.webp" width="100%" alt="Room files and members" /><br><sub>A room: padded files and each member's ticket</sub></td>
+    <td><img src="docs/screenshots/receipts.webp" width="100%" alt="Receipts drawer" /><br><sub>Receipts: every step, private or direct, with explorer links</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/recipient.webp" width="100%" alt="Recipient opening a file" /><br><sub>The recipient opens a file, decrypted on their device</sub></td>
+    <td><img src="docs/screenshots/public.webp" width="100%" alt="Public view" /><br><sub>Public view: what anyone can see, next to what you see</sub></td>
+  </tr>
+</table>
 
 ---
 
 ## Try it
 
-| Where | How |
-|---|---|
-| Website | [Open Haven](https://havenethglobal.xyz). Sign in with a wallet, or press **Try it** with no wallet (two fresh identities in one tab) |
-| Phone | Open the website → Settings → **Install the app**. Android also gets "Share to Haven" |
-
-Everything runs on Sepolia (ENSv2), Arkiv's Rabdi testnet and Swarm. Nothing is mocked or pre-seeded: every value on
-screen is read live. The startup animation plays once per page load, not on in-app navigation; click it or press Escape
-to skip it.
-
-### Features
-
-| Feature | How it works |
-|---|---|
-| Identity and onboarding | Sign in with a supported wallet or try two demo identities. Claim a sponsored `you.haven.eth` name or link an ENSv2 name you control. The app publishes a signed public-key history and checks for unexpected key changes before sharing. |
-| Folders and rooms | Organize files in named-drive folders or create a room with its own random ENS name and key. Subfolders can inherit the parent folder's members. |
-| File workflows | Upload encrypted files, preview and download them, see versions, and download a folder as a ZIP. Authorized managers can delete files. |
-| Sharing and permissions | Share with an ENS name as a viewer, editor or manager, choose an end date, and remove access early with a key refresh. File owners can create time-limited links to individual files. |
-| Groups and teams | Create a group, add ENS names and share a folder with its members. Alternatively, share with eligible direct subnames of an ENS namespace and sync membership changes. Group views include the creator and members. |
-| Anonymous uploads | When at least two eligible writers have joined, Semaphore proofs can authorize an upload without identifying which writer made it. Until then the app uses signed uploads. Availability depends on the configured proving service. |
-| Public view and receipts | Inspect onchain roles, encrypted Arkiv records, padded Swarm sizes and ignored writes. Receipts show transaction links, progress and whether requests were private or direct. |
-| Live updates | Encrypted Swarm GSOC doorbells notify members to recheck Arkiv when configured; the client polls as a fallback. |
-| Installable web app | Install Haven on a phone; Android can also send files to Haven from the system share sheet. |
+- **Website:** [havenethglobal.xyz](https://havenethglobal.xyz). Sign in with a wallet, or press **Try it** for two
+  identities in one tab (an owner and a recipient).
+- **Phone:** open the website, then Settings → **Install the app**.
+- **Demo script:** [`docs/DEMO.md`](docs/DEMO.md) walks through every feature, track by track.
 
 ---
 

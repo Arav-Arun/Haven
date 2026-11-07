@@ -33,11 +33,14 @@ function Ext({ href, children }: { href: string; children: ReactNode }) {
 export function PublicViewPanel({
   view,
   mine,
+  mineLoading = false,
   now,
   addressUrl,
 }: {
   view: PublicView;
   mine: { members: Member[]; files: FileEntry[] } | null;
+  /** The right side is still being opened with this device's keys. */
+  mineLoading?: boolean;
   now: Timestamp;
   addressUrl: (address: string) => string;
 }) {
@@ -143,7 +146,9 @@ export function PublicViewPanel({
               </ul>
             </>
           ) : (
-            <p className="text-sm text-muted">Sign in with access to this folder to compare.</p>
+            <p className="text-sm text-muted">
+              {mineLoading ? "Opening the same records with your keys…" : "Sign in with access to this folder to compare."}
+            </p>
           )}
         </Column>
       </div>

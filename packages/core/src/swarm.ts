@@ -144,7 +144,8 @@ async function routedCall(
     return await call(route.fetch);
   } catch (error) {
     if (route.step.route !== "anon") throw error;
-    step({ kind: "route", label: `${label}: too large for the private network, sent direct`, route: "direct", network: route.step.network });
+    const why = (error instanceof Error ? error.message : String(error)).slice(0, 80);
+    step({ kind: "route", label: `${label}: the private network couldn't carry it (${why}), sent direct`, route: "direct", network: route.step.network });
     return await call(config.directFetch ?? globalThis.fetch.bind(globalThis));
   }
 }

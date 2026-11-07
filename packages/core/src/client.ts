@@ -2888,10 +2888,16 @@ class Client implements HavenClient {
         while (nextFile < reading.files.length) {
           const i = nextFile++;
           const file = reading.files[i]!;
+          const url = `${this.cfg.beeUrl.replace(/\/+$/, "")}/bytes/${file.swarmRef.slice(2)}`;
           try {
-            const res = await doFetch(`${this.cfg.beeUrl.replace(/\/+$/, "")}/bytes/${file.swarmRef.slice(2)}`, { method: "HEAD" });
-            const length = Number(res.headers.get("content-length"));
-            if (res.ok && length > 0) sizes[i] = { ref: file.swarmRef, paddedBytes: length };
+            const res = await doFetch(url, { method: "HEAD" });
+            let length = res.ok ? Number(res.headers.get("content-length")) : 0;
+            // The private network's relay can drop a HEAD reply's length: fetch the blob on the same route and measure it.
+            if (!(length > 0)) {
+              const got = await doFetch(url);
+              length = got.ok ? (await got.arrayBuffer()).byteLength : 0;
+            }
+            if (length > 0) sizes[i] = { ref: file.swarmRef, paddedBytes: length };
           } catch {
             // not reachable: leave it out rather than guess
           }
