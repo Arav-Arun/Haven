@@ -61,7 +61,7 @@ Built at **ETHGlobal Mumbai 2026** for: **ENS** (Best use of ENSv2) · **Arkiv**
   </tr>
   <tr>
     <td><img src="docs/screenshots/recipient.webp" width="100%" alt="Recipient opening a file" /><br><sub>The recipient opens a file, decrypted on their device</sub></td>
-    <td><img src="docs/screenshots/public.webp" width="100%" alt="Public view" /><br><sub>Public view: what anyone can see, next to what you see</sub></td>
+    <td><img src="docs/screenshots/shared.webp" width="100%" alt="Share confirmation" /><br><sub>Shared: on the chain they appear only as a new stealth address</sub></td>
   </tr>
 </table>
 
@@ -111,11 +111,11 @@ Built at **ETHGlobal Mumbai 2026** for: **ENS** (Best use of ENSv2) · **Arkiv**
    an epoch key limited by their end date; their onchain role expires and their Arkiv key copy leaves the query surface.
    Managers receive the folder secret, so rotate the keys when removing one. Anyone can keep files they already opened.
 
-For a team, open **Groups**, create a group, and add members by ENS name. The group's list includes its creator and
-members. Share a folder with the group to grant each eligible member access. When the group's owner changes its members,
-the app attempts to sync their access to the owner's shared folders in the background; check receipts for failures.
-Team rules can also be synced manually. Changes require a manager's client to run, so access is not removed until sync
-and key refresh complete.
+**Teams:**
+- Open **Groups**, create a group and add members by ENS name. Share a folder with the group to give each member access.
+- When the group's owner changes its members, their access to the owner's shared folders is synced in the background
+  (receipts show any failure). Team rules can also be synced by hand.
+- Removal needs a manager's client to run: access is not gone until the sync and key refresh complete.
 
 Design: [`docs/plan/HAVEN_PLAN.md`](docs/plan/HAVEN_PLAN.md). Protocol details: [`docs/protocol.md`](docs/protocol.md).
 

@@ -66,9 +66,9 @@ export function PublicViewPanel({
         <Column title="What anyone can see" about="Read from the public chains. No keys involved.">
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
             <dt className="text-muted">Name</dt>
-            <dd className="truncate">{view.ensName}</dd>
+            <dd className="truncate">{view.ensName || "Not known to this device (open it from a folder you hold)"}</dd>
             <dt className="text-muted">Owner</dt>
-            <dd>{view.ownerVisible ? "Visible from the name" : "Not visible: this is an unlinked room"}</dd>
+            <dd>{!view.ensName ? "Shown by the name, if it's in a drive" : view.ownerVisible ? "Visible from the name" : "Not visible: this is an unlinked room"}</dd>
             <dt className="text-muted">Registry</dt>
             <dd>
               <Ext href={addressUrl(view.folder)}>{shortAddress(view.folder)}</Ext>
