@@ -61,7 +61,7 @@ Built at **ETHGlobal Mumbai 2026** for: **ENS** (Best use of ENSv2) · **Arkiv**
   </tr>
   <tr>
     <td><img src="docs/screenshots/recipient.webp" width="100%" alt="Recipient opening a file" /><br><sub>The recipient opens a file, decrypted on their device</sub></td>
-    <td><img src="docs/screenshots/public.webp" width="100%" alt="Public view" /><br><sub>Public view: what anyone can see, next to what you see</sub></td>
+    <td><img src="docs/screenshots/shared.webp" width="100%" alt="Share confirmation" /><br><sub>Shared: on the chain they appear only as a new stealth address</sub></td>
   </tr>
 </table>
 
